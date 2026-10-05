@@ -34,11 +34,12 @@ const client = new Client({
 
 const wallets = new Map();
 const eventsMap = new Map();
-const birthdaysMap = new Map();
+const birthdaysMap = new Map(); // Simpan UserId -> "DD/MM"
 
 // KANAL & TETAPAN SERVER
 const VERIFY_CHANNEL_ID = ""; 
 const WALLET_LOG_ID = "";     
+const BIRTHDAY_CHANNEL_ID = ""; // Masukkan ID channel tempat ucapan birthday ingin dihantar
 const WELCOME_CHANNEL_NAME = "🤗・selamat-datang";
 const SERVER_LOGS_CHANNEL_NAME = "server-logs";
 const VERIFIED_ROLE_NAME = "Member";
@@ -70,6 +71,11 @@ client.once(Events.ClientReady, async (c) => {
   } catch (error) {
     console.error("Gagal mendaftarkan slash commands:", error);
   }
+
+  // Sistem semakan harian untuk Birthday (@user pada hari tersebut)
+  setInterval(() => {
+    checkBirthdays();
+  }, 1000 * 60 * 60); // Semak setiap 1 jam
 });
 
 function getWallet(id) {
@@ -85,6 +91,34 @@ async function sendLog(guild, channelNameOrId, payload) {
   }
   if (ch && "send" in ch) {
     await ch.send(payload);
+  }
+}
+
+// Fungsi semak hari jadi automatik
+async function checkBirthdays() {
+  const now = new Date();
+  const day = String(now.getDate()).padStart(2, '0');
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const todayFormatted = `${day}/${month}`; // Format "DD/MM"
+
+  for (const [userId, bday] of birthdaysMap.entries()) {
+    if (bday === todayFormatted) {
+      for (const [_, guild] of client.guilds.cache) {
+        const targetChannel = guild.channels.cache.get(BIRTHDAY_CHANNEL_ID) || 
+                              guild.channels.cache.find(c => c.name.includes("birthday") && c.isTextBased());
+        if (targetChannel) {
+          const bdayEmbed = new EmbedBuilder()
+            .setColor("#ffb6c1")
+            .setTitle("🎉 HAPPY BIRTHDAY! 🎂✨")
+            .setDescription(`Selamat Hari Lahir <@${userId}>! 🥳💕\n\nSemoga hari lahir anda pada hari ini diwarnai dengan seribu kebahagiaan, dimurahkan rezeki, sentiasa sihat, dan terus sukses dalam apa jua bidang yang diceburi! Terima kasih kerana menjadi sebahagian daripada komuniti **PlatoMy** yang ceria ini. 🌸✨`)
+            .setImage("https://cdn.discordapp.com/attachments/1549051773438787724/1551515791910903918/Video.gif")
+            .setTimestamp();
+
+          await targetChannel.send({ content: `🎂 Selamat Hari Lahir <@${userId}>!`, embeds: [bdayEmbed] }).catch(() => {});
+        }
+      }
+      birthdaysMap.delete(userId);
+    }
   }
 }
 
@@ -196,10 +230,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return interaction.reply({ content: "❌ Hanya Admin sahaja!", ephemeral: true });
       }
 
+      let bdayListText = "";
+      for (const [userId, date] of birthdaysMap.entries()) {
+        bdayListText += `• 🌸 **${date}** : <@${userId}>\n`;
+      }
+
       const bdayEmbed = new EmbedBuilder()
         .setColor("#ffb6c1")
         .setTitle("🎂 Birthday Corner 🎂")
-        .setDescription("💌 Ingin tarikh lahir anda disenaraikan di sini supaya kami boleh meraikannya bersama? Klik butang di bawah untuk menetapkan tarikh lahir anda! ♡\n\n✨ **Upcoming Birthdays**\n• *Tiada tarikh direkodkan lagi. Jom daftar sekarang!*");
+        .setDescription(`💌 Ingin tarikh lahir anda disenaraikan di sini supaya kami boleh meraikannya bersama? Klik butang di bawah untuk menetapkan tarikh lahir anda! ♡\n\n✨ **Upcoming Birthdays**\n${bdayListText || "• *Tiada tarikh direkodkan lagi. Jom daftar sekarang!*"}`);
 
       const bdayBtn = new ButtonBuilder()
         .setCustomId("open_birthday_modal")
