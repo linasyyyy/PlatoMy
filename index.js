@@ -49,7 +49,7 @@ const VERIFIED_ROLE_NAME = "Member";
 
 const commands = [
   new SlashCommandBuilder().setName("wallet").setDescription("Semak baki Coins dan Pips anda!"),
-  new SlashCommandBuilder().setName("setup-verify").setDescription("Hantar panel verifikasi Plato ID"),
+  new SlashCommandBuilder().setName("setup-verify").setDescription("Hantar panel sahkan Plato ID"),
   new SlashCommandBuilder()
     .setName("create-event")
     .setDescription("Cipta event komuniti baharu (Admin sahaja)")
@@ -113,8 +113,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
       const embed = new EmbedBuilder()
         .setColor("#ffb6c1")
-        .setTitle("🌸 PlatoMy Plato ID Verification")
-        .setDescription("Sila klik butang di bawah untuk verifikasi Plato ID anda!");
+        .setTitle("PlatoMy • Sahkan Plato ID ✨")
+        .setDescription("Sila klik butang di bawah untuk sahkan Plato ID anda!");
       const btn = new ButtonBuilder().setCustomId("open_verify_modal").setLabel("✨ Tekan Disini").setStyle(ButtonStyle.Primary);
       await interaction.reply({ content: "✅ Panel dihantar!", ephemeral: true });
       await interaction.channel.send({ embeds: [embed], components: [new ActionRowBuilder().addComponents(btn)] });
@@ -140,7 +140,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setDescription(`${description}\n\n📅 **Date & Time:** ${datetime}\n👥 **Players:** 0/${maxPlayers}\n🎁 **Reward:** ${reward}\n✨ **Server Points:** ${serverPoints}`)
         .setTimestamp();
 
-      const joinBtn = new ButtonBuilder().setCustomId("join_event").setLabel("🎟️️ Join Event").setStyle(ButtonStyle.Success);
+      const joinBtn = new ButtonBuilder().setCustomId("join_event").setLabel("🎟 Join Event").setStyle(ButtonStyle.Success);
       const row = new ActionRowBuilder().addComponents(joinBtn);
 
       await interaction.reply({ content: "✨ Event berjaya dicipta!", ephemeral: true });
@@ -208,7 +208,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     const reviewEmbed = new EmbedBuilder()
       .setColor("#ffb6c1")
-      .setTitle("🔍 New Plato ID Verification Request")
+      .setTitle("🔍 Permohonan Sahkan Plato ID Baru")
       .setDescription(`• **Member:** ${interaction.user}\n• **Plato ID:** \`${platoId}\`\n• **Invited by:** ${invitedBy}`)
       .setTimestamp();
 
@@ -216,13 +216,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const rejectBtn = new ButtonBuilder().setCustomId(`verify_reject_${interaction.user.id}`).setLabel("Reject").setStyle(ButtonStyle.Danger);
 
     await sendLog(interaction.guild, VERIFY_CHANNEL_NAME, { embeds: [reviewEmbed], components: [new ActionRowBuilder().addComponents(approveBtn, rejectBtn)] });
-    await interaction.editReply({ content: "✨ Permohonan verifikasi telah dihantar kepada admin!" });
+    await interaction.editReply({ content: "✨ Permohonan sahkan Plato ID telah dihantar kepada admin!" });
     return;
   }
 
   if (interaction.isButton()) {
     if (interaction.customId === "open_verify_modal") {
-      const modal = new ModalBuilder().setCustomId("ign_verify_modal").setTitle("Plato ID Verification Form");
+      const modal = new ModalBuilder().setCustomId("ign_verify_modal").setTitle("Borang Sahkan Plato ID");
       const platoIdInput = new TextInputBuilder().setCustomId("plato_id").setLabel("Plato ID").setStyle(TextInputStyle.Short).setRequired(true);
       const invitedInput = new TextInputBuilder().setCustomId("invited_by").setLabel("Invited by (Optional)").setStyle(TextInputStyle.Short).setRequired(false);
       modal.addComponents(new ActionRowBuilder().addComponents(platoIdInput), new ActionRowBuilder().addComponents(invitedInput));
@@ -276,7 +276,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const role = interaction.guild.roles.cache.find(r => r.name === VERIFIED_ROLE_NAME);
         if (role) await targetMember.roles.add(role).catch(() => {});
       }
-      const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0]).setColor("#57F287").setTitle("✅ Verification Approved");
+      const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0]).setColor("#57F287").setTitle("✅ Sahkan Diluluskan");
       await interaction.edit({ embeds: [updatedEmbed], components: [] });
       return;
     }
@@ -284,7 +284,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.customId.startsWith("verify_reject_")) {
       if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) return;
       await interaction.deferUpdate();
-      const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0]).setColor("#ED4245").setTitle("✅ Verification Rejected");
+      const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0]).setColor("#ED4245").setTitle("✅ Sahkan Ditolak");
       await interaction.edit({ embeds: [updatedEmbed], components: [] });
       return;
     }
