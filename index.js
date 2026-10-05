@@ -30,6 +30,7 @@ const eventsMap = new Map();
 const VERIFY_CHANNEL = "verification-log";
 const EVENT_LOG = "event-log";
 const WALLET_LOG = "wallet-log";
+const VERIFIED_ROLE_NAME = "Member";
 
 const commands = [
   new SlashCommandBuilder().setName("wallet").setDescription("Semak baki wallet!"),
@@ -72,7 +73,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (interaction.isChatInputCommand()) {
     if (interaction.commandName === "wallet") {
       const w = getWallet(interaction.user.id);
-      const embed = new EmbedBuilder().setColor("#ffb6c1").setTitle("💰 My Wallet").setDescription(`🪙 **Coins:** ${w.coins}\n💠 **Pips:** ${w.pips}\n✨ **Points:** ${w.serverPoints}`);
+      const embed = new EmbedBuilder()
+        .setColor("#ffb6c1")
+        .setAuthor({ name: interaction.user.username, iconURL: interaction.user.displayAvatarURL({ size: 128, dynamic: true }) })
+        .setTitle("💰 My Wallet")
+        .setDescription(`🪙 **Plato Coins:** ${w.coins.toLocaleString()}\n💠 **Pips:** ${w.pips.toLocaleString()}\n✨ **Server Points:** ${w.serverPoints.toLocaleString()}`)
+        .setTimestamp();
       await interaction.reply({ embeds: [embed], ephemeral: true });
       return;
     }
@@ -82,10 +88,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const target = interaction.options.getUser("target");
       if (action === "check") {
         const w = getWallet(target.id);
-        return interaction.reply({ content: `🔍 **${target.tag}**: Coins:${w.coins} | Pips: ${w.pips} \vert{} Points:${w.serverPoints}`, ephemeral: true });
+        const embed = new EmbedBuilder().setColor("#ffb6c1").setTitle("🔍 Wallet Balance").setDescription(`• **Member:** ${target}\n🪙 Coins: ${w.coins}\n💠 Pips: ${w.pips}\n✨ Points: ${w.serverPoints}`);
+        return interaction.reply({ embeds: [embed], ephemeral: true });
       }
       const modal = new ModalBuilder().setCustomId(`wallet_modal_${action}_${target.id}`).setTitle("Urus Wallet");
-      modal.addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId("amount_input").setLabel("Jumlah").setStyle(TextInputStyle.Short).setRequired(true)));
+      const amountInput = new TextInputBuilder().setCustomId("amount_input").setLabel("Jumlah (Amount)").setStyle(TextInputStyle.Short).setRequired(true);
+      const reasonInput = new TextInputBuilder().setCustomId("reason_input").setLabel("Sebab (Reason)").setStyle(TextInputStyle.Paragraph).setPlaceholder("Contoh: Event Reward").setRequired(false);
+      modal.addComponents(new ActionRowBuilder().addComponents(amountInput), new ActionRowBuilder().addComponents(reasonInput));
       await interaction.showModal(modal);
       return;
     }
@@ -104,13 +113,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const dt = interaction.options.getString("datetime");
       const max = interaction.options.getInteger("max_players");
       const reward = interaction.options.getString("reward");
-      const pts = interaction.options.getInteger("server_points") || 0;
 
       const embed = new EmbedBuilder().setColor("#ffb6c1").setTitle(`🎮 ${name}`).setDescription(`${desc}\n\n📅 ${dt}\n👥 Players: 0/${max}\n🎁 ${reward}`);
       const btn = new ButtonBuilder().setCustomId("join_event").setLabel("🎟 Join Event").setStyle(ButtonStyle.Success);
       await interaction.reply({ content: "✨ Event dicipta!", ephemeral: true });
       const msg = await interaction.channel.send({ embeds: [embed], components: [new ActionRowBuilder().addComponents(btn)] });
-      eventsMap.set(msg.id, { name, max, reward, pts, participants: [], ended: false });
+      eventsMap.set(msg.id, { name, max, reward, participants: [], ended: false });
       return;
     }
   }
@@ -132,17 +140,22 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await interaction.deferReply({ ephemeral: true });
       const [, , action, targetId] = interaction.customId.split("_");
       const amount = parseInt(interaction.fields.getTextInputValue("amount_input"), 10);
+      const reason = interaction.fields.getTextInputValue("reason_input") || "Tiada sebab diberikan";
       const target = await client.users.fetch(targetId);
       const w = getWallet(targetId);
       let cur = "";
 
-      if (action === "add_coins") { w.coins += amount; cur = "Coins"; }
-      else if (action === "deduct_coins") { w.coins = Math.max(0, w.coins - amount); cur = "Coins"; }
-      else if (action === "add_pips") { w.pips += amount; cur = "Pips"; }
-      else if (action === "deduct_pips") { w.pips = Math.max(0, w.pips - amount); cur = "Pips"; }
+      if (action === "add_coins") { w.coins += amount; cur = "🪙 Coins"; }
+      else if (action === "deduct_coins") { w.coins = Math.max(0, w.coins - amount); cur = "🪙 Coins"; }
+      else if (action === "add_pips") { w.pips += amount; cur = "💠 Pips"; }
+      else if (action === "deduct_pips") { w.pips = Math.max(0, w.pips - amount); cur = "💠 Pips"; }
 
       await interaction.editReply({ content: `✅ Berjaya kemaskini baki ${target.tag}!` });
-      const logEmbed = new EmbedBuilder().setColor("#ffb6c1").setTitle("📜 Wallet Log").setDescription(`• **Member:** ${target}\n• **Action:** ${action} ${amount} ${cur}\n• **Admin:** ${interaction.user}`);
+      const logEmbed = new EmbedBuilder()
+        .setColor("#ffb6c1")
+        .setTitle("📜 Wallet Log")
+        .setDescription(`• **Member:** ${target}\n• **Action:** ${action} ${amount} ${cur}\n• **Reason:** ${reason}\n• **Admin:** ${interaction.user}`)
+        .setTimestamp();
       await sendLog(interaction.guild, WALLET_LOG, logEmbed);
       return;
     }
