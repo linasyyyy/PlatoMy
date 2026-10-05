@@ -40,57 +40,29 @@ const client = new Client({
   ],
 });
 
-const levels = new Map();
 const wallets = new Map();
-const giveawaysMap = new Map();
 const eventsMap = new Map();
 
-const WELCOME_CHANNEL_NAME = "🤗・selamat-datang";
-const SERVER_LOGS_CHANNEL_NAME = "server-logs";
-const WALLET_LOG_CHANNEL_NAME = "wallet-log";
 const VERIFY_CHANNEL_NAME = "verification-log";
 const EVENT_LOG_CHANNEL_NAME = "event-log";
-
 const VERIFIED_ROLE_NAME = "Member";
-const LOGO_URL = "https://cdn.discordapp.com/attachments/1549051773438787724/1549403998686281808/IMG_5614.png";
 
 const commands = [
-  new SlashCommandBuilder().setName("rank").setDescription("Tengok level dan XP anda!"),
-  new SlashCommandBuilder().setName("leaderboard").setDescription("Tengok carta top members!"),
   new SlashCommandBuilder().setName("wallet").setDescription("Semak baki Coins dan Pips anda!"),
-  new SlashCommandBuilder()
-    .setName("admin-wallet")
-    .setDescription("Urus baki wallet ahli (Admin sahaja)")
-    .addStringOption(option =>
-      option.setName("action").setDescription("Pilih tindakan").setRequired(true).addChoices(
-        { name: "Add Coins", value: "add_coins" },
-        { name: "Deduct Coins", value: "deduct_coins" },
-        { name: "Add Pips", value: "add_pips" },
-        { name: "Deduct Pips", value: "deduct_pips" },
-        { name: "Check Balance", value: "check" }
-      )
-    )
-    .addUserOption(option => option.setName("target").setDescription("Ahli").setRequired(true)),
   new SlashCommandBuilder().setName("setup-verify").setDescription("Hantar panel verifikasi Plato ID"),
   new SlashCommandBuilder()
-    .setName("giveaway")
-    .setDescription("Cipta giveaway")
-    .addStringOption(option => option.setName("prize").setDescription("Hadiah").setRequired(true))
-    .addIntegerOption(option => option.setName("winners").setDescription("Pemenang").setRequired(true))
-    .addIntegerOption(option => option.setName("duration").setDescription("Masa (minit)").setRequired(true)),
-  new SlashCommandBuilder()
     .setName("create-event")
-    .setDescription("Cipta event")
+    .setDescription("Cipta event komuniti baharu (Admin sahaja)")
     .addStringOption(option => option.setName("name").setDescription("Nama event").setRequired(true))
-    .addStringOption(option => option.setName("description").setDescription("Penerangan").setRequired(true))
-    .addStringOption(option => option.setName("datetime").setDescription("Tarikh & Masa").setRequired(true))
-    .addIntegerOption(option => option.setName("max_players").setDescription("Had pemain").setRequired(true))
-    .addStringOption(option => option.setName("reward").setDescription("Hadiah").setRequired(true))
-    .addIntegerOption(option => option.setName("server_points").setDescription("Server Points").setRequired(false)),
+    .addStringOption(option => option.setName("description").setDescription("Penerangan event").setRequired(true))
+    .addStringOption(option => option.setName("datetime").setDescription("Tarikh & Masa (Contoh: 10 Okt, 8 PM)").setRequired(true))
+    .addIntegerOption(option => option.setName("max_players").setDescription("Had maksimum pemain").setRequired(true))
+    .addStringOption(option => option.setName("reward").setDescription("Hadiah (Contoh: 1,000 Coins)").setRequired(true))
+    .addIntegerOption(option => option.setName("server_points").setDescription("Server Points (Pilihan)").setRequired(false)),
   new SlashCommandBuilder()
     .setName("end-event")
-    .setDescription("Tamatkan event")
-    .addStringOption(option => option.setName("event_id").setDescription("ID Mesej").setRequired(true))
+    .setDescription("Tamatkan event dan umumkan pemenang")
+    .addStringOption(option => option.setName("event_id").setDescription("ID Mesej Event").setRequired(true))
     .addUserOption(option => option.setName("winner_1").setDescription("1st Place").setRequired(false))
     .addUserOption(option => option.setName("winner_2").setDescription("2nd Place").setRequired(false))
     .addUserOption(option => option.setName("winner_3").setDescription("3rd Place").setRequired(false)),
@@ -123,19 +95,6 @@ async function sendLog(guild, channelName, logPayload) {
   }
 }
 
-client.on(Events.GuildMemberAdd, async (member) => {
-  const channel = member.guild.channels.cache.find(c => c.name.includes(WELCOME_CHANNEL_NAME) && c.isTextBased());
-  if (!channel || !("send" in channel)) return;
-
-  const welcomeEmbed = new EmbedBuilder()
-    .setColor("#ffb6c1")
-    .setTitle("🌸 SELAMAT DATANG!")
-    .setDescription(`Hai ${member}! Selamat datang ke Plato MY! ♡`)
-    .setTimestamp();
-
-  await channel.send({ embeds: [welcomeEmbed] });
-});
-
 client.on(Events.InteractionCreate, async (interaction) => {
   if (interaction.isChatInputCommand()) {
     if (interaction.commandName === "wallet") {
@@ -146,8 +105,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
       });
       return;
     }
+
     if (interaction.commandName === "setup-verify") {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) return;
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        await interaction.reply({ content: "❌ Hanya Admin sahaja!", ephemeral: true });
+        return;
+      }
       const embed = new EmbedBuilder()
         .setColor("#ffb6c1")
         .setTitle("🌸 PlatoMy Plato ID Verification")
@@ -155,6 +118,85 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const btn = new ButtonBuilder().setCustomId("open_verify_modal").setLabel("✨ Tekan Disini").setStyle(ButtonStyle.Primary);
       await interaction.reply({ content: "✅ Panel dihantar!", ephemeral: true });
       await interaction.channel.send({ embeds: [embed], components: [new ActionRowBuilder().addComponents(btn)] });
+      return;
+    }
+
+    if (interaction.commandName === "create-event") {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        await interaction.reply({ content: "❌ Hanya Admin sahaja!", ephemeral: true });
+        return;
+      }
+
+      const eventName = interaction.options.getString("name");
+      const description = interaction.options.getString("description");
+      const datetime = interaction.options.getString("datetime");
+      const maxPlayers = interaction.options.getInteger("max_players");
+      const reward = interaction.options.getString("reward");
+      const serverPoints = interaction.options.getInteger("server_points") || 0;
+
+      const eventEmbed = new EmbedBuilder()
+        .setColor("#ffb6c1")
+        .setTitle(`🎮 ${eventName}`)
+        .setDescription(`${description}\n\n📅 **Date & Time:** ${datetime}\n👥 **Players:** 0/${maxPlayers}\n🎁 **Reward:** ${reward}\n✨ **Server Points:** ${serverPoints}`)
+        .setTimestamp();
+
+      const joinBtn = new ButtonBuilder().setCustomId("join_event").setLabel("🎟️️ Join Event").setStyle(ButtonStyle.Success);
+      const row = new ActionRowBuilder().addComponents(joinBtn);
+
+      await interaction.reply({ content: "✨ Event berjaya dicipta!", ephemeral: true });
+      const eventMessage = await interaction.channel.send({ embeds: [eventEmbed], components: [row] });
+
+      eventsMap.set(eventMessage.id, {
+        name: eventName,
+        maxPlayers,
+        reward,
+        serverPoints,
+        participants: [],
+        ended: false,
+      });
+      return;
+    }
+
+    if (interaction.commandName === "end-event") {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        await interaction.reply({ content: "❌ Hanya Admin sahaja!", ephemeral: true });
+        return;
+      }
+
+      const eventId = interaction.options.getString("event_id");
+      const eventData = eventsMap.get(eventId);
+
+      if (!eventData || eventData.ended) {
+        await interaction.reply({ content: "❌ Event tidak dijumpai atau telah tamat.", ephemeral: true });
+        return;
+      }
+
+      eventData.ended = true;
+      const w1 = interaction.options.getUser("winner_1");
+      const w2 = interaction.options.getUser("winner_2");
+      const w3 = interaction.options.getUser("winner_3");
+
+      const winnersList = [];
+      if (w1) winnersList.push({ user: w1, place: "1st", medal: "🥇" });
+      if (w2) winnersList.push({ user: w2, place: "2nd", medal: "🥈" });
+      if (w3) winnersList.push({ user: w3, place: "3rd", medal: "🥉" });
+
+      let resultsDesc = `🎁 **Event:** ${eventData.name}\n\n🏆 **Event Results**\n`;
+      for (const w of winnersList) {
+        resultsDesc += `${w.medal} **${w.place}** – ${w.user}\n`;
+        const wallet = getWallet(w.user.id);
+        wallet.serverPoints += eventData.serverPoints;
+
+        const logEmbed = new EmbedBuilder()
+          .setColor("#ffb6c1")
+          .setTitle("🏆 Event Reward Log")
+          .setDescription(`• **Member:** ${w.user}\n• **Event:** ${eventData.name}\n• **Result:** ${w.place} Place\n• **Reward:** ${eventData.reward}\n• **Server Points:** +${eventData.serverPoints}`)
+          .setTimestamp();
+        await sendLog(interaction.guild, EVENT_LOG_CHANNEL_NAME, logEmbed);
+      }
+
+      const resultEmbed = new EmbedBuilder().setColor("#ffb6c1").setTitle("🏆 EVENT RESULTS 🏆").setDescription(resultsDesc).setTimestamp();
+      await interaction.reply({ embeds: [resultEmbed] });
       return;
     }
   }
@@ -187,6 +229,44 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await interaction.showModal(modal);
       return;
     }
+
+    if (interaction.customId === "join_event") {
+      await interaction.deferReply({ ephemeral: true });
+      const eventData = eventsMap.get(interaction.message.id);
+
+      if (!eventData || eventData.ended) {
+        await interaction.editReply({ content: "❌ Event ini telah tamat atau tidak wujud." });
+        return;
+      }
+
+      if (eventData.participants.includes(interaction.user.id)) {
+        await interaction.editReply({ content: "⚠️ Awak sudah menyertai event ini!" });
+        return;
+      }
+
+      if (eventData.participants.length >= eventData.maxPlayers) {
+        await interaction.editReply({ content: "❌ Maaf, tempat duduk event ini telah penuh!" });
+        return;
+      }
+
+      eventData.participants.push(interaction.user.id);
+      const isFull = eventData.participants.length >= eventData.maxPlayers;
+
+      const oldEmbed = interaction.message.embeds[0];
+      const updatedEmbed = EmbedBuilder.from(oldEmbed)
+        .setDescription(oldEmbed.description.replace(/👥 \*\*Players:\*\* \d+\/\d+/, `👥 **Players:** ${eventData.participants.length}/${eventData.maxPlayers}`));
+
+      let newComponents = interaction.message.components;
+      if (isFull) {
+        const disabledBtn = new ButtonBuilder().setCustomId("full").setLabel("🔒 Event Full").setStyle(ButtonStyle.Secondary).setDisabled(true);
+        newComponents = [new ActionRowBuilder().addComponents(disabledBtn)];
+      }
+
+      await interaction.message.edit({ embeds: [updatedEmbed], components: newComponents }).catch(() => {});
+      await interaction.editReply({ content: `✅ Berjaya menyertai event! (${eventData.participants.length}/${eventData.maxPlayers})` });
+      return;
+    }
+
     if (interaction.customId.startsWith("verify_approve_")) {
       if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) return;
       await interaction.deferUpdate();
@@ -200,6 +280,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await interaction.edit({ embeds: [updatedEmbed], components: [] });
       return;
     }
+
     if (interaction.customId.startsWith("verify_reject_")) {
       if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) return;
       await interaction.deferUpdate();
