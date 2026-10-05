@@ -7,9 +7,6 @@ import {
   Routes,
   SlashCommandBuilder,
   PermissionFlagsBits,
-  ModalBuilder,
-  TextInputBuilder,
-  TextInputStyle,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
@@ -28,7 +25,6 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBit
 const wallets = new Map();
 const eventsMap = new Map();
 const VERIFY_CHANNEL = "verification-log";
-const EVENT_LOG = "event-log";
 const WALLET_LOG = "wallet-log";
 const VERIFIED_ROLE_NAME = "Member";
 
@@ -39,7 +35,9 @@ const commands = [
       { name: "Add Coins", value: "add_coins" }, { name: "Deduct Coins", value: "deduct_coins" },
       { name: "Add Pips", value: "add_pips" }, { name: "Deduct Pips", value: "deduct_pips" }, { name: "Check", value: "check" }
     ))
-    .addUserOption(opt => opt.setName("target").setDescription("Ahli").setRequired(true)),
+    .addUserOption(opt => opt.setName("target").setDescription("Ahli").setRequired(true))
+    .addIntegerOption(opt => opt.setName("amount").setDescription("Jumlah").setRequired(true))
+    .addStringOption(opt => opt.setName("reason").setDescription("Sebab/Alasan").setRequired(false)),
   new SlashCommandBuilder().setName("setup-verify").setDescription("Hantar panel sahkan Plato ID"),
   new SlashCommandBuilder().setName("create-event").setDescription("Cipta event")
     .addStringOption(opt => opt.setName("name").setDescription("Nama").setRequired(true))
@@ -47,10 +45,6 @@ const commands = [
     .addStringOption(opt => opt.setName("datetime").setDescription("Masa").setRequired(true))
     .addIntegerOption(opt => opt.setName("max_players").setDescription("Had pemain").setRequired(true))
     .addStringOption(opt => opt.setName("reward").setDescription("Hadiah").setRequired(true))
-    .addIntegerOption(opt => opt.setName("server_points").setDescription("Points").setRequired(false)),
-  new SlashCommandBuilder().setName("end-event").setDescription("Tamatkan event")
-    .addStringOption(opt => opt.setName("event_id").setDescription("ID Mesej").setRequired(true))
-    .addUserOption(opt => opt.setName("winner_1").setDescription("1st").setRequired(false))
 ].map(c => c.toJSON());
 
 client.once(Events.ClientReady, async (c) => {
@@ -84,17 +78,32 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
     if (interaction.commandName === "admin-wallet") {
       if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) return interaction.reply({ content: "❌ Admin sahaja!", ephemeral: true });
+      
       const action = interaction.options.getString("action");
       const target = interaction.options.getUser("target");
+      const amount = interaction.options.getInteger("amount") || 0;
+      const reason = interaction.options.getString("reason") || "Tiada sebab diberikan";
+      const w = getWallet(target.id);
+      let cur = "";
+
       if (action === "check") {
-        const w = getWallet(target.id);
         const embed = new EmbedBuilder().setColor("#ffb6c1").setTitle("🔍 Wallet Balance").setDescription(`• **Member:** ${target}\n🪙 Coins: ${w.coins}\n💠 Pips: ${w.pips}\n✨ Points: ${w.serverPoints}`);
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
-      const modal = new ModalBuilder().setCustomId(`wallet_modal_${action}_${target.id}`).setTitle("Urus Wallet");
-      const detailsInput = new TextInputBuilder().setCustomId("details_input").setLabel("Jumlah & Sebab (Contoh: 500 - Hadiah)").setStyle(TextInputStyle.Short).setPlaceholder("500 - Hadiah Event").setRequired(true);
-      modal.addComponents(new ActionRowBuilder().addComponents(detailsInput));
-      await interaction.showModal(modal);
+
+      if (action === "add_coins") { w.coins += amount; cur = "🪙 Coins"; }
+      else if (action === "deduct_coins") { w.coins = Math.max(0, w.coins - amount); cur = "🪙 Coins"; }
+      else if (action === "add_pips") { w.pips += amount; cur = "💠 Pips"; }
+      else if (action === "deduct_pips") { w.pips = Math.max(0, w.pips - amount); cur = "💠 Pips"; }
+
+      await interaction.reply({ content: `✅ Berjaya kemaskini baki ${target.tag}!`, ephemeral: true });
+      
+      const logEmbed = new EmbedBuilder()
+        .setColor("#ffb6c1")
+        .setTitle("📜 Wallet Log")
+        .setDescription(`• **Member:** ${target}\n• **Action:** ${action} ${amount}${cur}\n• **Reason:** ${reason}\n• **Admin:** ${interaction.user}`)
+        .setTimestamp();
+      await sendLog(interaction.guild, WALLET_LOG, logEmbed);
       return;
     }
     if (interaction.commandName === "setup-verify") {
@@ -122,52 +131,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
   }
 
-  if (interaction.isModalSubmit()) {
-    if (interaction.customId === "ign_verify_modal") {
-      await interaction.deferReply({ ephemeral: true });
-      const id = interaction.fields.getTextInputValue("plato_id");
-      const embed = new EmbedBuilder().setColor("#ffb6c1").setTitle("🔍 Permohonan Sahkan Plato ID").setDescription(`• **Member:** ${interaction.user}\n• **Plato ID:** \`${id}\``);
-      const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(`verify_approve_${interaction.user.id}`).setLabel("Approve").setStyle(ButtonStyle.Success),
-        new ButtonBuilder().setCustomId(`verify_reject_${interaction.user.id}`).setLabel("Reject").setStyle(ButtonStyle.Danger)
-      );
-      await sendLog(interaction.guild, VERIFY_CHANNEL, { embeds: [embed], components: [row] });
-      await interaction.editReply({ content: "✨ Permohonan anda akan dihantar kepada admin untuk semakan!" });
-      return;
-    }
-    if (interaction.customId.startsWith("wallet_modal_")) {
-      await interaction.deferReply({ ephemeral: true });
-      const [, , action, targetId] = interaction.customId.split("_");
-      const inputVal = interaction.fields.getTextInputValue("details_input");
-      
-      // Pecahkan input kepada jumlah dan sebab (jika ada tanda '-')
-      const parts = inputVal.split("-");
-      const amount = parseInt(parts[0].trim(), 10);
-      const reason = parts[1] ? parts[1].trim() : "Tiada sebab diberikan";
-
-      if (isNaN(amount) || amount <= 0) {
-        await interaction.editReply({ content: "❌ Sila masukkan nombor jumlah yang sah di bahagian hadapan!" });
-        return;
-      }
-
-      const target = await client.users.fetch(targetId);
-      const w = getWallet(targetId);
-      let cur = "";
-
-      if (action === "add_coins") { w.coins += amount; cur = "🪙 Coins"; }
-      else if (action === "deduct_coins") { w.coins = Math.max(0, w.coins - amount); cur = "🪙 Coins"; }
-      else if (action === "add_pips") { w.pips += amount; cur = "💠 Pips"; }
-      else if (action === "deduct_pips") { w.pips = Math.max(0, w.pips - amount); cur = "💠 Pips"; }
-
-      await interaction.editReply({ content: `✅ Berjaya kemaskini baki ${target.tag}!` });
-      const logEmbed = new EmbedBuilder()
-        .setColor("#ffb6c1")
-        .setTitle("📜 Wallet Log")
-        .setDescription(`• **Member:** ${target}\n• **Action:** ${action} ${amount} ${cur}\n• **Reason:** ${reason}\n• **Admin:** ${interaction.user}`)
-        .setTimestamp();
-      await sendLog(interaction.guild, WALLET_LOG, logEmbed);
-      return;
-    }
+  if (interaction.isModalSubmit() && interaction.customId === "ign_verify_modal") {
+    await interaction.deferReply({ ephemeral: true });
+    const id = interaction.fields.getTextInputValue("plato_id");
+    const embed = new EmbedBuilder().setColor("#ffb6c1").setTitle("🔍 Permohonan Sahkan Plato ID").setDescription(`• **Member:** ${interaction.user}\n• **Plato ID:** \`${id}\``);
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`verify_approve_${interaction.user.id}`).setLabel("Approve").setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`verify_reject_${interaction.user.id}`).setLabel("Reject").setStyle(ButtonStyle.Danger)
+    );
+    await sendLog(interaction.guild, VERIFY_CHANNEL, { embeds: [embed], components: [row] });
+    await interaction.editReply({ content: "✨ Permohonan anda akan dihantar kepada admin untuk semakan!" });
+    return;
   }
 
   if (interaction.isButton()) {
