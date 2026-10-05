@@ -46,7 +46,7 @@ const client = new Client({
 const levels = new Map();
 const wallets = new Map();
 const giveawaysMap = new Map();
-const eventsMap = new Map(); // Untuk menyimpan data event aktif
+const eventsMap = new Map();
 
 const WELCOME_CHANNEL_NAME = "🤗・selamat-datang";
 const SERVER_LOGS_CHANNEL_NAME = "server-logs";
@@ -257,43 +257,4 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const userAvatar = interaction.user.displayAvatarURL({ size: 128, dynamic: true });
       const walletEmbed = new EmbedBuilder()
         .setColor("#ffb6c1")
-        .setAuthor({ name: interaction.user.username, iconURL: userAvatar })
-        .setTitle("💰 My Wallet")
-        .setDescription(`🪙 **Plato Coins:** ${wallet.coins.toLocaleString()}\n💠 **Pips:** ${wallet.pips.toLocaleString()}\n✨ **Server Points:** ${wallet.serverPoints.toLocaleString()}`)
-        .setTimestamp();
-      await interaction.reply({ embeds: [walletEmbed] });
-      return;
-    }
-
-    if (interaction.commandName === "admin-wallet") {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        await interaction.reply({ content: "❌ Maaf, hanya Admin yang sah boleh menggunakan arahan ini!", ephemeral: true });
-        return;
-      }
-
-      const action = interaction.options.getString("action");
-      const targetUser = interaction.options.getUser("target");
-
-      if (action === "check") {
-        const wallet = getWallet(targetUser.id);
-        await interaction.reply({
-          content: `🔍 **Baki Wallet ${targetUser.tag}:**\n🪙 Coins: ${wallet.coins.toLocaleString()}\n💠 Pips: ${wallet.pips.toLocaleString()}\n✨ Points: ${wallet.serverPoints.toLocaleString()}`,
-          ephemeral: true,
-        });
-        return;
-      }
-
-      const modal = new ModalBuilder()
-        .setCustomId(`wallet_modal_${action}_${targetUser.id}`)
-        .setTitle("Manage Wallet Balance");
-
-      const amountInput = new TextInputBuilder()
-        .setCustomId("amount_input")
-        .setLabel("Jumlah (Amount)")
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder("Contoh: 500")
-        .setRequired(true);
-
-      const reasonInput = new TextInputBuilder()
-        .setCustomId("reason_input")
-        .setLabel("
+        .setAuthor({ name: interaction.user.username
