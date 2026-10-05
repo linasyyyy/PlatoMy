@@ -385,6 +385,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   if (interaction.isModalSubmit()) {
     if (interaction.customId === "ign_verify_modal") {
+      await interaction.deferReply({ ephemeral: true });
       const platoId = interaction.fields.getTextInputValue("plato_id");
       const invitedBy = interaction.fields.getTextInputValue("invited_by") || "Tiada / Sendiri";
 
@@ -407,11 +408,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const row = new ActionRowBuilder().addComponents(approveBtn, rejectBtn);
 
       await sendLog(interaction.guild, VERIFY_CHANNEL_NAME, { embeds: [reviewEmbed], components: [row] });
-      await interaction.reply({ content: "✨ Permohonan verifikasi anda telah dihantar kepada admin untuk disemak!", ephemeral: true });
+      await interaction.editReply({ content: "✨ Permohonan verifikasi anda telah dihantar kepada admin untuk disemak!" });
       return;
     }
 
     if (interaction.customId.startsWith("wallet_modal_")) {
+      await interaction.deferReply({ ephemeral: true });
       const parts = interaction.customId.split("_");
       const action = `${parts[2]}_${parts[3]}`;
       const targetUserId = parts[4];
@@ -421,7 +423,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const amount = parseInt(amountStr, 10);
 
       if (isNaN(amount) || amount <= 0) {
-        await interaction.reply({ content: "❌ Sila masukkan nombor yang sah melebihi 0!", ephemeral: true });
+        await interaction.editReply({ content: "❌ Sila masukkan nombor yang sah melebihi 0!" });
         return;
       }
 
@@ -448,7 +450,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         formattedChange = `-${amount.toLocaleString()}`;
       }
 
-      await interaction.reply({ content: `✅ Berjaya kemaskini baki untuk **${targetUser.tag}**!`, ephemeral: true });
+      await interaction.editReply({ content: `✅ Berjaya kemaskini baki untuk **${targetUser.tag}**!` });
 
       const logEmbed = new EmbedBuilder()
         .setColor("#ffb6c1")
@@ -490,29 +492,33 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
 
     if (interaction.customId === "join_giveaway") {
+      if (!interaction.deferred && !interaction.replied) {
+        await interaction.deferReply({ ephemeral: true }).catch(() => {});
+      }
       const giveawayData = giveawaysMap.get(interaction.message.id);
 
       if (!giveawayData || giveawayData.ended) {
-        await interaction.reply({ content: "❌ Giveaway ini telah tamat atau tidak wujud.", ephemeral: true });
+        await interaction.editReply({ content: "❌ Giveaway ini telah tamat atau tidak wujud." }).catch(() => {});
         return;
       }
 
       if (giveawayData.participants.includes(interaction.user.id)) {
-        await interaction.reply({ content: "⚠️ Awak sudah menyertai giveaway ini!", ephemeral: true });
+        await interaction.editReply({ content: "⚠️ Awak sudah menyertai giveaway ini!" }).catch(() => {});
         return;
       }
 
       giveawayData.participants.push(interaction.user.id);
-      await interaction.reply({ content: "✅ Berjaya menyertai giveaway! Semoga ada rezeki! 🍀", ephemeral: true });
+      await interaction.editReply({ content: "✅ Berjaya menyertai giveaway! Semoga ada rezeki! 🍀" }).catch(() => {});
       return;
     }
 
     if (interaction.customId.startsWith("verify_approve_")) {
       if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        await interaction.reply({ content: "❌ Hanya Admin sahaja boleh meluluskan permohonan ini!", ephemeral: true });
+        if (!interaction.deferred && !interaction.replied) await interaction.reply({ content: "❌ Hanya Admin sahaja boleh meluluskan permohonan ini!", ephemeral: true });
         return;
       }
 
+      await interaction.deferUpdate();
       const targetUserId = interaction.customId.replace("verify_approve_", "");
       const targetMember = await interaction.guild.members.fetch(targetUserId).catch(() => null);
 
@@ -529,16 +535,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setTitle("✅ Verification Approved")
         .addFields({ name: "Reviewed by", value: `${interaction.user}` });
 
-      await interaction.update({ embeds: [updatedEmbed], components: [] });
+      await interaction.edit({ embeds: [updatedEmbed], components: [] });
       return;
     }
 
     if (interaction.customId.startsWith("verify_reject_")) {
       if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        await interaction.reply({ content: "❌ Hanya Admin sahaja boleh menolak permohonan ini!", ephemeral: true });
+        if (!interaction.deferred && !interaction.replied) await interaction.reply({ content: "❌ Hanya Admin sahaja boleh menolak permohonan ini!", ephemeral: true });
         return;
       }
 
+      await interaction.deferUpdate();
       const targetUserId = interaction.customId.replace("verify_reject_", "");
       const targetMember = await interaction.guild.members.fetch(targetUserId).catch(() => null);
 
@@ -551,7 +558,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setTitle("✅ Verification Rejected")
         .addFields({ name: "Reviewed by", value: `${interaction.user}` });
 
-      await interaction.update({ embeds: [updatedEmbed], components: [] });
+      await interaction.edit({ embeds: [updatedEmbed], components: [] });
       return;
     }
   }
