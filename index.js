@@ -305,7 +305,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       const verifyButton = new ButtonBuilder()
         .setCustomId("open_verify_modal")
-        .setLabel("📝 Verify IGN")
+        .setLabel("✨ Tekan Disini")
         .setStyle(ButtonStyle.Primary);
 
       const row = new ActionRowBuilder().addComponents(verifyButton);
