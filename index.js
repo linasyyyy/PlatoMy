@@ -241,7 +241,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setColor("#ffb6c1")
         .setAuthor({ name: interaction.user.username, iconURL: userAvatar })
         .setTitle("💰 My Wallet")
-        .setDescription(`:PlatoCoins: **Plato Coins:** ${wallet.coins.toLocaleString()}\n:Pips: **Pips:** ${wallet.pips.toLocaleString()}\n✨ **Server Points:** ${wallet.serverPoints.toLocaleString()}`)
+        .setDescription(`🪙 **Plato Coins:** ${wallet.coins.toLocaleString()}\n💠 **Pips:** ${wallet.pips.toLocaleString()}\n✨ **Server Points:** ${wallet.serverPoints.toLocaleString()}`)
         .setTimestamp();
       await interaction.reply({ embeds: [walletEmbed] });
       return;
@@ -259,7 +259,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (action === "check") {
         const wallet = getWallet(targetUser.id);
         await interaction.reply({
-          content: `🔍 **Baki Wallet ${targetUser.tag}:**\n:PlatoCoins: Coins: ${wallet.coins.toLocaleString()}\n:Pips: Pips: ${wallet.pips.toLocaleString()}\n✨ Points: ${wallet.serverPoints.toLocaleString()}`,
+          content: `🔍 **Baki Wallet ${targetUser.tag}:**\n🪙 Coins: ${wallet.coins.toLocaleString()}\n💠 Pips: ${wallet.pips.toLocaleString()}\n✨ Points: ${wallet.serverPoints.toLocaleString()}`,
           ephemeral: true,
         });
         return;
@@ -432,19 +432,19 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       if (action === "add_coins") {
         wallet.coins += amount;
-        currencyType = ":PlatoCoins: Plato Coins";
+        currencyType = "🪙 Plato Coins";
         formattedChange = `+${amount.toLocaleString()}`;
       } else if (action === "deduct_coins") {
         wallet.coins = Math.max(0, wallet.coins - amount);
-        currencyType = ":PlatoCoins: Plato Coins";
+        currencyType = "🪙 Plato Coins";
         formattedChange = `-${amount.toLocaleString()}`;
       } else if (action === "add_pips") {
         wallet.pips += amount;
-        currencyType = ":Pips: Pips";
+        currencyType = "💠 Pips";
         formattedChange = `+${amount.toLocaleString()}`;
       } else if (action === "deduct_pips") {
         wallet.pips = Math.max(0, wallet.pips - amount);
-        currencyType = ":Pips: Pips";
+        currencyType = "💠 Pips";
         formattedChange = `-${amount.toLocaleString()}`;
       }
 
