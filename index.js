@@ -45,10 +45,31 @@ const eventsMap = new Map();
 
 const VERIFY_CHANNEL_NAME = "verification-log";
 const EVENT_LOG_CHANNEL_NAME = "event-log";
+const WALLET_LOG_CHANNEL_NAME = "wallet-log";
 const VERIFIED_ROLE_NAME = "Member";
 
 const commands = [
   new SlashCommandBuilder().setName("wallet").setDescription("Semak baki Coins dan Pips anda!"),
+  new SlashCommandBuilder()
+    .setName("admin-wallet")
+    .setDescription("Urus baki wallet ahli (Admin sahaja)")
+    .addStringOption(option =>
+      option.setName("action")
+        .setDescription("Pilih tindakan")
+        .setRequired(true)
+        .addChoices(
+          { name: "Add Coins", value: "add_coins" },
+          { name: "Deduct Coins", value: "deduct_coins" },
+          { name: "Add Pips", value: "add_pips" },
+          { name: "Deduct Pips", value: "deduct_pips" },
+          { name: "Check Balance", value: "check" }
+        )
+    )
+    .addUserOption(option =>
+      option.setName("target")
+        .setDescription("Ahli yang ingin diuruskan")
+        .setRequired(true)
+    ),
   new SlashCommandBuilder().setName("setup-verify").setDescription("Hantar panel sahkan Plato ID"),
   new SlashCommandBuilder()
     .setName("create-event")
@@ -103,6 +124,51 @@ client.on(Events.InteractionCreate, async (interaction) => {
         content: `🪙 **Plato Coins:** ${wallet.coins}\n💠 **Pips:** ${wallet.pips}\n✨ **Server Points:** ${wallet.serverPoints}`,
         ephemeral: true,
       });
+      return;
+    }
+
+    if (interaction.commandName === "admin-wallet") {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        await interaction.reply({ content: "❌ Maaf, hanya Admin yang sah boleh menggunakan arahan ini!", ephemeral: true });
+        return;
+      }
+
+      const action = interaction.options.getString("action");
+      const targetUser = interaction.options.getUser("target");
+
+      if (action === "check") {
+        const wallet = getWallet(targetUser.id);
+        await interaction.reply({
+          content: `🔍 **Baki Wallet ${targetUser.tag}:**\n🪙 Coins: ${wallet.coins.toLocaleString()}\n💠 Pips: ${wallet.pips.toLocaleString()}\n✨ Points: ${wallet.serverPoints.toLocaleString()}`,
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const modal = new ModalBuilder()
+        .setCustomId(`wallet_modal_${action}_${targetUser.id}`)
+        .setTitle("Manage Wallet Balance");
+
+      const amountInput = new TextInputBuilder()
+        .setCustomId("amount_input")
+        .setLabel("Jumlah (Amount)")
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder("Contoh: 500")
+        .setRequired(true);
+
+      const reasonInput = new TextInputBuilder()
+        .setCustomId("reason_input")
+        .setLabel("Sebab (Reason)")
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder("Contoh: Event Reward")
+        .setRequired(false);
+
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(amountInput),
+        new ActionRowBuilder().addComponents(reasonInput)
+      );
+
+      await interaction.showModal(modal);
       return;
     }
 
@@ -201,23 +267,75 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
   }
 
-  if (interaction.isModalSubmit() && interaction.customId === "ign_verify_modal") {
-    await interaction.deferReply({ ephemeral: true });
-    const platoId = interaction.fields.getTextInputValue("plato_id");
-    const invitedBy = interaction.fields.getTextInputValue("invited_by") || "Tiada";
+  if (interaction.isModalSubmit()) {
+    if (interaction.customId === "ign_verify_modal") {
+      await interaction.deferReply({ ephemeral: true });
+      const platoId = interaction.fields.getTextInputValue("plato_id");
+      const invitedBy = interaction.fields.getTextInputValue("invited_by") || "Tiada";
 
-    const reviewEmbed = new EmbedBuilder()
-      .setColor("#ffb6c1")
-      .setTitle("🔍 Permohonan Sahkan Plato ID Baru")
-      .setDescription(`• **Member:** ${interaction.user}\n• **Plato ID:** \`${platoId}\`\n• **Invited by:** ${invitedBy}`)
-      .setTimestamp();
+      const reviewEmbed = new EmbedBuilder()
+        .setColor("#ffb6c1")
+        .setTitle("🔍 Permohonan Sahkan Plato ID Baru")
+        .setDescription(`• **Member:** ${interaction.user}\n• **Plato ID:** \`${platoId}\`\n• **Invited by:** ${invitedBy}`)
+        .setTimestamp();
 
-    const approveBtn = new ButtonBuilder().setCustomId(`verify_approve_${interaction.user.id}`).setLabel("Approve").setStyle(ButtonStyle.Success);
-    const rejectBtn = new ButtonBuilder().setCustomId(`verify_reject_${interaction.user.id}`).setLabel("Reject").setStyle(ButtonStyle.Danger);
+      const approveBtn = new ButtonBuilder().setCustomId(`verify_approve_${interaction.user.id}`).setLabel("Approve").setStyle(ButtonStyle.Success);
+      const rejectBtn = new ButtonBuilder().setCustomId(`verify_reject_${interaction.user.id}`).setLabel("Reject").setStyle(ButtonStyle.Danger);
 
-    await sendLog(interaction.guild, VERIFY_CHANNEL_NAME, { embeds: [reviewEmbed], components: [new ActionRowBuilder().addComponents(approveBtn, rejectBtn)] });
-    await interaction.editReply({ content: "✨ Permohonan sahkan Plato ID telah dihantar kepada admin!" });
-    return;
+      await sendLog(interaction.guild, VERIFY_CHANNEL_NAME, { embeds: [reviewEmbed], components: [new ActionRowBuilder().addComponents(approveBtn, rejectBtn)] });
+      await interaction.editReply({ content: "✨ Permohonan anda akan dihantar kepada admin untuk semakan!" });
+      return;
+    }
+
+    if (interaction.customId.startsWith("wallet_modal_")) {
+      await interaction.deferReply({ ephemeral: true });
+      const parts = interaction.customId.split("_");
+      const action = `${parts[2]}_${parts[3]}`;
+      const targetUserId = parts[4];
+
+      const amountStr = interaction.fields.getTextInputValue("amount_input");
+      const reason = interaction.fields.getTextInputValue("reason_input") || "Tiada sebab diberikan";
+      const amount = parseInt(amountStr, 10);
+
+      if (isNaN(amount) || amount <= 0) {
+        await interaction.editReply({ content: "❌ Sila masukkan nombor yang sah melebihi 0!" });
+        return;
+      }
+
+      const targetUser = await client.users.fetch(targetUserId);
+      const wallet = getWallet(targetUserId);
+      let currencyType = "";
+      let formattedChange = "";
+
+      if (action === "add_coins") {
+        wallet.coins += amount;
+        currencyType = "🪙 Plato Coins";
+        formattedChange = `+${amount.toLocaleString()}`;
+      } else if (action === "deduct_coins") {
+        wallet.coins = Math.max(0, wallet.coins - amount);
+        currencyType = "🪙 Plato Coins";
+        formattedChange = `-${amount.toLocaleString()}`;
+      } else if (action === "add_pips") {
+        wallet.pips += amount;
+        currencyType = "💠 Pips";
+        formattedChange = `+${amount.toLocaleString()}`;
+      } else if (action === "deduct_pips") {
+        wallet.pips = Math.max(0, wallet.pips - amount);
+        currencyType = "💠 Pips";
+        formattedChange = `-${amount.toLocaleString()}`;
+      }
+
+      await interaction.editReply({ content: `✅ Berjaya kemaskini baki untuk **${targetUser.tag}**!` });
+
+      const logEmbed = new EmbedBuilder()
+        .setColor("#ffb6c1")
+        .setTitle("📜 Wallet Log")
+        .setDescription(`• **Member:** ${targetUser}\n• **Currency:** ${currencyType}\n• **Amount:** ${formattedChange}\n• **Reason:** ${reason}\n• **Changed by:** ${interaction.user}\n• **Date:** <t:${Math.floor(Date.now() / 1000)}:F>`)
+        .setTimestamp();
+
+      await sendLog(interaction.guild, WALLET_LOG_CHANNEL_NAME, logEmbed);
+      return;
+    }
   }
 
   if (interaction.isButton()) {
