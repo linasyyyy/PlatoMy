@@ -87,7 +87,7 @@ const commands = [
     ),
   new SlashCommandBuilder()
     .setName("setup-verify")
-    .setDescription("Hantar panel butang verifikasi IGN (Admin sahaja)"),
+    .setDescription("Hantar panel butang verifikasi Plato ID (Admin sahaja)"),
   new SlashCommandBuilder()
     .setName("giveaway")
     .setDescription("Cipta giveaway baru (Admin sahaja)")
@@ -130,12 +130,12 @@ function getWallet(userId) {
   return wallets.get(userId);
 }
 
-async function sendLog(guild, channelName, logEmbed) {
+async function sendLog(guild, channelName, logPayload) {
   const logChannel = guild.channels.cache.find(
-    (c) => c.name.includes(channelName) && c.isTextBased()
+    (c) => c.name.toLowerCase().includes(channelName.toLowerCase()) && c.isTextBased()
   );
   if (logChannel && "send" in logChannel) {
-    await logChannel.send({ embeds: [logEmbed] });
+    await logChannel.send(logPayload);
   }
 }
 
@@ -300,7 +300,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       const verifyEmbed = new EmbedBuilder()
         .setColor("#ffb6c1")
-        .setTitle("🌸 PlatoMy IGN Verification")
+        .setTitle("🌸 PlatoMy Plato ID Verification")
         .setDescription("Sila klik butang di bawah untuk mengisi Plato ID dan maklumat jemputan anda bagi mendapatkan akses ke channel eksklusif! ♡");
 
       const verifyButton = new ButtonBuilder()
@@ -390,7 +390,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       const reviewEmbed = new EmbedBuilder()
         .setColor("#ffb6c1")
-        .setTitle("🔍 New IGN Verification Request")
+        .setTitle("🔍 New Plato ID Verification Request")
         .setDescription(`• **Member:** ${interaction.user} (${interaction.user.tag})\n• **Plato ID:** \`${platoId}\`\n• **Invited by:** ${invitedBy}`)
         .setTimestamp();
 
@@ -464,7 +464,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.customId === "open_verify_modal") {
       const modal = new ModalBuilder()
         .setCustomId("ign_verify_modal")
-        .setTitle("IGN Verification Form");
+        .setTitle("Plato ID Verification Form");
 
       const platoIdInput = new TextInputBuilder()
         .setCustomId("plato_id")
@@ -521,7 +521,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         if (role) {
           await targetMember.roles.add(role).catch(console.error);
         }
-        await targetMember.send("🎉 Tahniah! Permohonan Plato IGN anda telah diluluskan oleh admin. Anda kini mempunyai akses ke channel eksklusif! 🌸").catch(() => {});
+        await targetMember.send("🎉 Tahniah! Permohonan Plato ID anda telah diluluskan oleh admin. Anda kini mempunyai akses ke channel eksklusif! 🌸").catch(() => {});
       }
 
       const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
@@ -543,7 +543,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const targetMember = await interaction.guild.members.fetch(targetUserId).catch(() => null);
 
       if (targetMember) {
-        await targetMember.send("❌ Maaf, permohonan Plato IGN anda telah ditolak. Sila hubungi admin jika terdapat sebarang pertanyaan.").catch(() => {});
+        await targetMember.send("❌ Maaf, permohonan Plato ID anda telah ditolak. Sila hubungi admin jika terdapat sebarang pertanyaan.").catch(() => {});
       }
 
       const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
