@@ -92,9 +92,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
       const modal = new ModalBuilder().setCustomId(`wallet_modal_${action}_${target.id}`).setTitle("Urus Wallet");
-      const amountInput = new TextInputBuilder().setCustomId("amount_input").setLabel("Jumlah (Amount)").setStyle(TextInputStyle.Short).setRequired(true);
-      const reasonInput = new TextInputBuilder().setCustomId("reason_input").setLabel("Sebab (Reason)").setStyle(TextInputStyle.Paragraph).setPlaceholder("Contoh: Event Reward").setRequired(false);
-      modal.addComponents(new ActionRowBuilder().addComponents(amountInput), new ActionRowBuilder().addComponents(reasonInput));
+      const detailsInput = new TextInputBuilder().setCustomId("details_input").setLabel("Jumlah & Sebab (Contoh: 500 - Hadiah)").setStyle(TextInputStyle.Short).setPlaceholder("500 - Hadiah Event").setRequired(true);
+      modal.addComponents(new ActionRowBuilder().addComponents(detailsInput));
       await interaction.showModal(modal);
       return;
     }
@@ -139,8 +138,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.customId.startsWith("wallet_modal_")) {
       await interaction.deferReply({ ephemeral: true });
       const [, , action, targetId] = interaction.customId.split("_");
-      const amount = parseInt(interaction.fields.getTextInputValue("amount_input"), 10);
-      const reason = interaction.fields.getTextInputValue("reason_input") || "Tiada sebab diberikan";
+      const inputVal = interaction.fields.getTextInputValue("details_input");
+      
+      // Pecahkan input kepada jumlah dan sebab (jika ada tanda '-')
+      const parts = inputVal.split("-");
+      const amount = parseInt(parts[0].trim(), 10);
+      const reason = parts[1] ? parts[1].trim() : "Tiada sebab diberikan";
+
+      if (isNaN(amount) || amount <= 0) {
+        await interaction.editReply({ content: "❌ Sila masukkan nombor jumlah yang sah di bahagian hadapan!" });
+        return;
+      }
+
       const target = await client.users.fetch(targetId);
       const w = getWallet(targetId);
       let cur = "";
