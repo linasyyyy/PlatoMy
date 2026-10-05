@@ -46,11 +46,13 @@ const client = new Client({
 const levels = new Map();
 const wallets = new Map();
 const giveawaysMap = new Map();
+const eventsMap = new Map(); // Untuk menyimpan data event aktif
 
 const WELCOME_CHANNEL_NAME = "🤗・selamat-datang";
 const SERVER_LOGS_CHANNEL_NAME = "server-logs";
 const WALLET_LOG_CHANNEL_NAME = "wallet-log";
 const VERIFY_CHANNEL_NAME = "verification-log";
+const EVENT_LOG_CHANNEL_NAME = "event-log";
 
 const VERIFIED_ROLE_NAME = "Member";
 const LOGO_URL = "https://cdn.discordapp.com/attachments/1549051773438787724/1549403998686281808/IMG_5614.png?ex=6ac447ab&is=6ac2f62b&hm=1fca40b2dcd05697b7b7629216cf9f064205e294ed0186f26aa45fff2880ad7e&";
@@ -106,6 +108,22 @@ const commands = [
         .setDescription("Tempoh masa dalam minit")
         .setRequired(true)
     ),
+  new SlashCommandBuilder()
+    .setName("create-event")
+    .setDescription("Cipta komuniti event baru (Admin sahaja)")
+    .addStringOption(option => option.setName("name").setDescription("Nama event").setRequired(true))
+    .addStringOption(option => option.setName("description").setDescription("Penerangan event").setRequired(true))
+    .addStringOption(option => option.setName("datetime").setDescription("Tarikh & Masa (Contoh: 10 Okt 2026, 8:00 PM)").setRequired(true))
+    .addIntegerOption(option => option.setName("max_players").setDescription("Had maksimum pemain").setRequired(true))
+    .addStringOption(option => option.setName("reward").setDescription("Hadiah/Ganjaran (Contoh: 1,000 Coins)").setRequired(true))
+    .addIntegerOption(option => option.setName("server_points").setDescription("Server Points (Pilihan)").setRequired(false)),
+  new SlashCommandBuilder()
+    .setName("end-event")
+    .setDescription("Tamatkan event dan umumkan pemenang (Admin sahaja)")
+    .addStringOption(option => option.setName("event_id").setDescription("ID Mesej Event").setRequired(true))
+    .addUserOption(option => option.setName("winner_1").setDescription("Pemenang Tempat ke-1").setRequired(false))
+    .addUserOption(option => option.setName("winner_2").setDescription("Pemenang Tempat ke-2").setRequired(false))
+    .addUserOption(option => option.setName("winner_3").setDescription("Pemenang Tempat ke-3").setRequired(false)),
 ].map((command) => command.toJSON());
 
 client.once(Events.ClientReady, async (readyClient) => {
@@ -278,293 +296,4 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       const reasonInput = new TextInputBuilder()
         .setCustomId("reason_input")
-        .setLabel("Sebab (Reason)")
-        .setStyle(TextInputStyle.Paragraph)
-        .setPlaceholder("Contoh: Event Reward")
-        .setRequired(false);
-
-      modal.addComponents(
-        new ActionRowBuilder().addComponents(amountInput),
-        new ActionRowBuilder().addComponents(reasonInput)
-      );
-
-      await interaction.showModal(modal);
-      return;
-    }
-
-    if (interaction.commandName === "setup-verify") {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        await interaction.reply({ content: "❌ Hanya Admin sahaja boleh setup panel ini!", ephemeral: true });
-        return;
-      }
-
-      const verifyEmbed = new EmbedBuilder()
-        .setColor("#ffb6c1")
-        .setTitle("🌸 PlatoMy Plato ID Verification")
-        .setDescription("Sila klik butang di bawah untuk mengisi Plato ID dan maklumat jemputan anda bagi mendapatkan akses ke channel eksklusif! ♡");
-
-      const verifyButton = new ButtonBuilder()
-        .setCustomId("open_verify_modal")
-        .setLabel("✨ Tekan Disini")
-        .setStyle(ButtonStyle.Primary);
-
-      const row = new ActionRowBuilder().addComponents(verifyButton);
-
-      await interaction.reply({ content: "✅ Panel verifikasi berjaya dihantar!", ephemeral: true });
-      await interaction.channel.send({ embeds: [verifyEmbed], components: [row] });
-      return;
-    }
-
-    if (interaction.commandName === "giveaway") {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        await interaction.reply({ content: "❌ Hanya Admin sahaja boleh mencipta giveaway!", ephemeral: true });
-        return;
-      }
-
-      const prize = interaction.options.getString("prize");
-      const winnersCount = interaction.options.getInteger("winners");
-      const durationMins = interaction.options.getInteger("duration");
-
-      const endsAt = Date.now() + durationMins * 60 * 1000;
-
-      const giveawayEmbed = new EmbedBuilder()
-        .setColor("#ffb6c1")
-        .setTitle("🎉 GIVEAWAY 🎉")
-        .setDescription(`🎁 **Prize:** ${prize}\n👥 **Winners:** ${winnersCount}\n⏳ **Ends At:** <t:${Math.floor(endsAt / 1000)}:R>\n\nTekan butang di bawah untuk menyertai! ✨`)
-        .setTimestamp(endsAt);
-
-      const joinBtn = new ButtonBuilder()
-        .setCustomId("join_giveaway")
-        .setLabel("🎉 Join Giveaway")
-        .setStyle(ButtonStyle.Success);
-
-      const row = new ActionRowBuilder().addComponents(joinBtn);
-
-      await interaction.reply({ content: "✨ Giveaway berjaya dimulakan!", ephemeral: true });
-      const giveawayMessage = await interaction.channel.send({ embeds: [giveawayEmbed], components: [row] });
-
-      giveawaysMap.set(giveawayMessage.id, {
-        prize,
-        winnersCount,
-        participants: [],
-        ended: false,
-      });
-
-      setTimeout(async () => {
-        const giveawayData = giveawaysMap.get(giveawayMessage.id);
-        if (!giveawayData || giveawayData.ended) return;
-
-        giveawayData.ended = true;
-
-        if (giveawayData.participants.length === 0) {
-          const endedEmbed = EmbedBuilder.from(giveawayMessage.embeds[0])
-            .setTitle("🎉 GIVEAWAY TAMAT 🎉")
-            .setDescription(`🎁 **Prize:** ${prize}\n\n❌ Tiada sesiapa yang menyertai giveaway ini.`);
-          await giveawayMessage.edit({ embeds: [endedEmbed], components: [] }).catch(() => {});
-          return;
-        }
-
-        const shuffled = [...giveawayData.participants].sort(() => 0.5 - Math.random());
-        const winners = shuffled.slice(0, giveawayData.winnersCount);
-        const winnerMentions = winners.map((id) => `<@${id}>`).join(", ");
-
-        const resultEmbed = new EmbedBuilder()
-          .setColor("#ffb6c1")
-          .setTitle("🏆 GIVEAWAY WINNERS 🏆")
-          .setDescription(`🎁 **Prize:** ${prize}\n\n🎉 **Winner(s):** ${winnerMentions}\n\nTahniah kepada pemenang! ♡`)
-          .setTimestamp();
-
-        await giveawayMessage.edit({ embeds: [resultEmbed], components: [] }).catch(() => {});
-        await interaction.channel.send({ content: `🎊 Tahniah ${winnerMentions}! Anda memenangi **${prize}**!` });
-
-      }, durationMins * 60 * 1000);
-
-      return;
-    }
-  }
-
-  if (interaction.isModalSubmit()) {
-    if (interaction.customId === "ign_verify_modal") {
-      await interaction.deferReply({ ephemeral: true });
-      const platoId = interaction.fields.getTextInputValue("plato_id");
-      const invitedBy = interaction.fields.getTextInputValue("invited_by") || "Tiada / Sendiri";
-
-      const reviewEmbed = new EmbedBuilder()
-        .setColor("#ffb6c1")
-        .setTitle("🔍 New Plato ID Verification Request")
-        .setDescription(`• **Member:** ${interaction.user} (${interaction.user.tag})\n• **Plato ID:** \`${platoId}\`\n• **Invited by:** ${invitedBy}`)
-        .setTimestamp();
-
-      const approveBtn = new ButtonBuilder()
-        .setCustomId(`verify_approve_${interaction.user.id}`)
-        .setLabel("Approve")
-        .setStyle(ButtonStyle.Success);
-
-      const rejectBtn = new ButtonBuilder()
-        .setCustomId(`verify_reject_${interaction.user.id}`)
-        .setLabel("Reject")
-        .setStyle(ButtonStyle.Danger);
-
-      const row = new ActionRowBuilder().addComponents(approveBtn, rejectBtn);
-
-      await sendLog(interaction.guild, VERIFY_CHANNEL_NAME, { embeds: [reviewEmbed], components: [row] });
-      await interaction.editReply({ content: "✨ Permohonan verifikasi anda telah dihantar kepada admin untuk disemak!" });
-      return;
-    }
-
-    if (interaction.customId.startsWith("wallet_modal_")) {
-      await interaction.deferReply({ ephemeral: true });
-      const parts = interaction.customId.split("_");
-      const action = `${parts[2]}_${parts[3]}`;
-      const targetUserId = parts[4];
-
-      const amountStr = interaction.fields.getTextInputValue("amount_input");
-      const reason = interaction.fields.getTextInputValue("reason_input") || "Tiada sebab diberikan";
-      const amount = parseInt(amountStr, 10);
-
-      if (isNaN(amount) || amount <= 0) {
-        await interaction.editReply({ content: "❌ Sila masukkan nombor yang sah melebihi 0!" });
-        return;
-      }
-
-      const targetUser = await client.users.fetch(targetUserId);
-      const wallet = getWallet(targetUserId);
-      let currencyType = "";
-      let formattedChange = "";
-
-      if (action === "add_coins") {
-        wallet.coins += amount;
-        currencyType = "🪙 Plato Coins";
-        formattedChange = `+${amount.toLocaleString()}`;
-      } else if (action === "deduct_coins") {
-        wallet.coins = Math.max(0, wallet.coins - amount);
-        currencyType = "🪙 Plato Coins";
-        formattedChange = `-${amount.toLocaleString()}`;
-      } else if (action === "add_pips") {
-        wallet.pips += amount;
-        currencyType = "💠 Pips";
-        formattedChange = `+${amount.toLocaleString()}`;
-      } else if (action === "deduct_pips") {
-        wallet.pips = Math.max(0, wallet.pips - amount);
-        currencyType = "💠 Pips";
-        formattedChange = `-${amount.toLocaleString()}`;
-      }
-
-      await interaction.editReply({ content: `✅ Berjaya kemaskini baki untuk **${targetUser.tag}**!` });
-
-      const logEmbed = new EmbedBuilder()
-        .setColor("#ffb6c1")
-        .setTitle("📜 Wallet Log")
-        .setDescription(`• **Member:** ${targetUser}\n• **Currency:** ${currencyType}\n• **Amount:** ${formattedChange}\n• **Reason:** ${reason}\n• **Changed by:** ${interaction.user}\n• **Date:** <t:${Math.floor(Date.now() / 1000)}:F>`)
-        .setTimestamp();
-
-      await sendLog(interaction.guild, WALLET_LOG_CHANNEL_NAME, logEmbed);
-    }
-  }
-
-  if (interaction.isButton()) {
-    if (interaction.customId === "open_verify_modal") {
-      const modal = new ModalBuilder()
-        .setCustomId("ign_verify_modal")
-        .setTitle("Plato ID Verification Form");
-
-      const platoIdInput = new TextInputBuilder()
-        .setCustomId("plato_id")
-        .setLabel("Plato ID")
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder("Masukkan Plato ID anda di sini...")
-        .setRequired(true);
-
-      const invitedInput = new TextInputBuilder()
-        .setCustomId("invited_by")
-        .setLabel("Invited by (Optional)")
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder("Nama/Tag rakan yang menjemput...")
-        .setRequired(false);
-
-      modal.addComponents(
-        new ActionRowBuilder().addComponents(platoIdInput),
-        new ActionRowBuilder().addComponents(invitedInput)
-      );
-
-      await interaction.showModal(modal);
-      return;
-    }
-
-    if (interaction.customId === "join_giveaway") {
-      if (!interaction.deferred && !interaction.replied) {
-        await interaction.deferReply({ ephemeral: true }).catch(() => {});
-      }
-      const giveawayData = giveawaysMap.get(interaction.message.id);
-
-      if (!giveawayData || giveawayData.ended) {
-        await interaction.editReply({ content: "❌ Giveaway ini telah tamat atau tidak wujud." }).catch(() => {});
-        return;
-      }
-
-      if (giveawayData.participants.includes(interaction.user.id)) {
-        await interaction.editReply({ content: "⚠️ Awak sudah menyertai giveaway ini!" }).catch(() => {});
-        return;
-      }
-
-      giveawayData.participants.push(interaction.user.id);
-      await interaction.editReply({ content: "✅ Berjaya menyertai giveaway! Semoga ada rezeki! 🍀" }).catch(() => {});
-      return;
-    }
-
-    if (interaction.customId.startsWith("verify_approve_")) {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        if (!interaction.deferred && !interaction.replied) await interaction.reply({ content: "❌ Hanya Admin sahaja boleh meluluskan permohonan ini!", ephemeral: true });
-        return;
-      }
-
-      await interaction.deferUpdate();
-      const targetUserId = interaction.customId.replace("verify_approve_", "");
-      const targetMember = await interaction.guild.members.fetch(targetUserId).catch(() => null);
-
-      if (targetMember) {
-        const role = interaction.guild.roles.cache.find(r => r.name === VERIFIED_ROLE_NAME);
-        if (role) {
-          await targetMember.roles.add(role).catch(console.error);
-        }
-        await targetMember.send("🎉 Tahniah! Permohonan Plato ID anda telah diluluskan oleh admin. Anda kini mempunyai akses ke channel eksklusif! 🌸").catch(() => {});
-      }
-
-      const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
-        .setColor("#57F287")
-        .setTitle("✅ Verification Approved")
-        .addFields({ name: "Reviewed by", value: `${interaction.user}` });
-
-      await interaction.edit({ embeds: [updatedEmbed], components: [] });
-      return;
-    }
-
-    if (interaction.customId.startsWith("verify_reject_")) {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        if (!interaction.deferred && !interaction.replied) await interaction.reply({ content: "❌ Hanya Admin sahaja boleh menolak permohonan ini!", ephemeral: true });
-        return;
-      }
-
-      await interaction.deferUpdate();
-      const targetUserId = interaction.customId.replace("verify_reject_", "");
-      const targetMember = await interaction.guild.members.fetch(targetUserId).catch(() => null);
-
-      if (targetMember) {
-        await targetMember.send("❌ Maaf, permohonan Plato ID anda telah ditolak. Sila hubungi admin jika terdapat sebarang pertanyaan.").catch(() => {});
-      }
-
-      const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
-        .setColor("#ED4245")
-        .setTitle("✅ Verification Rejected")
-        .addFields({ name: "Reviewed by", value: `${interaction.user}` });
-
-      await interaction.edit({ embeds: [updatedEmbed], components: [] });
-      return;
-    }
-  }
-});
-
-client.login(token).catch((error) => {
-  console.error("Gagal log masuk ke Discord:", error);
-  process.exitCode = 1;
-});
+        .setLabel("
