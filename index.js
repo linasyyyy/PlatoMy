@@ -14,6 +14,17 @@ import {
   ButtonBuilder,
   ButtonStyle,
 } from "discord.js";
+import http from "http";
+
+// Pelayan web mini untuk memenuhi syarat port Render
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { "Content-Type": "text/plain" });
+  res.end("PlatoMy Bot is running!\n");
+});
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`HTTP server is listening on port ${PORT}`);
+});
 
 const token = process.env.DISCORD_TOKEN;
 
@@ -487,7 +498,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
 
       if (giveawayData.participants.includes(interaction.user.id)) {
-        await interaction.reply({ content: "⚠️️ Awak sudah menyertai giveaway ini!", ephemeral: true });
+        await interaction.reply({ content: "⚠️ Awak sudah menyertai giveaway ini!", ephemeral: true });
         return;
       }
 
