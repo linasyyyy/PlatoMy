@@ -35,7 +35,7 @@ const eventsMap = new Map();
 const birthdaysMap = new Map(); 
 const giveawaysMap = new Map(); 
 
-// --- LAMAN WEB DASHBOARD INTERAKTIF (CARL-BOT STYLE) ---
+// --- LAMAN WEB DASHBOARD INTERAKTIF (DENGAN PILIHAN CHANNEL KHAS) ---
 const server = http.createServer(async (req, res) => {
   const parsedUrl = url.parse(req.url, true);
   const pathname = parsedUrl.pathname;
@@ -48,10 +48,19 @@ const server = http.createServer(async (req, res) => {
       const postData = querystring.parse(body);
       const actionType = postData.actionType;
       
-      // Cari guild pertama yang bot join untuk hantar aksi
       const guild = client.guilds.cache.first();
       if (guild) {
-        const textChannel = guild.channels.cache.find(c => c.isTextBased() && c.permissionsFor(guild.members.me).has(PermissionFlagsBits.SendMessages));
+        let targetChannelName = "";
+        if (actionType === "giveaway") targetChannelName = "🎁・giveaway";
+        else if (actionType === "event") targetChannelName = "🗣️・event-annoucement";
+        else if (actionType === "setup_verify") targetChannelName = "🫆・verify-here";
+        else if (actionType === "setup_birthday") targetChannelName = "🎂・birthday-corner";
+
+        let textChannel = guild.channels.cache.find(c => c.name.toLowerCase().includes(targetChannelName.toLowerCase()) && c.isTextBased());
+        
+        if (!textChannel) {
+          textChannel = guild.channels.cache.find(c => c.isTextBased() && c.permissionsFor(guild.members.me).has(PermissionFlagsBits.SendMessages));
+        }
         
         if (textChannel) {
           if (actionType === "giveaway") {
@@ -120,7 +129,7 @@ const server = http.createServer(async (req, res) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>PlatoMy • Control Panel</title>
+        <title>👑 PlatoMy • Control Panel</title>
         <style>
             body { background-color: #fff0f3; color: #59484b; font-family: 'Segoe UI', Tahoma, sans-serif; text-align: center; padding: 20px; }
             .container { max-width: 750px; margin: 0 auto; }
@@ -140,45 +149,45 @@ const server = http.createServer(async (req, res) => {
             <div class="card">
                 <h1>🌸 PlatoMy Bot Control Panel 🌸</h1>
                 <div class="badge">✨ Status: Online & Connected</div>
-                <p>Urus bot Discord anda secara terus dari website ini macam Carl-bot! ♡</p>
+                <p>Urus bot Discord anda secara terus dari website ini! ♡</p>
             </div>
 
             <div class="card">
-                <h3>🎉 Cipta Giveaway Pantas</h3>
+                <h3>🎉 Cipta Giveaway (Hantar ke 🎁・giveaway)</h3>
                 <form action="/action" method="POST">
                     <input type="hidden" name="actionType" value="giveaway">
                     <input type="text" name="gwPrize" placeholder="Hadiah (Cth: 1,000 Coins)" required>
                     <input type="number" name="gwDuration" placeholder="Masa (Minit)" required>
                     <input type="number" name="gwWinners" placeholder="Bilangan Pemenang" required>
-                    <button type="submit">Hantar Giveaway ke Discord 🚀</button>
+                    <button type="submit">Hantar Giveaway 🚀</button>
                 </form>
             </div>
 
             <div class="card">
-                <h3>🎮 Cipta Event Komuniti</h3>
+                <h3>🗣️ Cipta Event (Hantar ke 🗣️・event-annoucement)</h3>
                 <form action="/action" method="POST">
                     <input type="hidden" name="actionType" value="event">
                     <input type="text" name="evTitle" placeholder="Tajuk Event" required>
                     <input type="text" name="evTime" placeholder="Masa (Cth: 10/10 @ 8 PM)" required>
                     <input type="text" name="evPrize" placeholder="Hadiah Event" required>
-                    <button type="submit">Hantar Event ke Discord 🎮</button>
+                    <button type="submit">Hantar Event 🎮</button>
                 </form>
             </div>
 
             <div class="card">
                 <h3>📌 Hantar Panel Setup Utama</h3>
-                <form action="/action" method="POST" style="display: flex; gap: 10px;">
+                <form action="/action" method="POST">
                     <input type="hidden" name="actionType" value="setup_verify">
-                    <button type="submit">Hantar Panel Verify</button>
+                    <button type="submit">Hantar Panel Verify (ke 🫆・verify-here)</button>
                 </form>
                 <form action="/action" method="POST" style="margin-top: 10px;">
                     <input type="hidden" name="actionType" value="setup_birthday">
-                    <button type="submit">Hantar Panel Birthday</button>
+                    <button type="submit">Hantar Panel Birthday (ke 🎂・birthday-corner)</button>
                 </form>
             </div>
 
             <div class="card">
-                <h3>📊 Live Leaderboard (Top 5)</h3>
+                <h3>👑 Live Leaderboard (Top 5)</h3>
                 <table>
                     <tr><th>Rank</th><th>User</th><th>Level & Points</th></tr>
                     ${leaderboardRows}
@@ -487,7 +496,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setDescription("Ingin membuat pertukaran item? Sila klik butang di bawah untuk membuka Trading Ticket!");        
       
       const row = new ActionRowBuilder().addComponents(         
-        new ButtonBuilder().setCustomId("open_trading_ticket").setLabel("🛍️️ Open Trading Ticket").setStyle(ButtonStyle.Success)
+        new ButtonBuilder().setCustomId("open_trading_ticket").setLabel("🛍 Open Trading Ticket").setStyle(ButtonStyle.Success)
       );        
       
       await interaction.reply({ content: "✅ Panel Trading Ticket berjaya dihantar!", ephemeral: true });       
@@ -520,9 +529,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
         
         const dateInput = new TextInputBuilder()           
           .setCustomId("bday_date")           
-          .setLabel("Tarikh Lahir (Format: DD/MM)")           
+          .setLabel("Tarikh Lahir (Format: Hari/Bulan Cth: 15/10)")           
           .setStyle(TextInputStyle.Short)           
           .setPlaceholder("15/10")           
+          .setMaxLength(5)
           .setRequired(true);          
         
         modal.addComponents(new ActionRowBuilder().addComponents(dateInput));         
@@ -607,7 +617,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const giveawayEmbed = new EmbedBuilder()
           .setColor("#ffb6c1")
           .setTitle("🎉 GIVEAWAY BERMULA! 🎁")
-          .setDescription(`🎁 **Hadiah:** ${prize}\n👑 **Bilangan Pemenang:** ${winnersCount}\n⏳ **Berakhir Pada:** <t:${endTimeSeconds}:R> (<t:${endTimeSeconds}:f>)\n\n✨ Klik butang **"🎉 Sertai Giveaway"** di bawah untuk menyertai!\n👥 **Jumlah Penyertaan:** 0`)
+          .setDescription(`🎁 **Hadiah:** ${prize}\n👑 **Bilangan Pemenang:** ${winnersCount}\n⏳ **Berakhir Pada:** <t:${endTimeSeconds}:R> (<t:${endTimeSeconds}:f>)\n\n✨ Klik butang **"🎉 Sertai Giveaway"** di bawah untuk menyertai!\n👥 **Penyertaan:** 0`)
           .setThumbnail(LOGO_URL)
           .setTimestamp();
 
@@ -645,7 +655,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           const endedEmbed = new EmbedBuilder()
             .setColor("#57F287")
             .setTitle("🎉 GIVEAWAY TELAH TAMAT! 🏆")
-            .setDescription(`🎁 **Hadiah:** ${gw.prize}\n👥 **Jumlah Penyertaan:** ${gw.participants.length}\n\n🏆 **Pemenang Rasmi:**\n${winnersText}`)
+            .setDescription(`🎁 **Hadiah:** ${gw.prize}\n👥 **Penyertaan:** ${gw.participants.length}\n\n🏆 **Pemenang Rasmi:**\n${winnersText}`)
             .setThumbnail(LOGO_URL)
             .setTimestamp();
 
@@ -718,7 +728,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const eventEmbed = new EmbedBuilder()
         .setColor("#ffb6c1")
         .setTitle(`🎮 ${title}`)
-        .setDescription(`${desc}\n\n📅 **Date & Time:** ${datetimeStr}\n⏳ **Duration:** ${duration}\n🎁 **Prize Pool:** ${prize}\n👥 **Players:** 0`)
+        .setDescription(`${desc}\n\n📅 **Date & Time:** ${datetimeStr}\n⏳ **Duration:** ${duration}\n🎁 **Prize Pool:** ${prize}\n👥 **Pemain:** 0`)
         .setTimestamp();
 
       const joinBtn = new ButtonBuilder()
@@ -824,9 +834,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       const dateInput = new TextInputBuilder()
         .setCustomId("bday_date")
-        .setLabel("Tarikh Lahir (Format: DD/MM)")
+        .setLabel("Tarikh Lahir (Format: Hari/Bulan Cth: 15/10)")
         .setStyle(TextInputStyle.Short)
         .setPlaceholder("15/10")
+        .setMaxLength(5)
         .setRequired(true);
 
       modal.addComponents(new ActionRowBuilder().addComponents(dateInput));
