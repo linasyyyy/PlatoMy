@@ -39,7 +39,7 @@ const birthdaysMap = new Map(); // Simpan UserId -> "DD/MM"
 // KANAL & TETAPAN SERVER
 const VERIFY_CHANNEL_ID = ""; 
 const WALLET_LOG_ID = "";     
-const BIRTHDAY_CHANNEL_ID = ""; // Masukkan ID channel tempat ucapan birthday ingin dihantar
+const BIRTHDAY_CHANNEL_ID = ""; 
 const WELCOME_CHANNEL_NAME = "🤗・selamat-datang";
 const SERVER_LOGS_CHANNEL_NAME = "server-logs";
 const VERIFIED_ROLE_NAME = "Member";
@@ -47,6 +47,7 @@ const LOGO_URL = "https://cdn.discordapp.com/attachments/1549051773438787724/154
 
 const commands = [
   new SlashCommandBuilder().setName("wallet").setDescription("Semak baki wallet anda!"),
+  new SlashCommandBuilder().setName("leaderboard").setDescription("Papar papan pendahulu (Leaderboard EXP & Server Points) 📊"),
   new SlashCommandBuilder().setName("admin-wallet").setDescription("Urus baki wallet ahli (Admin sahaja)")
     .addStringOption(opt => opt.setName("action").setDescription("Tindakan").setRequired(true).addChoices(
       { name: "Add Coins", value: "add_coins" }, { name: "Deduct Coins", value: "deduct_coins" },
@@ -72,10 +73,9 @@ client.once(Events.ClientReady, async (c) => {
     console.error("Gagal mendaftarkan slash commands:", error);
   }
 
-  // Sistem semakan harian untuk Birthday (@user pada hari tersebut)
   setInterval(() => {
     checkBirthdays();
-  }, 1000 * 60 * 60); // Semak setiap 1 jam
+  }, 1000 * 60 * 60);
 });
 
 function getWallet(id) {
@@ -94,12 +94,11 @@ async function sendLog(guild, channelNameOrId, payload) {
   }
 }
 
-// Fungsi semak hari jadi automatik
 async function checkBirthdays() {
   const now = new Date();
   const day = String(now.getDate()).padStart(2, '0');
   const month = String(now.getMonth() + 1).padStart(2, '0');
-  const todayFormatted = `${day}/${month}`; // Format "DD/MM"
+  const todayFormatted = `${day}/${month}`;
 
   for (const [userId, bday] of birthdaysMap.entries()) {
     if (bday === todayFormatted) {
@@ -122,7 +121,6 @@ async function checkBirthdays() {
   }
 }
 
-// WELCOME SYSTEM
 client.on(Events.GuildMemberAdd, async (member) => {
   const channel = member.guild.channels.cache.find(
     (candidate) => candidate.name.includes(WELCOME_CHANNEL_NAME) && candidate.isTextBased(),
@@ -145,7 +143,6 @@ client.on(Events.GuildMemberAdd, async (member) => {
   await channel.send({ embeds: [welcomeEmbed] });
 });
 
-// GOODBYE SYSTEM
 client.on(Events.GuildMemberRemove, async (member) => {
   const channel = member.guild.channels.cache.find(
     (candidate) => candidate.name.includes(SERVER_LOGS_CHANNEL_NAME) && candidate.isTextBased(),
@@ -171,10 +168,38 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const embed = new EmbedBuilder()
         .setColor("#ffb6c1")
         .setAuthor({ name: interaction.user.username, iconURL: interaction.user.displayAvatarURL({ size: 128, dynamic: true }) })
-        .setTitle("💰 My Wallet")
+        .setTitle("💰 PlatoMy Wallet")
         .setDescription(`🪙 **Plato Coins:** ${w.coins.toLocaleString()}\n💠 **Pips:** ${w.pips.toLocaleString()}\n✨ **Server Points:** ${w.serverPoints.toLocaleString()}`)
         .setTimestamp();
       await interaction.reply({ embeds: [embed], ephemeral: true });
+      return;
+    }
+
+    if (interaction.commandName === "leaderboard") {
+      const sortedWallets = [...wallets.entries()].sort((a, b) => b[1].serverPoints - a[1].serverPoints).slice(0, 10);
+      
+      let lbDescription = "Want to see more than the top 10?\n\n";
+      
+      if (sortedWallets.length === 0) {
+        lbDescription += "• *Belum ada rekod leaderboard EXP lagi.*";
+      } else {
+        const medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
+        sortedWallets.forEach(([userId, data], index) => {
+          const medalIcon = medals[index] || `#${index + 1}`;
+          const estimatedLevel = Math.floor(data.serverPoints / 100) + 1;
+          lbDescription += `${medalIcon} **<@${userId}>**\nLevel${estimatedLevel} • XP: **${data.serverPoints.toLocaleString()}** pts\n\n`;
+        });
+      }
+
+      const lbEmbed = new EmbedBuilder()
+        .setColor("#ffb6c1")
+        .setTitle("📊 Leaderboard - Lifetime EXP")
+        .setDescription(lbDescription)
+        .setThumbnail(LOGO_URL)
+        .setFooter({ text: "Last update: Just now" })
+        .setTimestamp();
+
+      await interaction.reply({ embeds: [lbEmbed] });
       return;
     }
 
@@ -238,7 +263,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const bdayEmbed = new EmbedBuilder()
         .setColor("#ffb6c1")
         .setTitle("🎂 Birthday Corner 🎂")
-        .setDescription(`💌 Ingin tarikh lahir anda disenaraikan di sini supaya kami boleh meraikannya bersama? Klik butang di bawah untuk menetapkan tarikh lahir anda! ♡\n\n✨ **Upcoming Birthdays**\n${bdayListText || "• *Tiada tarikh direkodkan lagi. Jom daftar sekarang!*"}`);
+        .setDescription(`💌 Ingin tarikh lahir anda disenaraikan di sini supaya kami boleh meraikannya bersama? Klik butang di bawah untuk menetapkan tarikh lahir anda! ♡\n\n✨ **Upcoming Birthdays**\n${bdayListText || "• *Tiada tarikh direkodkan lagi. Jom daftar sekarang!* "}`);
 
       const bdayBtn = new ButtonBuilder()
         .setCustomId("open_birthday_modal")
@@ -261,9 +286,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         const dateInput = new TextInputBuilder()
           .setCustomId("bday_date")
-          .setLabel("Tarikh Lahir (Contoh: 15/10)")
+          .setLabel("Tarikh Lahir (Format: DD/MM)")
           .setStyle(TextInputStyle.Short)
-          .setPlaceholder("DD/MM")
+          .setPlaceholder("15/10")
           .setRequired(true);
 
         modal.addComponents(new ActionRowBuilder().addComponents(dateInput));
@@ -294,7 +319,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           .setCustomId("event_datetime")
           .setLabel("Date & Start Time")
           .setStyle(TextInputStyle.Short)
-          .setPlaceholder("10/10/2026 @ 8:00 PM")
+          .setPlaceholder("10/10 @ 8:00 PM")
           .setRequired(true);
 
         const durationInput = new TextInputBuilder()
@@ -353,7 +378,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     if (interaction.customId === "birthday_modal") {
       await interaction.deferReply({ ephemeral: true });
-      const bdayDate = interaction.fields.getTextInputValue("bday_date");
+      const bdayDate = interaction.fields.getTextInputValue("bday_date"); // Format: DD/MM
       birthdaysMap.set(interaction.user.id, bdayDate);
 
       let bdayListText = "";
@@ -432,9 +457,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       const dateInput = new TextInputBuilder()
         .setCustomId("bday_date")
-        .setLabel("Tarikh Lahir (Contoh: 15/10)")
+        .setLabel("Tarikh Lahir (Format: DD/MM)")
         .setStyle(TextInputStyle.Short)
-        .setPlaceholder("DD/MM")
+        .setPlaceholder("15/10")
         .setRequired(true);
 
       modal.addComponents(new ActionRowBuilder().addComponents(dateInput));
