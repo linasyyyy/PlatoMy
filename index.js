@@ -13,6 +13,8 @@ import {
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
+  ChannelType,
+  StringSelectMenuBuilder,
 } from "discord.js";
 import http from "http";
 
@@ -40,6 +42,9 @@ const birthdaysMap = new Map(); // Simpan UserId -> "DD/MM"
 const VERIFY_CHANNEL_ID = ""; 
 const WALLET_LOG_ID = "";     
 const BIRTHDAY_CHANNEL_ID = ""; 
+const LEVEL_LOG_CHANNEL_NAME = "🆙・level-up";       // Channel log untuk Level Up
+const TRADING_LOG_CHANNEL_NAME = "🤝・blackmarket"; // Channel log untuk Trading Ticket
+const REPORT_LOG_CHANNEL_NAME = "report-log";         // Channel log untuk Report System
 const WELCOME_CHANNEL_NAME = "🤗・selamat-datang";
 const SERVER_LOGS_CHANNEL_NAME = "server-logs";
 const VERIFIED_ROLE_NAME = "Member";
@@ -58,6 +63,7 @@ const commands = [
     .addStringOption(opt => opt.setName("reason").setDescription("Sebab/Alasan").setRequired(false)),
   new SlashCommandBuilder().setName("setup-verify").setDescription("Hantar panel sahkan Plato ID (Admin sahaja)"),
   new SlashCommandBuilder().setName("setup-birthday").setDescription("Hantar panel Birthday Corner yang aesthetic (Admin sahaja)"),
+  new SlashCommandBuilder().setName("setup-ticket").setDescription("Hantar panel Trading & Report Ticket (Admin sahaja)"),
   new SlashCommandBuilder().setName("birthday").setDescription("Urus tarikh lahir anda")
     .addSubcommand(sub => sub.setName("set").setDescription("Tetapkan tarikh lahir anda")),
   new SlashCommandBuilder().setName("event").setDescription("Urus event komuniti")
@@ -81,6 +87,23 @@ client.once(Events.ClientReady, async (c) => {
 function getWallet(id) {
   if (!wallets.has(id)) wallets.set(id, { coins: 0, pips: 0, serverPoints: 0 });
   return wallets.get(id);
+}
+
+// Fungsi pembantu untuk hantar mesej Level Up ke channel 🆙・level-up
+async function sendLevelUpLog(guild, userId, newLevel, totalXp) {
+  const channel = guild.channels.cache.find(
+    (candidate) => candidate.name.toLowerCase().includes(LEVEL_LOG_CHANNEL_NAME.toLowerCase()) && candidate.isTextBased()
+  );
+  if (!channel || !("send" in channel)) return;
+
+  const levelUpEmbed = new EmbedBuilder()
+    .setColor("#ffb6c1")
+    .setTitle("🆙 LEVEL UP! 🎉")
+    .setDescription(`Tahniah <@${userId}>! Anda baru sahaja naik ke **Level ${newLevel}**! ✨\n\n📊 **Jumlah EXP Terkumpul:** \`${totalXp.toLocaleString()} pts\`\nTeruskan aktif bersembang dalam komuniti **PlatoMy**! 🚀`)
+    .setThumbnail(LOGO_URL)
+    .setTimestamp();
+
+  await channel.send({ content: `🎉 Tahniah <@${userId}> atas kenaikan level anda!`, embeds: [levelUpEmbed] }).catch(() => {});
 }
 
 async function sendLog(guild, channelNameOrId, payload) {
@@ -113,48 +136,48 @@ async function checkBirthdays() {
             .setImage("https://cdn.discordapp.com/attachments/1549051773438787724/1551515791910903918/Video.gif")
             .setTimestamp();
 
-          await targetChannel.send({ content: `🎂 Selamat Hari Lahir <@${userId}>!`, embeds: [bdayEmbed] }).catch(() => {});
-        }
-      }
-      birthdaysMap.delete(userId);
-    }
-  }
-}
+          await targetChannel.send({ content: `🎂 Selamat Hari Lahir <@${userId}>!`, embeds: [bdayEmbed] }).catch(() => {});         
+        }       
+      }       
+      birthdaysMap.delete(userId);     
+    }   
+  } 
+}  
 
-client.on(Events.GuildMemberAdd, async (member) => {
-  const channel = member.guild.channels.cache.find(
-    (candidate) => candidate.name.includes(WELCOME_CHANNEL_NAME) && candidate.isTextBased(),
-  );
-  if (!channel || !("send" in channel)) return;
+client.on(Events.GuildMemberAdd, async (member) => {   
+  const channel = member.guild.channels.cache.find(     
+    (candidate) => candidate.name.includes(WELCOME_CHANNEL_NAME) && candidate.isTextBased(),   
+  );   
+  if (!channel || !("send" in channel)) return;    
 
-  const userName = member.user.tag;
-  const userAvatar = member.user.displayAvatarURL({ size: 128, dynamic: true });
+  const userName = member.user.tag;   
+  const userAvatar = member.user.displayAvatarURL({ size: 128, dynamic: true });    
 
-  const welcomeEmbed = new EmbedBuilder()
-    .setColor("#ffb6c1")
-    .setAuthor({ name: userName, iconURL: userAvatar })
-    .setTitle("🌸 SELAMAT DATANG!")
+  const welcomeEmbed = new EmbedBuilder()     
+    .setColor("#ffb6c1")     
+    .setAuthor({ name: userName, iconURL: userAvatar })     
+    .setTitle("🌸 SELAMAT DATANG!")     
     .setDescription(`Hai ${member}! 🖐️💕\nSelamat datang ke Plato MY!\n\n🎀 Jom enjoy dan have fun bersama kami! ♡`)
     .setImage("https://cdn.discordapp.com/attachments/1549051773438787724/1551515791910903918/Video.gif")
     .setThumbnail(LOGO_URL)
-    .setFooter({ text: `Awak adalah member ke ${member.guild.memberCount}!` })
-    .setTimestamp();
+    .setFooter({ text: `Awak adalah member ke ${member.guild.memberCount}!` })     
+    .setTimestamp();    
 
-  await channel.send({ embeds: [welcomeEmbed] });
-});
+  await channel.send({ embeds: [welcomeEmbed] }); 
+});  
 
-client.on(Events.GuildMemberRemove, async (member) => {
-  const channel = member.guild.channels.cache.find(
-    (candidate) => candidate.name.includes(SERVER_LOGS_CHANNEL_NAME) && candidate.isTextBased(),
-  );
-  if (!channel || !("send" in channel)) return;
+client.on(Events.GuildMemberRemove, async (member) => {   
+  const channel = member.guild.channels.cache.find(     
+    (candidate) => candidate.name.includes(SERVER_LOGS_CHANNEL_NAME) && candidate.isTextBased(),   
+  );   
+  if (!channel || !("send" in channel)) return;    
 
-  const userAvatar = member.user.displayAvatarURL({ size: 128, dynamic: true });
-  const goodbyeEmbed = new EmbedBuilder()
-    .setColor("#ffb6c1")
+  const userAvatar = member.user.displayAvatarURL({ size: 128, dynamic: true });   
+  const goodbyeEmbed = new EmbedBuilder()     
+    .setColor("#ffb6c1")     
     .setTitle(`${member.user.tag} left the server`)
-    .setDescription(`**User**\n<@${member.id}>`)
-    .setThumbnail(userAvatar)
+    .setDescription(`**User**\n<@${member.id}>`)     
+    .setThumbnail(userAvatar)     
     .setFooter({ text: `${member.guild.name}` })
     .setTimestamp();
 
@@ -177,7 +200,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     if (interaction.commandName === "leaderboard") {
       const sortedWallets = [...wallets.entries()].sort((a, b) => b[1].serverPoints - a[1].serverPoints).slice(0, 10);
-      
       let lbDescription = "Want to see more than the top 10?\n\n";
       
       if (sortedWallets.length === 0) {
@@ -185,8 +207,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
       } else {
         const medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
         sortedWallets.forEach(([userId, data], index) => {
-          const medalIcon = medals[index] || `#${index + 1}`;
-          const estimatedLevel = Math.floor(data.serverPoints / 100) + 1;
+          const medalIcon = medals[index] || `#${index + 1}`;           
+          const estimatedLevel = Math.floor(data.serverPoints / 100) + 1;           
           lbDescription += `${medalIcon} **<@${userId}>**\nLevel${estimatedLevel} • XP: **${data.serverPoints.toLocaleString()}** pts\n\n`;
         });
       }
@@ -221,10 +243,23 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
+      // Contoh simulasi perubahan poin yang turut menyemak kenaikan level
+      const oldPoints = w.serverPoints;
       if (action === "add_coins") { w.coins += amount; cur = "🪙 Coins"; }
       else if (action === "deduct_coins") { w.coins = Math.max(0, w.coins - amount); cur = "🪙 Coins"; }
-      else if (action === "add_pips") { w.pips += amount; cur = "💠 Pips"; }
+      else if (action === "add_pips") { 
+        w.pips += amount; 
+        w.serverPoints += amount; // Mengemaskini juga serverPoints jika berkaitan
+        cur = "💠 Pips"; 
+      }
       else if (action === "deduct_pips") { w.pips = Math.max(0, w.pips - amount); cur = "💠 Pips"; }
+
+      // Semak jika berlakunya kenaikan level (setiap 100 mata = 1 level)
+      const oldLevel = Math.floor(oldPoints / 100) + 1;
+      const newLevel = Math.floor(w.serverPoints / 100) + 1;
+      if (newLevel > oldLevel) {
+        await sendLevelUpLog(interaction.guild, target.id, newLevel, w.serverPoints);
+      }
 
       await interaction.reply({ content: `✅ Berjaya kemaskini baki ${target.tag}!`, ephemeral: true });
       
@@ -263,107 +298,123 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const bdayEmbed = new EmbedBuilder()
         .setColor("#ffb6c1")
         .setTitle("🎂 Birthday Corner 🎂")
-        .setDescription(`💌 Ingin tarikh lahir anda disenaraikan di sini supaya kami boleh meraikannya bersama? Klik butang di bawah untuk menetapkan tarikh lahir anda! ♡\n\n✨ **Upcoming Birthdays**\n${bdayListText || "• *Tiada tarikh direkodkan lagi. Jom daftar sekarang!* "}`);
+        .setDescription(`💌 Ingin tarikh lahir anda disenaraikan di sini supaya kami boleh meraikannya bersama? Klik butang di bawah untuk menetapkan tarikh lahir anda! ♡\n\n✨ **Upcoming Birthdays**\n${bdayListText || "• *Tiada tarikh direkodkan lagi. Jom daftar sekarang!* "}`);        
+      
+      const bdayBtn = new ButtonBuilder()         
+        .setCustomId("open_birthday_modal")         
+        .setLabel("🎀 Set/Update Birthday")         
+        .setStyle(ButtonStyle.Primary);        
+      
+      const row = new ActionRowBuilder().addComponents(bdayBtn);        
+      await interaction.reply({ content: "✅ Birthday Corner berjaya dihantar!", ephemeral: true });       
+      await interaction.channel.send({ embeds: [bdayEmbed], components: [row] });       
+      return;     
+    }      
 
-      const bdayBtn = new ButtonBuilder()
-        .setCustomId("open_birthday_modal")
-        .setLabel("🎀 Set/Update Birthday")
-        .setStyle(ButtonStyle.Primary);
+    if (interaction.commandName === "setup-ticket") {       
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) return;       
+      const embed = new EmbedBuilder()         
+        .setColor("#ffb6c1")         
+        .setTitle("🌸 PlatoMy • Support & Ticket Center 🎫")         
+        .setDescription("Perlukan bantuan berkaitan trading atau ingin membuat laporan? Sila klik butang di bawah untuk membuka tiket peribadi!");        
+      
+      const row = new ActionRowBuilder().addComponents(         
+        new ButtonBuilder().setCustomId("open_trading_ticket").setLabel("🛍️ Open Trading Ticket").setStyle(ButtonStyle.Success),         
+        new ButtonBuilder().setCustomId("open_report_ticket").setLabel("🚨 Submit Report").setStyle(ButtonStyle.Danger)       
+      );        
+      
+      await interaction.reply({ content: "✅ Panel Ticket Hub berjaya dihantar!", ephemeral: true });       
+      await interaction.channel.send({ embeds: [embed], components: [row] });       
+      return;     
+    }      
 
-      const row = new ActionRowBuilder().addComponents(bdayBtn);
+    if (interaction.commandName === "birthday") {       
+      const sub = interaction.options.getSubcommand();       
+      if (sub === "set") {         
+        const modal = new ModalBuilder()           
+          .setCustomId("birthday_modal")           
+          .setTitle("🎀 Set Your Birthday");          
+        
+        const dateInput = new TextInputBuilder()           
+          .setCustomId("bday_date")           
+          .setLabel("Tarikh Lahir (Format: DD/MM)")           
+          .setStyle(TextInputStyle.Short)           
+          .setPlaceholder("15/10")           
+          .setRequired(true);          
+        
+        modal.addComponents(new ActionRowBuilder().addComponents(dateInput));         
+        await interaction.showModal(modal);         
+        return;       
+      }     
+    }      
 
-      await interaction.reply({ content: "✅ Birthday Corner berjaya dihantar!", ephemeral: true });
-      await interaction.channel.send({ embeds: [bdayEmbed], components: [row] });
-      return;
-    }
+    if (interaction.commandName === "event") {       
+      const subcommand = interaction.options.getSubcommand();       
+      if (subcommand === "create") {         
+        if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {           
+          return interaction.reply({ content: "❌ Hanya Admin sahaja yang boleh mencipta event!", ephemeral: true });         
+        }          
 
-    if (interaction.commandName === "birthday") {
-      const sub = interaction.options.getSubcommand();
-      if (sub === "set") {
-        const modal = new ModalBuilder()
-          .setCustomId("birthday_modal")
-          .setTitle("🎀 Set Your Birthday");
+        const modal = new ModalBuilder()           
+          .setCustomId("event_create_modal")           
+          .setTitle("🌸 PlatoMy • Create Event (v2.0)");          
 
-        const dateInput = new TextInputBuilder()
-          .setCustomId("bday_date")
-          .setLabel("Tarikh Lahir (Format: DD/MM)")
-          .setStyle(TextInputStyle.Short)
-          .setPlaceholder("15/10")
-          .setRequired(true);
+        const titleInput = new TextInputBuilder()           
+          .setCustomId("event_title")           
+          .setLabel("Event Title")           
+          .setStyle(TextInputStyle.Short)           
+          .setPlaceholder("🌸 PlatoMy Evening Bingo")           
+          .setRequired(true);          
 
-        modal.addComponents(new ActionRowBuilder().addComponents(dateInput));
-        await interaction.showModal(modal);
-        return;
-      }
-    }
+        const datetimeInput = new TextInputBuilder()           
+          .setCustomId("event_datetime")           
+          .setLabel("Date & Start Time")           
+          .setStyle(TextInputStyle.Short)           
+          .setPlaceholder("10/10 @ 8:00 PM")           
+          .setRequired(true);          
 
-    if (interaction.commandName === "event") {
-      const subcommand = interaction.options.getSubcommand();
-      if (subcommand === "create") {
-        if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-          return interaction.reply({ content: "❌ Hanya Admin sahaja yang boleh mencipta event!", ephemeral: true });
-        }
+        const durationInput = new TextInputBuilder()           
+          .setCustomId("event_duration")           
+          .setLabel("Duration")           
+          .setStyle(TextInputStyle.Short)           
+          .setPlaceholder("90 minutes")           
+          .setRequired(true);          
 
-        const modal = new ModalBuilder()
-          .setCustomId("event_create_modal")
-          .setTitle("🌸 PlatoMy • Create Event (v2.0)");
+        const prizeInput = new TextInputBuilder()           
+          .setCustomId("event_prize")           
+          .setLabel("Prize Pool")           
+          .setStyle(TextInputStyle.Short)           
+          .setPlaceholder("1,500 Plato Coins + Exclusive Role 👑")           
+          .setRequired(true);          
 
-        const titleInput = new TextInputBuilder()
-          .setCustomId("event_title")
-          .setLabel("Event Title")
-          .setStyle(TextInputStyle.Short)
-          .setPlaceholder("🌸 PlatoMy Evening Bingo")
-          .setRequired(true);
+        const descInput = new TextInputBuilder()           
+          .setCustomId("event_desc")           
+          .setLabel("Description / Notes")           
+          .setStyle(TextInputStyle.Paragraph)           
+          .setPlaceholder("Sila bersedia 5 minit lebih awal! Let's have fun! ✨")           
+          .setRequired(true);          
 
-        const datetimeInput = new TextInputBuilder()
-          .setCustomId("event_datetime")
-          .setLabel("Date & Start Time")
-          .setStyle(TextInputStyle.Short)
-          .setPlaceholder("10/10 @ 8:00 PM")
-          .setRequired(true);
+        modal.addComponents(           
+          new ActionRowBuilder().addComponents(titleInput),           
+          new ActionRowBuilder().addComponents(datetimeInput),           
+          new ActionRowBuilder().addComponents(durationInput),           
+          new ActionRowBuilder().addComponents(prizeInput),           
+          new ActionRowBuilder().addComponents(descInput)         
+        );          
 
-        const durationInput = new TextInputBuilder()
-          .setCustomId("event_duration")
-          .setLabel("Duration")
-          .setStyle(TextInputStyle.Short)
-          .setPlaceholder("90 minutes")
-          .setRequired(true);
+        await interaction.showModal(modal);         
+        return;       
+      }     
+    }   
+  }    
 
-        const prizeInput = new TextInputBuilder()
-          .setCustomId("event_prize")
-          .setLabel("Prize Pool")
-          .setStyle(TextInputStyle.Short)
-          .setPlaceholder("1,500 Plato Coins + Exclusive Role 👑")
-          .setRequired(true);
-
-        const descInput = new TextInputBuilder()
-          .setCustomId("event_desc")
-          .setLabel("Description / Notes")
-          .setStyle(TextInputStyle.Paragraph)
-          .setPlaceholder("Sila bersedia 5 minit lebih awal! Let's have fun! ✨")
-          .setRequired(true);
-
-        modal.addComponents(
-          new ActionRowBuilder().addComponents(titleInput),
-          new ActionRowBuilder().addComponents(datetimeInput),
-          new ActionRowBuilder().addComponents(durationInput),
-          new ActionRowBuilder().addComponents(prizeInput),
-          new ActionRowBuilder().addComponents(descInput)
-        );
-
-        await interaction.showModal(modal);
-        return;
-      }
-    }
-  }
-
-  if (interaction.isModalSubmit()) {
-    if (interaction.customId === "ign_verify_modal") {
-      await interaction.deferReply({ ephemeral: true });
-      const id = interaction.fields.getTextInputValue("plato_id");
-      const embed = new EmbedBuilder()
-        .setColor("#ffb6c1")
-        .setTitle("🔍 Permohonan Sahkan Plato ID")
+  if (interaction.isModalSubmit()) {     
+    if (interaction.customId === "ign_verify_modal") {       
+      await interaction.deferReply({ ephemeral: true });       
+      const id = interaction.fields.getTextInputValue("plato_id");       
+      const embed = new EmbedBuilder()         
+        .setColor("#ffb6c1")         
+        .setTitle("🔍 Permohonan Sahkan Plato ID")         
         .setDescription(`• **Member:** ${interaction.user}\n• **Plato ID:** \`${id}\``);
       
       const row = new ActionRowBuilder().addComponents(
@@ -378,7 +429,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     if (interaction.customId === "birthday_modal") {
       await interaction.deferReply({ ephemeral: true });
-      const bdayDate = interaction.fields.getTextInputValue("bday_date"); // Format: DD/MM
+      const bdayDate = interaction.fields.getTextInputValue("bday_date");
       birthdaysMap.set(interaction.user.id, bdayDate);
 
       let bdayListText = "";
@@ -431,6 +482,65 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await interaction.editReply({ content: "✨ Event v2.0 berjaya dicipta!" });
       return;
     }
+
+    if (interaction.customId.startsWith("report_modal_")) {
+      await interaction.deferReply({ ephemeral: true });
+      const category = interaction.customId.replace("report_modal_", "");
+      const details = interaction.fields.getTextInputValue("report_details");
+      const evidence = interaction.fields.getTextInputValue("report_evidence") || "Tiada bukti diberikan";
+
+      const reportChannel = interaction.guild.channels.cache.find(c => c.name.includes("report-log") && c.isTextBased());
+
+      if (!reportChannel) {
+        return interaction.editReply({ content: "❌ Channel 'report-log' tidak dijumpai di server! Sila pastikan channel tersebut wujud." });
+      }
+
+      const reportEmbed = new EmbedBuilder()
+        .setColor("#ff2222")
+        .setTitle(`🚨 Laporan Baharu: [${category}]`)
+        .setDescription(`• **Pelapor:** ${interaction.user} (${interaction.user.tag})\n• **Status:** 🟡 Open\n• **Handler:** Belum di-claim\n\n📝 **Butiran:**\n${details}\n\n🔗 **Bukti / Screenshot:**\n${evidence}`)
+        .setTimestamp();
+
+      const actionRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId("report_claim").setLabel("🙋‍♂️ Claim Report").setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId("report_resolve").setLabel("✅ Resolve").setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId("report_reject").setLabel("❌ Reject").setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId("report_close").setLabel("🔒 Close & Log").setStyle(ButtonStyle.Secondary)
+      );
+
+      await reportChannel.send({ embeds: [reportEmbed], components: [actionRow] });
+      await interaction.editReply({ content: "✅ Laporan anda telah berjaya dihantar ke channel **report-log**! Terima kasih." });
+      return;
+    }
+  }
+
+  if (interaction.isStringSelectMenu() && interaction.customId === "report_category_select") {
+    const selectedCategory = interaction.values[0];
+    const modal = new ModalBuilder()
+      .setCustomId(`report_modal_${selectedCategory}`)
+      .setTitle(`Report: ${selectedCategory}`);
+
+    const detailsInput = new TextInputBuilder()
+      .setCustomId("report_details")
+      .setLabel("Butiran / Isu Laporan")
+      .setStyle(TextInputStyle.Paragraph)
+      .setPlaceholder("Terangkan masalah atau pengguna yang ingin dilapor...")
+      .setRequired(true);
+
+    const evidenceInput = new TextInputBuilder()
+      .setCustomId("report_evidence")
+      .setLabel("Link Bukti / Screenshot")
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder("https://imgur.com/... atau lampiran pautan")
+      .setRequired(false);
+
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(detailsInput),
+      new ActionRowBuilder().addComponents(evidenceInput)
+    );
+
+    await interaction.showModal(modal);
+    return;
   }
 
   if (interaction.isButton()) {
@@ -464,6 +574,111 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       modal.addComponents(new ActionRowBuilder().addComponents(dateInput));
       await interaction.showModal(modal);
+      return;
+    }
+
+    if (interaction.customId === "open_trading_ticket") {
+      await interaction.deferReply({ ephemeral: true });
+      const guild = interaction.guild;
+      const ticketChannel = await guild.channels.create({
+        name: `trade-${interaction.user.username}`,
+        type: ChannelType.GuildText,
+        permissionOverwrites: [
+          { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
+          { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
+        ],
+      });
+
+      const embed = new EmbedBuilder()
+        .setColor("#ffb6c1")
+        .setTitle("🛍️ Trading Ticket - Private Room")
+        .setDescription(`Hai ${interaction.user}! Selamat datang ke ruang trading peribadi anda.\n\nSila nyatakan barangan/servis yang ingin diniagakan. Staf akan segera membantu anda.`);
+
+      const closeBtn = new ButtonBuilder()
+        .setCustomId("close_ticket")
+        .setLabel("🔒 Close Ticket")
+        .setStyle(ButtonStyle.Danger);
+
+      await ticketChannel.send({ content: `${interaction.user}`, embeds: [embed], components: [new ActionRowBuilder().addComponents(closeBtn)] });
+      await interaction.editReply({ content: `✅ Tiket peribadi anda telah dibuka: <#${ticketChannel.id}>` });
+      return;
+    }
+
+    if (interaction.customId === "open_report_ticket") {
+      const selectMenu = new StringSelectMenuBuilder()
+        .setCustomId("report_category_select")
+        .setPlaceholder("Sila pilih kategori laporan...")
+        .addOptions([
+          { label: "Player / User Report", value: "Player Report", description: "Lapor salah laku pemain" },
+          { label: "Scam / Trading Issue", value: "Scam Issue", description: "Isu penipuan atau perdagangan" },
+          { label: "Harassment", value: "Harassment", description: "Gangguan atau ancaman" },
+          { label: "Bug / Technical Issue", value: "Technical Bug", description: "Isu teknikal atau pepijat" },
+          { label: "Other", value: "Other", description: "Lain-lain isu" },
+        ]);
+
+      const row = new ActionRowBuilder().addComponents(selectMenu);
+      await interaction.reply({ content: "📌 Sila pilih kategori laporan anda di bawah:", components: [row], ephemeral: true });
+      return;
+    }
+
+    if (interaction.customId === "close_ticket") {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return interaction.reply({ content: "❌ Hanya staf atau admin sahaja yang boleh menutup tiket ini!", ephemeral: true });
+      }
+
+      await interaction.reply({ content: "🔒 Tiket ini akan ditutup dalam masa 5 saat..." });
+      
+      setTimeout(async () => {
+        const logChannel = interaction.guild.channels.cache.find(c => c.name.includes(TRADING_LOG_CHANNEL_NAME) && c.isTextBased());
+        if (logChannel) {
+          const logEmb = new EmbedBuilder()
+            .setColor("#ffb6c1")
+            .setTitle("🔒 Trading Ticket Closed Log")
+            .setDescription(`• **Channel:** \`${interaction.channel.name}\`\n• **Closed by:** ${interaction.user}`)
+            .setTimestamp();
+          await logChannel.send({ embeds: [logEmb] }).catch(() => {});
+        }
+        await interaction.channel.delete().catch(() => {});
+      }, 5000);
+      return;
+    }
+
+    // Report Management Buttons for Staff
+    if (["report_claim", "report_resolve", "report_reject", "report_close"].includes(interaction.customId)) {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return interaction.reply({ content: "❌ Hanya staf sahaja yang boleh menguruskan laporan ini!", ephemeral: true });
+      }
+
+      const oldEmb = interaction.message.embeds[0];
+      const oldDesc = oldEmb.description;
+      let newStatus = "🟡 Open";
+      let color = "#ff2222";
+
+      if (interaction.customId === "report_claim") {
+        newStatus = `🔵 Under Review (Claimed by ${interaction.user.tag})`;
+        color = "#5865F2";
+      } else if (interaction.customId === "report_resolve") {
+        newStatus = `🟢 Resolved (Handled by ${interaction.user.tag})`;
+        color = "#57F287";
+      } else if (interaction.customId === "report_reject") {
+        newStatus = `🔴 Rejected (Handled by ${interaction.user.tag})`;
+        color = "#ED4245";
+      } else if (interaction.customId === "report_close") {
+        newStatus = `🔒 Closed & Archived (Handled by ${interaction.user.tag})`;
+        color = "#99AAB5";
+      }
+
+      const updatedDesc = oldDesc.replace(/• \*\*Status:\*\* .*/, `• **Status:** ${newStatus}`);
+      const newEmb = EmbedBuilder.from(oldEmb).setColor(color).setDescription(updatedDesc);
+
+      await interaction.update({ embeds: [newEmb], components: interaction.customId === "report_close" ? [] : interaction.message.components });
+
+      if (interaction.customId === "report_close") {
+        const logChannel = interaction.guild.channels.cache.find(c => c.name.includes(REPORT_LOG_CHANNEL_NAME) && c.isTextBased());
+        if (logChannel) {
+          await logChannel.send({ embeds: [newEmb] }).catch(() => {});
+        }
+      }
       return;
     }
 
