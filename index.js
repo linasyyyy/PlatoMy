@@ -520,7 +520,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       let sortedBdays = [...birthdaysMap.entries()].sort((a,b) => a[1].timestamp - b[1].timestamp);
       let bdayListText = "";
       sortedBdays.forEach(([userId, data]) => {
-        bdayListText += `• <t:${data.timestamp}:D> : <@${userId>\n`;
+        bdayListText += `• <t:${data.timestamp}:D> : <@${userId}>\n`;
       });
 
       const bdayEmbed = new EmbedBuilder()
@@ -543,7 +543,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) return;       
       const embed = new EmbedBuilder()         
         .setColor("#ffb6c1")         
-        .setTitle("🛍️ PlatoMy • Trading Center 🤝")         
+        .setTitle("🛍️️ PlatoMy • Trading Center 🤝")         
         .setDescription("Ingin membuat pertukaran item? Sila klik butang di bawah untuk membuka Trading Ticket!");        
       
       const row = new ActionRowBuilder().addComponents(         
@@ -1230,6 +1230,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const disabledRow = new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId("join_event_v2").setLabel("🎟 Event Telah Tamat").setStyle(ButtonStyle.Secondary).setDisabled(true)
         );
+        await interaction.message.end?.({ components: [disabledRow] }).catch(() => {});
         await interaction.message.edit({ components: [disabledRow] }).catch(() => {});
         return interaction.editReply({ content: "❌ Maaf, masa untuk menyertai event ini sudah tamat!" });
       }
