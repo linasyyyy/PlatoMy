@@ -520,7 +520,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       let sortedBdays = [...birthdaysMap.entries()].sort((a,b) => a[1].timestamp - b[1].timestamp);
       let bdayListText = "";
       sortedBdays.forEach(([userId, data]) => {
-        bdayListText += `• <t:${data.timestamp}:E> <t:${data.timestamp}:d> (<t:${data.timestamp}:R>) : <@${userId}>\n`;
+        bdayListText += `• <t:${data.timestamp}:D> : <@${userId>\n`;
       });
 
       const bdayEmbed = new EmbedBuilder()
@@ -823,7 +823,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       let sortedBdays = [...birthdaysMap.entries()].sort((a,b) => a[1].timestamp - b[1].timestamp);
       let bdayListText = "";
       sortedBdays.forEach(([userId, data]) => {
-        bdayListText += `• <t:${data.timestamp}:E> <t:${data.timestamp}:d> (<t:${data.timestamp}:R>) : <@${userId}>\n`;
+        bdayListText += `• <t:${data.timestamp}:D> : <@${userId}>\n`;
       });
 
       const updatedEmbed = new EmbedBuilder()
