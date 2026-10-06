@@ -73,7 +73,22 @@ const server = http.createServer(async (req, res) => {
             const gwEmbed = new EmbedBuilder()
               .setColor("#ffb6c1")
               .setTitle("˚.🎀༘⋆ GIVEAWAY ˚.🎀༘⋆")
-              .setDescription(`🎁 **Hadiah:** ${prize}\n👑 **Pemenang:** ${winnersCount}\n⏳ **Berakhir:** <t:${endTimeSeconds}:R>\n\n👥 **Penyertaan:** 0`)               .setTimestamp();              const joinBtn = new ButtonBuilder().setCustomId("join_giveaway").setLabel("🎉 Sertai Giveaway").setStyle(ButtonStyle.Success);             const msg = await textChannel.send({ embeds: [gwEmbed], components: [new ActionRowBuilder().addComponents(joinBtn)] });              giveawaysMap.set(msg.id, { prize, winnersCount, participants: [], ended: false });           }            else if (actionType === "event") {             const title = postData.evTitle \vert{}\vert{} "Event Komuniti";             const timeStr = postData.evTime \vert{}\vert{} "Sekarang";             const prize = postData.evPrize \vert{}\vert{} "Tiada Hadiah";              const evEmbed = new EmbedBuilder()               .setColor("#ffb6c1")               .setTitle(`🎮 ${title}`)
+              .setDescription(`🎁 **Hadiah:** ${prize}\n👑 **Pemenang:** ${winnersCount}\n⏳ **Berakhir:** <t:${endTimeSeconds}:R>\n\n👥 **Penyertaan:** 0`)
+              .setTimestamp();
+
+            const joinBtn = new ButtonBuilder().setCustomId("join_giveaway").setLabel("🎉 Sertai Giveaway").setStyle(ButtonStyle.Success);
+            const msg = await textChannel.send({ embeds: [gwEmbed], components: [new ActionRowBuilder().addComponents(joinBtn)] });
+
+            giveawaysMap.set(msg.id, { prize, winnersCount, participants: [], ended: false });
+          } 
+          else if (actionType === "event") {
+            const title = postData.evTitle || "Event Komuniti";
+            const timeStr = postData.evTime || "Sekarang";
+            const prize = postData.evPrize || "Tiada Hadiah";
+
+            const evEmbed = new EmbedBuilder()
+              .setColor("#ffb6c1")
+              .setTitle(`🎮 ${title}`)
               .setDescription(`📅 **Masa:** ${timeStr}\n🎁 **Hadiah:** ${prize}\n👥 **Pemain:** 0`)
               .setTimestamp();
 
@@ -270,10 +285,9 @@ async function sendLog(guild, channelNameOrId, payload) {
   }
 }
 
-// Fungsi Parse Birthday fleksibel (Cth: "1 oktober", "7 oct")
 function parseBirthdayToTimestamp(inputStr) {
   const months = {
-    jan: 0, january: 0, okey: 0,
+    jan: 0, january: 0,
     feb: 1, february: 1,
     mar: 2, march: 2,
     apr: 3, april: 3,
@@ -1211,7 +1225,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return interaction.editReply({ content: "❌ Event ini tidak wujud atau telah tamat." });
       }
 
-      // Semak sama ada masa event sudah lepas
       if (Date.now() > ev.endTimeMs) {
         ev.ended = true;
         const disabledRow = new ActionRowBuilder().addComponents(
