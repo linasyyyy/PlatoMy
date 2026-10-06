@@ -35,12 +35,11 @@ const eventsMap = new Map();
 const birthdaysMap = new Map(); 
 const giveawaysMap = new Map(); 
 
-// --- LAMAN WEB DASHBOARD INTERAKTIF (DENGAN PILIHAN CHANNEL KHAS) ---
+// --- LAMAN WEB DASHBOARD INTERAKTIF ---
 const server = http.createServer(async (req, res) => {
   const parsedUrl = url.parse(req.url, true);
   const pathname = parsedUrl.pathname;
 
-  // 1. PROSES TINDAKAN DARIPADA WEBSITE (FORM SUBMIT)
   if (req.method === "POST" && pathname === "/action") {
     let body = "";
     req.on("data", chunk => { body += chunk; });
@@ -52,7 +51,7 @@ const server = http.createServer(async (req, res) => {
       if (guild) {
         let targetChannelName = "";
         if (actionType === "giveaway") targetChannelName = "🎁・giveaway";
-        else if (actionType === "event") targetChannelName = "🗣️・event-annoucement";
+        else if (actionType === "event") targetChannelName = "🗣・event-annoucement";
         else if (actionType === "setup_verify") targetChannelName = "🫆・verify-here";
         else if (actionType === "setup_birthday") targetChannelName = "🎂・birthday-corner";
 
@@ -73,7 +72,7 @@ const server = http.createServer(async (req, res) => {
 
             const gwEmbed = new EmbedBuilder()
               .setColor("#ffb6c1")
-              .setTitle("🎉 GIVEAWAY BERMULA! 🎁")
+              .setTitle("˚.🎀༘⋆ GIVEAWAY ˚.🎀༘⋆")
               .setDescription(`🎁 **Hadiah:** ${prize}\n👑 **Pemenang:** ${winnersCount}\n⏳ **Berakhir:** <t:${endTimeSeconds}:R>\n\n👥 **Penyertaan:** 0`)
               .setTimestamp();
 
@@ -117,7 +116,6 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 2. PAPARAN LAMAN WEB DASHBOARD
   const sortedWallets = [...wallets.entries()].sort((a, b) => b[1].serverPoints - a[1].serverPoints).slice(0, 5);
   let leaderboardRows = sortedWallets.length === 0 ? "<tr><td colspan='3'>Belum ada rekod EXP lagi.</td></tr>" : 
     sortedWallets.map(([uid, data], i) => `<tr><td>#${i+1}</td><td>ID:${uid}</td><td>Lvl ${Math.floor(data.serverPoints/100)+1} (${data.serverPoints} pts)</td></tr>`).join("");
@@ -226,6 +224,9 @@ const commands = [
   new SlashCommandBuilder().setName("setup-birthday").setDescription("Hantar panel Birthday Corner yang aesthetic (Admin sahaja)"),
   new SlashCommandBuilder().setName("setup-trading").setDescription("Hantar panel Trading Ticket sahaja (Admin sahaja)"),
   new SlashCommandBuilder().setName("setup-report").setDescription("Hantar panel Report Ticket sahaja (Admin sahaja)"),
+  new SlashCommandBuilder().setName("embed-builder").setDescription("Cipta dan edit custom embed interaktif (Admin sahaja)")
+    .addChannelOption(opt => opt.setName("channel").setDescription("Pilih channel untuk hantar embed").setRequired(true)
+      .addChannelTypes(ChannelType.GuildText)),
   new SlashCommandBuilder().setName("birthday").setDescription("Urus tarikh lahir anda")
     .addSubcommand(sub => sub.setName("set").setDescription("Tetapkan tarikh lahir anda")),
   new SlashCommandBuilder().setName("event").setDescription("Urus event komuniti")
@@ -401,6 +402,27 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setTimestamp();
 
       await interaction.reply({ embeds: [lbEmbed] });
+      return;
+    }
+
+    if (interaction.commandName === "embed-builder") {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return interaction.reply({ content: "❌ Hanya Admin sahaja!", ephemeral: true });
+      }
+
+      const targetChannel = interaction.options.getChannel("channel");
+      
+      const defaultEmbed = new EmbedBuilder()
+        .setColor("#ffb6c1")
+        .setTitle("Plato MY")
+        .setDescription("Test");
+
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`eb_edit_${targetChannel.id}`).setLabel("edit basic info").setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId(`eb_send_${targetChannel.id}`).setLabel("🚀 Send to Channel").setStyle(ButtonStyle.Success)
+      );
+
+      await interaction.reply({ content: `✨ Embed Builder diaktifkan untuk channel **${targetChannel.name}**:`, embeds: [defaultEmbed], components: [row], ephemeral: true });
       return;
     }
 
@@ -616,7 +638,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         const giveawayEmbed = new EmbedBuilder()
           .setColor("#ffb6c1")
-          .setTitle("🎉 GIVEAWAY BERMULA! 🎁")
+          .setTitle("˚.🎀༘⋆ GIVEAWAY ˚.🎀༘⋆")
           .setDescription(`🎁 **Hadiah:** ${prize}\n👑 **Bilangan Pemenang:** ${winnersCount}\n⏳ **Berakhir Pada:** <t:${endTimeSeconds}:R> (<t:${endTimeSeconds}:f>)\n\n✨ Klik butang **"🎉 Sertai Giveaway"** di bawah untuk menyertai!\n👥 **Penyertaan:** 0`)
           .setThumbnail(LOGO_URL)
           .setTimestamp();
@@ -674,6 +696,22 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }    
 
   if (interaction.isModalSubmit()) {     
+    if (interaction.customId.startsWith("eb_modal_edit_")) {
+      await interaction.deferUpdate();
+      const newTitle = interaction.fields.getTextInputValue("eb_title");
+      const newDesc = interaction.fields.getTextInputValue("eb_desc");
+      const newColor = interaction.fields.getTextInputValue("eb_color") || "#ffb6c1";
+
+      const oldEmbed = interaction.message.embeds[0];
+      const updatedEmbed = EmbedBuilder.from(oldEmbed)
+        .setTitle(newTitle)
+        .setDescription(newDesc)
+        .setColor(newColor);
+
+      await interaction.editReply({ embeds: [updatedEmbed] });
+      return;
+    }
+
     if (interaction.customId === "ign_verify_modal") {       
       await interaction.deferReply({ ephemeral: true });       
       const id = interaction.fields.getTextInputValue("plato_id");       
@@ -811,6 +849,59 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 
   if (interaction.isButton()) {
+    if (interaction.customId.startsWith("eb_edit_")) {
+      const channelId = interaction.customId.replace("eb_edit_", "");
+      const currentEmbed = interaction.message.embeds[0];
+
+      const modal = new ModalBuilder()
+        .setCustomId(`eb_modal_edit_${channelId}`)
+        .setTitle("Edit Basic Information");
+
+      const titleInput = new TextInputBuilder()
+        .setCustomId("eb_title")
+        .setLabel("Embed Title")
+        .setStyle(TextInputStyle.Short)
+        .setValue(currentEmbed.title || "")
+        .setRequired(true);
+
+      const descInput = new TextInputBuilder()
+        .setCustomId("eb_desc")
+        .setLabel("Embed Description")
+        .setStyle(TextInputStyle.Paragraph)
+        .setValue(currentEmbed.description || "")
+        .setRequired(true);
+
+      const colorInput = new TextInputBuilder()
+        .setCustomId("eb_color")
+        .setLabel("Embed Color (Cth: #ffb6c1)")
+        .setStyle(TextInputStyle.Short)
+        .setValue("#ffb6c1")
+        .setRequired(false);
+
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(titleInput),
+        new ActionRowBuilder().addComponents(descInput),
+        new ActionRowBuilder().addComponents(colorInput)
+      );
+
+      await interaction.showModal(modal);
+      return;
+    }
+
+    if (interaction.customId.startsWith("eb_send_")) {
+      const channelId = interaction.customId.replace("eb_send_", "");
+      const targetChannel = interaction.guild.channels.cache.get(channelId);
+
+      if (!targetChannel) {
+        return interaction.reply({ content: "❌ Channel tidak dijumpai!", ephemeral: true });
+      }
+
+      const embedToSend = interaction.message.embeds[0];
+      await targetChannel.send({ embeds: [embedToSend] });
+      await interaction.update({ content: "✅ Embed berjaya dihantar ke channel pilihan!", embeds: [], components: [] });
+      return;
+    }
+
     if (interaction.customId === "open_verify_modal") {
       const modal = new ModalBuilder()
         .setCustomId("ign_verify_modal")
@@ -980,12 +1071,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       gw.participants.push(interaction.user.id);
 
-      const oldEmb = interaction.message.embeds[0];
-      const newEmb = EmbedBuilder.from(oldEmb)
-        .setDescription(oldEmb.description.replace(/👥 \*\*Penyertaan:\*\* \d+/, `👥 **Penyertaan:** ${gw.participants.length}`));
+      const oldEmbed = interaction.message.embeds[0];
+      const newEmbed = EmbedBuilder.from(oldEmbed)
+        .setDescription(oldEmbed.description.replace(/👥 \*\*Penyertaan:\*\* \d+/, `👥 **Penyertaan:** ${gw.participants.length}`));
 
-      await interaction.message.edit({ embeds: [newEmb] }).catch(() => {});
-      await interaction.editReply({ content: `✅ Berjaya menyertai giveaway! Semoga rezeki awak! 🎉` });
+      await interaction.message.edit({ embeds: [newEmbed] }).catch(() => {});
+      await interaction.editReply({ content: `✅ Berjaya menyertai giveaway! Semoga ada rezeki awak! 🎉` });
       return;
     }
 
