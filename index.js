@@ -417,12 +417,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setTitle("Plato MY")
         .setDescription("Test");
 
-      const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(`eb_edit_${targetChannel.id}`).setLabel("edit basic info").setStyle(ButtonStyle.Primary),
+      const row1 = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`eb_edit_basic_${targetChannel.id}`).setLabel("edit basic info").setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId(`eb_edit_author_${targetChannel.id}`).setLabel("edit author").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId(`eb_edit_footer_${targetChannel.id}`).setLabel("edit footer").setStyle(ButtonStyle.Secondary)
+      );
+
+      const row2 = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`eb_edit_images_${targetChannel.id}`).setLabel("edit images").setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId(`eb_send_${targetChannel.id}`).setLabel("🚀 Send to Channel").setStyle(ButtonStyle.Success)
       );
 
-      await interaction.reply({ content: `✨ Embed Builder diaktifkan untuk channel **${targetChannel.name}**:`, embeds: [defaultEmbed], components: [row], ephemeral: true });
+      await interaction.reply({ content: `✨ Embed Builder diaktifkan untuk channel **${targetChannel.name}**:`, embeds: [defaultEmbed], components: [row1, row2], ephemeral: true });
       return;
     }
 
@@ -696,7 +702,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }    
 
   if (interaction.isModalSubmit()) {     
-    if (interaction.customId.startsWith("eb_modal_edit_")) {
+    if (interaction.customId.startsWith("eb_modal_basic_")) {
       await interaction.deferUpdate();
       const newTitle = interaction.fields.getTextInputValue("eb_title");
       const newDesc = interaction.fields.getTextInputValue("eb_desc");
@@ -707,6 +713,46 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setTitle(newTitle)
         .setDescription(newDesc)
         .setColor(newColor);
+
+      await interaction.editReply({ embeds: [updatedEmbed] });
+      return;
+    }
+
+    if (interaction.customId.startsWith("eb_modal_author_")) {
+      await interaction.deferUpdate();
+      const authorName = interaction.fields.getTextInputValue("eb_author_name");
+      const authorIcon = interaction.fields.getTextInputValue("eb_author_icon") || null;
+
+      const oldEmbed = interaction.message.embeds[0];
+      const updatedEmbed = EmbedBuilder.from(oldEmbed)
+        .setAuthor({ name: authorName, iconURL: authorIcon });
+
+      await interaction.editReply({ embeds: [updatedEmbed] });
+      return;
+    }
+
+    if (interaction.customId.startsWith("eb_modal_footer_")) {
+      await interaction.deferUpdate();
+      const footerText = interaction.fields.getTextInputValue("eb_footer_text");
+      const footerIcon = interaction.fields.getTextInputValue("eb_footer_icon") || null;
+
+      const oldEmbed = interaction.message.embeds[0];
+      const updatedEmbed = EmbedBuilder.from(oldEmbed)
+        .setFooter({ text: footerText, iconURL: footerIcon });
+
+      await interaction.editReply({ embeds: [updatedEmbed] });
+      return;
+    }
+
+    if (interaction.customId.startsWith("eb_modal_images_")) {
+      await interaction.deferUpdate();
+      const imageUrl = interaction.fields.getTextInputValue("eb_image") || null;
+      const thumbUrl = interaction.fields.getTextInputValue("eb_thumbnail") || null;
+
+      const oldEmbed = interaction.message.embeds[0];
+      const updatedEmbed = EmbedBuilder.from(oldEmbed)
+        .setImage(imageUrl)
+        .setThumbnail(thumbUrl);
 
       await interaction.editReply({ embeds: [updatedEmbed] });
       return;
@@ -849,12 +895,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 
   if (interaction.isButton()) {
-    if (interaction.customId.startsWith("eb_edit_")) {
-      const channelId = interaction.customId.replace("eb_edit_", "");
+    if (interaction.customId.startsWith("eb_edit_basic_")) {
+      const channelId = interaction.customId.replace("eb_edit_basic_", "");
       const currentEmbed = interaction.message.embeds[0];
 
       const modal = new ModalBuilder()
-        .setCustomId(`eb_modal_edit_${channelId}`)
+        .setCustomId(`eb_modal_basic_${channelId}`)
         .setTitle("Edit Basic Information");
 
       const titleInput = new TextInputBuilder()
@@ -882,6 +928,99 @@ client.on(Events.InteractionCreate, async (interaction) => {
         new ActionRowBuilder().addComponents(titleInput),
         new ActionRowBuilder().addComponents(descInput),
         new ActionRowBuilder().addComponents(colorInput)
+      );
+
+      await interaction.showModal(modal);
+      return;
+    }
+
+    if (interaction.customId.startsWith("eb_edit_author_")) {
+      const channelId = interaction.customId.replace("eb_edit_author_", "");
+      const currentEmbed = interaction.message.embeds[0];
+
+      const modal = new ModalBuilder()
+        .setCustomId(`eb_modal_author_${channelId}`)
+        .setTitle("Edit Author");
+
+      const authorNameInput = new TextInputBuilder()
+        .setCustomId("eb_author_name")
+        .setLabel("Author Name")
+        .setStyle(TextInputStyle.Short)
+        .setValue(currentEmbed.author?.name || "")
+        .setRequired(false);
+
+      const authorIconInput = new TextInputBuilder()
+        .setCustomId("eb_author_icon")
+        .setLabel("Author Icon URL")
+        .setStyle(TextInputStyle.Short)
+        .setValue(currentEmbed.author?.iconURL || "")
+        .setRequired(false);
+
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(authorNameInput),
+        new ActionRowBuilder().addComponents(authorIconInput)
+      );
+
+      await interaction.showModal(modal);
+      return;
+    }
+
+    if (interaction.customId.startsWith("eb_edit_footer_")) {
+      const channelId = interaction.customId.replace("eb_edit_footer_", "");
+      const currentEmbed = interaction.message.embeds[0];
+
+      const modal = new ModalBuilder()
+        .setCustomId(`eb_modal_footer_${channelId}`)
+        .setTitle("Edit Footer");
+
+      const footerTextInput = new TextInputBuilder()
+        .setCustomId("eb_footer_text")
+        .setLabel("Footer Text")
+        .setStyle(TextInputStyle.Short)
+        .setValue(currentEmbed.footer?.text || "")
+        .setRequired(false);
+
+      const footerIconInput = new TextInputBuilder()
+        .setCustomId("eb_footer_icon")
+        .setLabel("Footer Icon URL")
+        .setStyle(TextInputStyle.Short)
+        .setValue(currentEmbed.footer?.iconURL || "")
+        .setRequired(false);
+
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(footerTextInput),
+        new ActionRowBuilder().addComponents(footerIconInput)
+      );
+
+      await interaction.showModal(modal);
+      return;
+    }
+
+    if (interaction.customId.startsWith("eb_edit_images_")) {
+      const channelId = interaction.customId.replace("eb_edit_images_", "");
+      const currentEmbed = interaction.message.embeds[0];
+
+      const modal = new ModalBuilder()
+        .setCustomId(`eb_modal_images_${channelId}`)
+        .setTitle("Edit Images");
+
+      const imageInput = new TextInputBuilder()
+        .setCustomId("eb_image")
+        .setLabel("Main Image URL")
+        .setStyle(TextInputStyle.Short)
+        .setValue(currentEmbed.image?.url || "")
+        .setRequired(false);
+
+      const thumbInput = new TextInputBuilder()
+        .setCustomId("eb_thumbnail")
+        .setLabel("Thumbnail URL")
+        .setStyle(TextInputStyle.Short)
+        .setValue(currentEmbed.thumbnail?.url || "")
+        .setRequired(false);
+
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(imageInput),
+        new ActionRowBuilder().addComponents(thumbInput)
       );
 
       await interaction.showModal(modal);
