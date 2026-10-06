@@ -17,6 +17,8 @@ import {
   StringSelectMenuBuilder,
 } from "discord.js";
 import http from "http";
+import url from "url";
+import querystring from "querystring";
 
 const token = process.env.DISCORD_TOKEN;
 const client = new Client({ 
@@ -33,60 +35,83 @@ const eventsMap = new Map();
 const birthdaysMap = new Map(); 
 const giveawaysMap = new Map(); 
 
-// --- LAMAN WEB DASHBOARD LENGKAP PLATOMY ---
-const server = http.createServer((req, res) => {
-  // 1. Leaderboard Data
-  const sortedWallets = [...wallets.entries()]
-    .sort((a, b) => b[1].serverPoints - a[1].serverPoints)
-    .slice(0, 5);
+// --- LAMAN WEB DASHBOARD INTERAKTIF (CARL-BOT STYLE) ---
+const server = http.createServer(async (req, res) => {
+  const parsedUrl = url.parse(req.url, true);
+  const pathname = parsedUrl.pathname;
 
-  let leaderboardRows = "";
-  if (sortedWallets.length === 0) {
-    leaderboardRows = "<tr><td colspan='3' style='color: #888;'>Belum ada rekod EXP lagi.</td></tr>";
-  } else {
-    const medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"];
-    sortedWallets.forEach(([userId, data], index) => {
-      const medalIcon = medals[index] || `#${index + 1}`;
-      const estimatedLevel = Math.floor(data.serverPoints / 100) + 1;
-      leaderboardRows += `
-        <tr>
-          <td>${medalIcon}</td>
-          <td>ID: ${userId}</td>
-          <td><b>Lvl ${estimatedLevel}</b> (${data.serverPoints.toLocaleString()} pts)</td>
-        </tr>
-      `;
+  // 1. PROSES TINDAKAN DARIPADA WEBSITE (FORM SUBMIT)
+  if (req.method === "POST" && pathname === "/action") {
+    let body = "";
+    req.on("data", chunk => { body += chunk; });
+    req.on("end", async () => {
+      const postData = querystring.parse(body);
+      const actionType = postData.actionType;
+      
+      // Cari guild pertama yang bot join untuk hantar aksi
+      const guild = client.guilds.cache.first();
+      if (guild) {
+        const textChannel = guild.channels.cache.find(c => c.isTextBased() && c.permissionsFor(guild.members.me).has(PermissionFlagsBits.SendMessages));
+        
+        if (textChannel) {
+          if (actionType === "giveaway") {
+            const prize = postData.gwPrize || "Hadiah Misteri";
+            const duration = parseInt(postData.gwDuration) || 5;
+            const winnersCount = parseInt(postData.gwWinners) || 1;
+
+            const endTime = Date.now() + duration * 60 * 1000;
+            const endTimeSeconds = Math.floor(endTime / 1000);
+
+            const gwEmbed = new EmbedBuilder()
+              .setColor("#ffb6c1")
+              .setTitle("🎉 GIVEAWAY BERMULA! 🎁")
+              .setDescription(`🎁 **Hadiah:** ${prize}\n👑 **Pemenang:** ${winnersCount}\n⏳ **Berakhir:** <t:${endTimeSeconds}:R>\n\n👥 **Penyertaan:** 0`)
+              .setTimestamp();
+
+            const joinBtn = new ButtonBuilder().setCustomId("join_giveaway").setLabel("🎉 Sertai Giveaway").setStyle(ButtonStyle.Success);
+            const msg = await textChannel.send({ embeds: [gwEmbed], components: [new ActionRowBuilder().addComponents(joinBtn)] });
+
+            giveawaysMap.set(msg.id, { prize, winnersCount, participants: [], ended: false });
+          } 
+          else if (actionType === "event") {
+            const title = postData.evTitle || "Event Komuniti";
+            const timeStr = postData.evTime || "Sekarang";
+            const prize = postData.evPrize || "Tiada Hadiah";
+
+            const evEmbed = new EmbedBuilder()
+              .setColor("#ffb6c1")
+              .setTitle(`🎮 ${title}`)
+              .setDescription(`📅 **Masa:** ${timeStr}\n🎁 **Hadiah:** ${prize}\n👥 **Pemain:** 0`)
+              .setTimestamp();
+
+            const joinBtn = new ButtonBuilder().setCustomId("join_event_v2").setLabel("🎟 Join Event").setStyle(ButtonStyle.Success);
+            const msg = await textChannel.send({ embeds: [evEmbed], components: [new ActionRowBuilder().addComponents(joinBtn)] });
+
+            eventsMap.set(msg.id, { title, participants: [], ended: false });
+          }
+          else if (actionType === "setup_verify") {
+            const embed = new EmbedBuilder().setColor("#ffb6c1").setTitle("PlatoMy • Sahkan Plato ID ✨").setDescription("Sila klik butang di bawah untuk sahkan Plato ID anda!");
+            const btn = new ButtonBuilder().setCustomId("open_verify_modal").setLabel("✨ Tekan Disini").setStyle(ButtonStyle.Primary);
+            await textChannel.send({ embeds: [embed], components: [new ActionRowBuilder().addComponents(btn)] });
+          }
+          else if (actionType === "setup_birthday") {
+            const embed = new EmbedBuilder().setColor("#ffb6c1").setTitle("🎂 Birthday Corner 🎂").setDescription("Klik butang di bawah untuk tetapkan tarikh lahir anda! ♡");
+            const btn = new ButtonBuilder().setCustomId("open_birthday_modal").setLabel("🎀 Set/Update Birthday").setStyle(ButtonStyle.Primary);
+            await textChannel.send({ embeds: [embed], components: [new ActionRowBuilder().addComponents(btn)] });
+          }
+        }
+      }
+
+      res.writeHead(302, { Location: "/" });
+      res.end();
     });
+    return;
   }
 
-  // 2. Giveaway Aktif Data
-  let giveawayRows = "";
-  if (giveawaysMap.size === 0) {
-    giveawayRows = "<tr><td colspan='2' style='color: #888;'>Tiada giveaway aktif buat masa ini.</td></tr>";
-  } else {
-    for (const [_, gw] of giveawaysMap.entries()) {
-      giveawayRows += `
-        <tr>
-          <td>🎁 <b>${gw.prize}</b></td>
-          <td>👥 ${gw.participants.length} Penyertaan</td>
-        </tr>
-      `;
-    }
-  }
-
-  // 3. Birthday Corner Data
-  let birthdayRows = "";
-  if (birthdaysMap.size === 0) {
-    birthdayRows = "<tr><td colspan='2' style='color: #888;'>Tiada tarikh lahir direkodkan lagi.</td></tr>";
-  } else {
-    for (const [userId, bData] of birthdaysMap.entries()) {
-      birthdayRows += `
-        <tr>
-          <td>🌸 <b>${bData.dateStr}</b></td>
-          <td>ID: ${userId}</td>
-        </tr>
-      `;
-    }
-  }
+  // 2. PAPARAN LAMAN WEB DASHBOARD
+  const sortedWallets = [...wallets.entries()].sort((a, b) => b[1].serverPoints - a[1].serverPoints).slice(0, 5);
+  let leaderboardRows = sortedWallets.length === 0 ? "<tr><td colspan='3'>Belum ada rekod EXP lagi.</td></tr>" : 
+    sortedWallets.map(([uid, data], i) => `<tr><td>#${i+1}</td><td>ID:${uid}</td><td>Lvl ${Math.floor(data.serverPoints/100)+1} (${data.serverPoints} pts)</td></tr>`).join("");
 
   res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
   res.end(`
@@ -95,101 +120,68 @@ const server = http.createServer((req, res) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>PlatoMy • Complete Dashboard</title>
+        <title>PlatoMy • Control Panel</title>
         <style>
-            body {
-                background-color: #fff0f3;
-                color: #59484b;
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                text-align: center;
-                padding: 20px 10px;
-            }
-            .container {
-                max-width: 700px;
-                margin: 0 auto;
-            }
-            .card {
-                background: white;
-                padding: 25px;
-                border-radius: 20px;
-                box-shadow: 0 10px 25px rgba(255, 182, 193, 0.4);
-                border: 2px solid #ffb6c1;
-                margin-bottom: 20px;
-            }
-            h1 {
-                color: #ff69b4;
-                font-size: 24px;
-                margin-bottom: 5px;
-            }
-            h3 {
-                color: #ff69b4;
-                font-size: 18px;
-                margin-top: 20px;
-                margin-bottom: 10px;
-            }
-            p {
-                font-size: 14px;
-                line-height: 1.5;
-            }
-            .badge {
-                display: inline-block;
-                background-color: #ffb6c1;
-                color: white;
-                padding: 5px 12px;
-                border-radius: 50px;
-                font-weight: bold;
-                font-size: 13px;
-                margin-bottom: 15px;
-            }
-            table {
-                width: 100%;
-                border-collapse: collapse;
-                background: #fff8f9;
-                border-radius: 10px;
-                overflow: hidden;
-                margin-bottom: 10px;
-            }
-            th, td {
-                padding: 8px 10px;
-                border-bottom: 1px solid #ffe4e6;
-                font-size: 13px;
-                text-align: center;
-            }
-            th {
-                background-color: #ffb6c1;
-                color: white;
-            }
+            body { background-color: #fff0f3; color: #59484b; font-family: 'Segoe UI', Tahoma, sans-serif; text-align: center; padding: 20px; }
+            .container { max-width: 750px; margin: 0 auto; }
+            .card { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(255,182,193,0.4); border: 2px solid #ffb6c1; margin-bottom: 20px; }
+            h1, h3 { color: #ff69b4; }
+            input, button { width: 100%; padding: 10px; margin: 8px 0; border-radius: 10px; border: 1px solid #ffb6c1; box-sizing: border-box; }
+            button { background-color: #ff69b4; color: white; font-weight: bold; cursor: pointer; }
+            button:hover { background-color: #ff479b; }
+            table { width: 100%; border-collapse: collapse; background: #fff8f9; border-radius: 10px; overflow: hidden; margin-top: 10px; }
+            th, td { padding: 8px; border-bottom: 1px solid #ffe4e6; font-size: 13px; text-align: center; }
+            th { background-color: #ffb6c1; color: white; }
+            .badge { display: inline-block; background: #ffb6c1; color: white; padding: 5px 12px; border-radius: 50px; font-weight: bold; font-size: 13px; }
         </style>
     </head>
     <body>
         <div class="container">
             <div class="card">
-                <h1>🌸 PlatoMy Community Hub 🌸</h1>
-                <div class="badge">✨ Status: Online & Running</div>
-                <p>Selamat datang ke pusat pemantauan rasmi komuniti PlatoMy! Semua aktiviti server terpapar di sini secara langsung. ♡</p>
+                <h1>🌸 PlatoMy Bot Control Panel 🌸</h1>
+                <div class="badge">✨ Status: Online & Connected</div>
+                <p>Urus bot Discord anda secara terus dari website ini macam Carl-bot! ♡</p>
             </div>
 
             <div class="card">
-                <h3>📊 Top 5 Live Leaderboard (EXP)</h3>
+                <h3>🎉 Cipta Giveaway Pantas</h3>
+                <form action="/action" method="POST">
+                    <input type="hidden" name="actionType" value="giveaway">
+                    <input type="text" name="gwPrize" placeholder="Hadiah (Cth: 1,000 Coins)" required>
+                    <input type="number" name="gwDuration" placeholder="Masa (Minit)" required>
+                    <input type="number" name="gwWinners" placeholder="Bilangan Pemenang" required>
+                    <button type="submit">Hantar Giveaway ke Discord 🚀</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h3>🎮 Cipta Event Komuniti</h3>
+                <form action="/action" method="POST">
+                    <input type="hidden" name="actionType" value="event">
+                    <input type="text" name="evTitle" placeholder="Tajuk Event" required>
+                    <input type="text" name="evTime" placeholder="Masa (Cth: 10/10 @ 8 PM)" required>
+                    <input type="text" name="evPrize" placeholder="Hadiah Event" required>
+                    <button type="submit">Hantar Event ke Discord 🎮</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h3>📌 Hantar Panel Setup Utama</h3>
+                <form action="/action" method="POST" style="display: flex; gap: 10px;">
+                    <input type="hidden" name="actionType" value="setup_verify">
+                    <button type="submit">Hantar Panel Verify</button>
+                </form>
+                <form action="/action" method="POST" style="margin-top: 10px;">
+                    <input type="hidden" name="actionType" value="setup_birthday">
+                    <button type="submit">Hantar Panel Birthday</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h3>📊 Live Leaderboard (Top 5)</h3>
                 <table>
                     <tr><th>Rank</th><th>User</th><th>Level & Points</th></tr>
                     ${leaderboardRows}
-                </table>
-            </div>
-
-            <div class="card">
-                <h3>🎉 Giveaway Aktif Sekarang</h3>
-                <table>
-                    <tr><th>Hadiah</th><th>Penyertaan</th></tr>
-                    ${giveawayRows}
-                </table>
-            </div>
-
-            <div class="card">
-                <h3>🎂 Birthday Corner</h3>
-                <table>
-                    <tr><th>Tarikh Lahir</th><th>Ahli</th></tr>
-                    ${birthdayRows}
                 </table>
             </div>
         </div>
@@ -495,7 +487,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setDescription("Ingin membuat pertukaran item? Sila klik butang di bawah untuk membuka Trading Ticket!");        
       
       const row = new ActionRowBuilder().addComponents(         
-        new ButtonBuilder().setCustomId("open_trading_ticket").setLabel("🛍️ Open Trading Ticket").setStyle(ButtonStyle.Success)
+        new ButtonBuilder().setCustomId("open_trading_ticket").setLabel("🛍️️ Open Trading Ticket").setStyle(ButtonStyle.Success)
       );        
       
       await interaction.reply({ content: "✅ Panel Trading Ticket berjaya dihantar!", ephemeral: true });       
@@ -959,7 +951,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       const oldEmb = interaction.message.embeds[0];
       const newEmb = EmbedBuilder.from(oldEmb)
-        .setDescription(oldEmb.description.replace(/👥 \*\*Players:\*\* \d+/, `👥 **Players:** ${ev.participants.length}`));
+        .setDescription(oldEmb.description.replace(/👥 \*\*Pemain:\*\* \d+/, `👥 **Pemain:** ${ev.participants.length}`));
 
       await interaction.message.edit({ embeds: [newEmb] }).catch(() => {});
       await interaction.editReply({ content: `✅ Berjaya menyertai event! Jumlah pemain: ${ev.participants.length}` });
@@ -979,7 +971,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       const oldEmb = interaction.message.embeds[0];
       const newEmb = EmbedBuilder.from(oldEmb)
-        .setDescription(oldEmb.description.replace(/👥 \*\*Jumlah Penyertaan:\*\* \d+/, `👥 **Jumlah Penyertaan:** ${gw.participants.length}`));
+        .setDescription(oldEmb.description.replace(/👥 \*\*Penyertaan:\*\* \d+/, `👥 **Penyertaan:** ${gw.participants.length}`));
 
       await interaction.message.edit({ embeds: [newEmb] }).catch(() => {});
       await interaction.editReply({ content: `✅ Berjaya menyertai giveaway! Semoga rezeki awak! 🎉` });
