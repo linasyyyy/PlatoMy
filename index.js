@@ -235,6 +235,7 @@ const commands = [
       .addStringOption(opt => opt.setName("prize").setDescription("Hadiah giveaway").setRequired(true))
       .addIntegerOption(opt => opt.setName("duration").setDescription("Tempoh masa dalam minit").setRequired(true))
       .addIntegerOption(opt => opt.setName("winners").setDescription("Bilangan pemenang").setRequired(true))
+      .addStringOption(opt => opt.setName("image").setDescription("Link URL imej besar banner giveaway").setRequired(false))
     ),
 ].map(c => c.toJSON());
 
@@ -637,6 +638,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const prize = interaction.options.getString("prize");
         const durationMins = interaction.options.getInteger("duration");
         const winnersCount = interaction.options.getInteger("winners");
+        const imageUrl = interaction.options.getString("image");
 
         const endTime = Date.now() + durationMins * 60 * 1000;
         const endTimeSeconds = Math.floor(endTime / 1000);
@@ -645,8 +647,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
           .setColor("#ffb6c1")
           .setTitle("˚.🎀༘⋆ GIVEAWAY ˚.🎀༘⋆")
           .setDescription(`🎁 **Hadiah:** ${prize}\n👑 **Bilangan Pemenang:** ${winnersCount}\n⏳ **Berakhir Pada:** <t:${endTimeSeconds}:R> (<t:${endTimeSeconds}:f>)\n\n✨ Klik butang **"🎉 Sertai Giveaway"** di bawah untuk menyertai!\n👥 **Penyertaan:** 0`)
-          .setThumbnail(LOGO_URL)
           .setTimestamp();
+
+        if (imageUrl) {
+          giveawayEmbed.setImage(imageUrl);
+        } else {
+          giveawayEmbed.setThumbnail(LOGO_URL);
+        }
 
         const joinBtn = new ButtonBuilder()
           .setCustomId("join_giveaway")
@@ -683,8 +690,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
             .setColor("#57F287")
             .setTitle("🎉 GIVEAWAY TELAH TAMAT! 🏆")
             .setDescription(`🎁 **Hadiah:** ${gw.prize}\n👥 **Penyertaan:** ${gw.participants.length}\n\n🏆 **Pemenang Rasmi:**\n${winnersText}`)
-            .setThumbnail(LOGO_URL)
             .setTimestamp();
+
+          if (imageUrl) {
+            endedEmbed.setImage(imageUrl);
+          } else {
+            endedEmbed.setThumbnail(LOGO_URL);
+          }
 
           const disabledRow = new ActionRowBuilder().addComponents(
             ButtonBuilder.from(joinBtn).setDisabled(true).setStyle(ButtonStyle.Secondary)
