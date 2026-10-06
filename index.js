@@ -63,7 +63,8 @@ const commands = [
     .addStringOption(opt => opt.setName("reason").setDescription("Sebab/Alasan").setRequired(false)),
   new SlashCommandBuilder().setName("setup-verify").setDescription("Hantar panel sahkan Plato ID (Admin sahaja)"),
   new SlashCommandBuilder().setName("setup-birthday").setDescription("Hantar panel Birthday Corner yang aesthetic (Admin sahaja)"),
-  new SlashCommandBuilder().setName("setup-ticket").setDescription("Hantar panel Trading & Report Ticket (Admin sahaja)"),
+  new SlashCommandBuilder().setName("setup-trading").setDescription("Hantar panel Trading Ticket sahaja (Admin sahaja)"),
+  new SlashCommandBuilder().setName("setup-report").setDescription("Hantar panel Report Ticket sahaja (Admin sahaja)"),
   new SlashCommandBuilder().setName("birthday").setDescription("Urus tarikh lahir anda")
     .addSubcommand(sub => sub.setName("set").setDescription("Tetapkan tarikh lahir anda")),
   new SlashCommandBuilder().setName("event").setDescription("Urus event komuniti")
@@ -243,18 +244,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
-      // Contoh simulasi perubahan poin yang turut menyemak kenaikan level
       const oldPoints = w.serverPoints;
       if (action === "add_coins") { w.coins += amount; cur = "🪙 Coins"; }
       else if (action === "deduct_coins") { w.coins = Math.max(0, w.coins - amount); cur = "🪙 Coins"; }
       else if (action === "add_pips") { 
         w.pips += amount; 
-        w.serverPoints += amount; // Mengemaskini juga serverPoints jika berkaitan
+        w.serverPoints += amount; 
         cur = "💠 Pips"; 
       }
       else if (action === "deduct_pips") { w.pips = Math.max(0, w.pips - amount); cur = "💠 Pips"; }
 
-      // Semak jika berlakunya kenaikan level (setiap 100 mata = 1 level)
       const oldLevel = Math.floor(oldPoints / 100) + 1;
       const newLevel = Math.floor(w.serverPoints / 100) + 1;
       if (newLevel > oldLevel) {
@@ -311,19 +310,34 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return;     
     }      
 
-    if (interaction.commandName === "setup-ticket") {       
+    if (interaction.commandName === "setup-trading") {       
       if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) return;       
       const embed = new EmbedBuilder()         
         .setColor("#ffb6c1")         
-        .setTitle("🌸 PlatoMy • Support & Ticket Center 🎫")         
-        .setDescription("Perlukan bantuan berkaitan trading atau ingin membuat laporan? Sila klik butang di bawah untuk membuka tiket peribadi!");        
+        .setTitle("🛍️ PlatoMy • Trading Center 🤝")         
+        .setDescription("Ingin membuat jual beli atau urus niaga? Sila klik butang di bawah untuk membuka Trading Ticket peribadi!");        
       
       const row = new ActionRowBuilder().addComponents(         
-        new ButtonBuilder().setCustomId("open_trading_ticket").setLabel("🛍️ Open Trading Ticket").setStyle(ButtonStyle.Success),         
-        new ButtonBuilder().setCustomId("open_report_ticket").setLabel("🚨 Submit Report").setStyle(ButtonStyle.Danger)       
+        new ButtonBuilder().setCustomId("open_trading_ticket").setLabel("🛍️ Open Trading Ticket").setStyle(ButtonStyle.Success)
       );        
       
-      await interaction.reply({ content: "✅ Panel Ticket Hub berjaya dihantar!", ephemeral: true });       
+      await interaction.reply({ content: "✅ Panel Trading Ticket berjaya dihantar!", ephemeral: true });       
+      await interaction.channel.send({ embeds: [embed], components: [row] });       
+      return;     
+    }
+
+    if (interaction.commandName === "setup-report") {       
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) return;       
+      const embed = new EmbedBuilder()         
+        .setColor("#ff2222")         
+        .setTitle("🚨 PlatoMy • Support & Report Center 🎫")         
+        .setDescription("Menghadapi sebarang isu, gangguan, atau masalah scam? Sila klik butang di bawah untuk membuat laporan rasmi kepada pihak admin!");        
+      
+      const row = new ActionRowBuilder().addComponents(         
+        new ButtonBuilder().setCustomId("open_report_ticket").setLabel("🚨 Submit Report").setStyle(ButtonStyle.Danger)
+      );        
+      
+      await interaction.reply({ content: "✅ Panel Report Ticket berjaya dihantar!", ephemeral: true });       
       await interaction.channel.send({ embeds: [embed], components: [row] });       
       return;     
     }      
@@ -717,7 +731,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.customId.startsWith("verify_reject_")) {
       if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) return;
       await interaction.deferUpdate();
-      await interaction.edit({ embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor("#ED4245").setTitle("❌ Ditolak")], components: [] });
+      await interaction.exit({ embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor("#ED4245").setTitle("❌ Ditolak")], components: [] }).catch(() => {});
       return;
     }
   }
