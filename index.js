@@ -73,29 +73,14 @@ const server = http.createServer(async (req, res) => {
             const gwEmbed = new EmbedBuilder()
               .setColor("#ffb6c1")
               .setTitle("˚.🎀༘⋆ GIVEAWAY ˚.🎀༘⋆")
-              .setDescription(`🎁 **Hadiah:** ${prize}\n👑 **Pemenang:** ${winnersCount}\n⏳ **Berakhir:** <t:${endTimeSeconds}:R>\n\n👥 **Penyertaan:** 0`)
-              .setTimestamp();
-
-            const joinBtn = new ButtonBuilder().setCustomId("join_giveaway").setLabel("🎉 Sertai Giveaway").setStyle(ButtonStyle.Success);
-            const msg = await textChannel.send({ embeds: [gwEmbed], components: [new ActionRowBuilder().addComponents(joinBtn)] });
-
-            giveawaysMap.set(msg.id, { prize, winnersCount, participants: [], ended: false });
-          } 
-          else if (actionType === "event") {
-            const title = postData.evTitle || "Event Komuniti";
-            const timeStr = postData.evTime || "Sekarang";
-            const prize = postData.evPrize || "Tiada Hadiah";
-
-            const evEmbed = new EmbedBuilder()
-              .setColor("#ffb6c1")
-              .setTitle(`🎮 ${title}`)
+              .setDescription(`🎁 **Hadiah:** ${prize}\n👑 **Pemenang:** ${winnersCount}\n⏳ **Berakhir:** <t:${endTimeSeconds}:R>\n\n👥 **Penyertaan:** 0`)               .setTimestamp();              const joinBtn = new ButtonBuilder().setCustomId("join_giveaway").setLabel("🎉 Sertai Giveaway").setStyle(ButtonStyle.Success);             const msg = await textChannel.send({ embeds: [gwEmbed], components: [new ActionRowBuilder().addComponents(joinBtn)] });              giveawaysMap.set(msg.id, { prize, winnersCount, participants: [], ended: false });           }            else if (actionType === "event") {             const title = postData.evTitle \vert{}\vert{} "Event Komuniti";             const timeStr = postData.evTime \vert{}\vert{} "Sekarang";             const prize = postData.evPrize \vert{}\vert{} "Tiada Hadiah";              const evEmbed = new EmbedBuilder()               .setColor("#ffb6c1")               .setTitle(`🎮 ${title}`)
               .setDescription(`📅 **Masa:** ${timeStr}\n🎁 **Hadiah:** ${prize}\n👥 **Pemain:** 0`)
               .setTimestamp();
 
             const joinBtn = new ButtonBuilder().setCustomId("join_event_v2").setLabel("🎟 Join Event").setStyle(ButtonStyle.Success);
             const msg = await textChannel.send({ embeds: [evEmbed], components: [new ActionRowBuilder().addComponents(joinBtn)] });
 
-            eventsMap.set(msg.id, { title, participants: [], ended: false });
+            eventsMap.set(msg.id, { title, dateStr: "Hari Ini", timeStr, endTimeMs: Date.now() + 86400000, participants: [], ended: false });
           }
           else if (actionType === "setup_verify") {
             const embed = new EmbedBuilder().setColor("#ffb6c1").setTitle("PlatoMy • Sahkan Plato ID ✨").setDescription("Sila klik butang di bawah untuk sahkan Plato ID anda!");
@@ -166,7 +151,7 @@ const server = http.createServer(async (req, res) => {
                 <form action="/action" method="POST">
                     <input type="hidden" name="actionType" value="event">
                     <input type="text" name="evTitle" placeholder="Tajuk Event" required>
-                    <input type="text" name="evTime" placeholder="Masa (Cth: 10/10 @ 8 PM)" required>
+                    <input type="text" name="evTime" placeholder="Masa (Cth: 8:00 PM)" required>
                     <input type="text" name="evPrize" placeholder="Hadiah Event" required>
                     <button type="submit">Hantar Event 🎮</button>
                 </form>
@@ -285,26 +270,49 @@ async function sendLog(guild, channelNameOrId, payload) {
   }
 }
 
-function convertBirthdayToTimestamp(dateStr) {
-  const [day, month] = dateStr.split("/").map(Number);
+// Fungsi Parse Birthday fleksibel (Cth: "1 oktober", "7 oct")
+function parseBirthdayToTimestamp(inputStr) {
+  const months = {
+    jan: 0, january: 0, okey: 0,
+    feb: 1, february: 1,
+    mar: 2, march: 2,
+    apr: 3, april: 3,
+    may: 4,
+    jun: 5, june: 5,
+    jul: 6, july: 6,
+    aug: 7, august: 7,
+    sep: 8, september: 8,
+    oct: 9, october: 9, okt: 9,
+    nov: 10, november: 10,
+    dec: 11, december: 11, dis: 11
+  };
+
+  const parts = inputStr.trim().toLowerCase().split(/\s+/);
+  if (parts.length < 2) return null;
+
+  const day = parseInt(parts[0]);
+  const monthKey = parts[1];
+  const month = months[monthKey];
+
+  if (isNaN(day) || month === undefined) return null;
+
   const now = new Date();
   let year = now.getFullYear();
-  
-  let targetDate = new Date(year, month - 1, day);
+  let targetDate = new Date(year, month, day);
+
   if (targetDate < now) {
     targetDate.setFullYear(year + 1);
   }
+
   return Math.floor(targetDate.getTime() / 1000);
 }
 
 async function checkBirthdays() {
   const now = new Date();
-  const day = String(now.getDate()).padStart(2, '0');
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const todayFormatted = `${day}/${month}`;
+  const todaySec = Math.floor(now.setHours(0,0,0,0) / 1000);
 
   for (const [userId, data] of birthdaysMap.entries()) {
-    if (data.dateStr === todayFormatted) {
+    if (data.timestamp <= todaySec + 86400 && data.timestamp >= todaySec) {
       for (const [_, guild] of client.guilds.cache) {
         const targetChannel = guild.channels.cache.get(BIRTHDAY_CHANNEL_ID) || 
                               guild.channels.cache.find(c => c.name.includes("birthday") && c.isTextBased());
@@ -495,10 +503,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return interaction.reply({ content: "❌ Hanya Admin sahaja!", ephemeral: true });
       }
 
+      let sortedBdays = [...birthdaysMap.entries()].sort((a,b) => a[1].timestamp - b[1].timestamp);
       let bdayListText = "";
-      for (const [userId, data] of birthdaysMap.entries()) {
-        bdayListText += `• 🌸 **${data.dateStr}** (<t:${data.timestamp}:R>) : <@${userId}>\n`;
-      }
+      sortedBdays.forEach(([userId, data]) => {
+        bdayListText += `• <t:${data.timestamp}:E> <t:${data.timestamp}:d> (<t:${data.timestamp}:R>) : <@${userId}>\n`;
+      });
 
       const bdayEmbed = new EmbedBuilder()
         .setColor("#ffb6c1")
@@ -535,7 +544,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.commandName === "setup-report") {       
       if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) return;       
       const embed = new EmbedBuilder()         
-        .setColor("#ff2222")         
+        .setColor("#ffb6c1")         
         .setTitle("🚨 PlatoMy • Report  🎫")         
         .setDescription("Menghadapi sebarang isu atau masalah? Sila klik butang di bawah untuk membuat laporan kepada Leader!");        
       
@@ -557,10 +566,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
         
         const dateInput = new TextInputBuilder()           
           .setCustomId("bday_date")           
-          .setLabel("Tarikh Lahir (Format: Hari/Bulan Cth: 15/10)")           
+          .setLabel("Tarikh Lahir (Cth: 1 Oktober atau 7 Oct)")           
           .setStyle(TextInputStyle.Short)           
-          .setPlaceholder("15/10")           
-          .setMaxLength(5)
+          .setPlaceholder("1 Oktober")           
           .setRequired(true);          
         
         modal.addComponents(new ActionRowBuilder().addComponents(dateInput));         
@@ -587,38 +595,38 @@ client.on(Events.InteractionCreate, async (interaction) => {
           .setPlaceholder("🌸 PlatoMy Evening Bingo")           
           .setRequired(true);          
 
-        const datetimeInput = new TextInputBuilder()           
-          .setCustomId("event_datetime")           
-          .setLabel("Date & Start Time")           
+        const dateInput = new TextInputBuilder()           
+          .setCustomId("event_date")           
+          .setLabel("Tarikh Event (Cth: 15 October 2026)")           
           .setStyle(TextInputStyle.Short)           
-          .setPlaceholder("10/10 @ 8:00 PM")           
+          .setPlaceholder("15 October 2026")           
           .setRequired(true);          
 
-        const durationInput = new TextInputBuilder()           
-          .setCustomId("event_duration")           
-          .setLabel("Duration")           
+        const timeInput = new TextInputBuilder()           
+          .setCustomId("event_time")           
+          .setLabel("Masa Tamat / Mula (Cth: 21:00 atau 9 PM)")           
           .setStyle(TextInputStyle.Short)           
-          .setPlaceholder("90 minutes")           
+          .setPlaceholder("21:00")           
           .setRequired(true);          
 
         const prizeInput = new TextInputBuilder()           
           .setCustomId("event_prize")           
           .setLabel("Prize Pool")           
           .setStyle(TextInputStyle.Short)           
-          .setPlaceholder("1,500 Plato Coins + Exclusive Role 👑")           
+          .setPlaceholder("1,500 Plato Coins")           
           .setRequired(true);          
 
         const descInput = new TextInputBuilder()           
           .setCustomId("event_desc")           
           .setLabel("Description / Notes")           
           .setStyle(TextInputStyle.Paragraph)           
-          .setPlaceholder("Sila bersedia 5 minit lebih awal! Let's have fun! ✨")           
+          .setPlaceholder("Sila bersedia 5 minit lebih awal!")           
           .setRequired(true);          
 
         modal.addComponents(           
           new ActionRowBuilder().addComponents(titleInput),           
-          new ActionRowBuilder().addComponents(datetimeInput),           
-          new ActionRowBuilder().addComponents(durationInput),           
+          new ActionRowBuilder().addComponents(dateInput),           
+          new ActionRowBuilder().addComponents(timeInput),           
           new ActionRowBuilder().addComponents(prizeInput),           
           new ActionRowBuilder().addComponents(descInput)         
         );          
@@ -687,7 +695,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           }
 
           const endedEmbed = new EmbedBuilder()
-            .setColor("#57F287")
+            .setColor("#ffb6c1")
             .setTitle("🎉 GIVEAWAY TELAH TAMAT! 🏆")
             .setDescription(`🎁 **Hadiah:** ${gw.prize}\n👥 **Penyertaan:** ${gw.participants.length}\n\n🏆 **Pemenang Rasmi:**\n${winnersText}`)
             .setTimestamp();
@@ -789,15 +797,20 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     if (interaction.customId === "birthday_modal") {
       await interaction.deferReply({ ephemeral: true });
-      const bdayDate = interaction.fields.getTextInputValue("bday_date");
-      const timestampSec = convertBirthdayToTimestamp(bdayDate);
-      
-      birthdaysMap.set(interaction.user.id, { dateStr: bdayDate, timestamp: timestampSec });
+      const bdayInput = interaction.fields.getTextInputValue("bday_date");
+      const timestampSec = parseBirthdayToTimestamp(bdayInput);
 
-      let bdayListText = "";
-      for (const [userId, data] of birthdaysMap.entries()) {
-        bdayListText += `• 🌸 **${data.dateStr}** (<t:${data.timestamp}:R>) : <@${userId}>\n`;
+      if (!timestampSec) {
+        return interaction.editReply({ content: "❌ Format tarikh tidak sah! Sila guna contoh seperti: `1 Oktober` atau `7 Oct`." });
       }
+      
+      birthdaysMap.set(interaction.user.id, { dateStr: bdayInput, timestamp: timestampSec });
+
+      let sortedBdays = [...birthdaysMap.entries()].sort((a,b) => a[1].timestamp - b[1].timestamp);
+      let bdayListText = "";
+      sortedBdays.forEach(([userId, data]) => {
+        bdayListText += `• <t:${data.timestamp}:E> <t:${data.timestamp}:d> (<t:${data.timestamp}:R>) : <@${userId}>\n`;
+      });
 
       const updatedEmbed = new EmbedBuilder()
         .setColor("#ffb6c1")
@@ -808,22 +821,25 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await interaction.message?.edit({ embeds: [updatedEmbed] }).catch(() => {});
       } catch (e) {}
 
-      await interaction.editReply({ content: `✨ Tarikh lahir anda (${bdayDate}) berjaya disimpan dalam Birthday Corner! ♡` });
+      await interaction.editReply({ content: `✨ Tarikh lahir anda berjaya disimpan dalam Birthday Corner! ♡` });
       return;
     }
 
     if (interaction.customId === "event_create_modal") {
       await interaction.deferReply({ ephemeral: true });
       const title = interaction.fields.getTextInputValue("event_title");
-      const datetimeStr = interaction.fields.getTextInputValue("event_datetime");
-      const duration = interaction.fields.getTextInputValue("event_duration");
+      const dateStr = interaction.fields.getTextInputValue("event_date");
+      const timeStr = interaction.fields.getTextInputValue("event_time");
       const prize = interaction.fields.getTextInputValue("event_prize");
       const desc = interaction.fields.getTextInputValue("event_desc");
+
+      const parsedTargetDate = new Date(`${dateStr} ${timeStr}`);
+      const endTimeMs = isNaN(parsedTargetDate.getTime()) ? Date.now() + 86400000 : parsedTargetDate.getTime();
 
       const eventEmbed = new EmbedBuilder()
         .setColor("#ffb6c1")
         .setTitle(`🎮 ${title}`)
-        .setDescription(`${desc}\n\n📅 **Date & Time:** ${datetimeStr}\n⏳ **Duration:** ${duration}\n🎁 **Prize Pool:** ${prize}\n👥 **Pemain:** 0`)
+        .setDescription(`${desc}\n\n📅 **Tarikh:** ${dateStr}\n⏰ **Masa Tamat:** ${timeStr}\n🎁 **Prize Pool:** ${prize}\n👥 **Pemain:** 0`)
         .setTimestamp();
 
       const joinBtn = new ButtonBuilder()
@@ -837,6 +853,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
       
       eventsMap.set(eventMessage.id, {
         title,
+        dateStr,
+        timeStr,
+        endTimeMs,
         participants: [],
         ended: false,
       });
@@ -858,7 +877,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
 
       const reportEmbed = new EmbedBuilder()
-        .setColor("#ff2222")
+        .setColor("#ffb6c1")
         .setTitle(`🚨 Laporan Baharu: [${category}]`)
         .setDescription(`• **Pelapor:** ${interaction.user} (${interaction.user.tag})\n• **Status:** 🟡 Open\n• **Handler:** Belum di-claim\n\n📝 **Butiran:**\n${details}\n\n🔗 **Bukti / Screenshot:**\n${evidence}`)
         .setTimestamp();
@@ -1075,10 +1094,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       const dateInput = new TextInputBuilder()
         .setCustomId("bday_date")
-        .setLabel("Tarikh Lahir (Format: Hari/Bulan Cth: 15/10)")
+        .setLabel("Tarikh Lahir (Cth: 1 Oktober atau 7 Oct)")
         .setStyle(TextInputStyle.Short)
-        .setPlaceholder("15/10")
-        .setMaxLength(5)
+        .setPlaceholder("1 Oktober")
         .setRequired(true);
 
       modal.addComponents(new ActionRowBuilder().addComponents(dateInput));
@@ -1160,24 +1178,19 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const oldEmb = interaction.message.embeds[0];
       const oldDesc = oldEmb.description;
       let newStatus = "🟡 Open";
-      let color = "#ff2222";
 
       if (interaction.customId === "report_claim") {
         newStatus = `🔵 Under Review (Claimed by ${interaction.user.tag})`;
-        color = "#5865F2";
       } else if (interaction.customId === "report_resolve") {
         newStatus = `🟢 Resolved (Handled by ${interaction.user.tag})`;
-        color = "#57F287";
       } else if (interaction.customId === "report_reject") {
         newStatus = `🔴 Rejected (Handled by ${interaction.user.tag})`;
-        color = "#ED4245";
       } else if (interaction.customId === "report_close") {
         newStatus = `🔒 Closed & Archived (Handled by ${interaction.user.tag})`;
-        color = "#99AAB5";
       }
 
       const updatedDesc = oldDesc.replace(/• \*\*Status:\*\* .*/, `• **Status:** ${newStatus}`);
-      const newEmb = EmbedBuilder.from(oldEmb).setColor(color).setDescription(updatedDesc);
+      const newEmb = EmbedBuilder.from(oldEmb).setColor("#ffb6c1").setDescription(updatedDesc);
 
       await interaction.update({ embeds: [newEmb], components: interaction.customId === "report_close" ? [] : interaction.message.components });
 
@@ -1193,7 +1206,20 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.customId === "join_event_v2") {
       await interaction.deferReply({ ephemeral: true });
       const ev = eventsMap.get(interaction.message.id);
-      if (!ev || ev.ended) return interaction.editReply({ content: "❌ Event ini telah tamat atau tidak wujud." });
+      
+      if (!ev || ev.ended) {
+        return interaction.editReply({ content: "❌ Event ini tidak wujud atau telah tamat." });
+      }
+
+      // Semak sama ada masa event sudah lepas
+      if (Date.now() > ev.endTimeMs) {
+        ev.ended = true;
+        const disabledRow = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId("join_event_v2").setLabel("🎟 Event Telah Tamat").setStyle(ButtonStyle.Secondary).setDisabled(true)
+        );
+        await interaction.message.edit({ components: [disabledRow] }).catch(() => {});
+        return interaction.editReply({ content: "❌ Maaf, masa untuk menyertai event ini sudah tamat!" });
+      }
 
       if (ev.participants.includes(interaction.user.id)) {
         return interaction.editReply({ content: "⚠️ Awak sudah menyertai event ini!" });
@@ -1238,14 +1264,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const role = interaction.guild.roles.cache.find(r => r.name === VERIFIED_ROLE_NAME);
         if (role) await member.roles.add(role).catch(() => {});
       }
-      await interaction.edit({ embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor("#57F287").setTitle("✅ Diluluskan")], components: [] });
+      await interaction.edit({ embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor("#ffb6c1").setTitle("✅ Diluluskan")], components: [] });
       return;
     }
 
     if (interaction.customId.startsWith("verify_reject_")) {
       if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) return;
       await interaction.deferUpdate();
-      await interaction.edit({ embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor("#ED4245").setTitle("❌ Ditolak")], components: [] }).catch(() => {});
+      await interaction.edit({ embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor("#ffb6c1").setTitle("❌ Ditolak")], components: [] }).catch(() => {});
       return;
     }
   }
