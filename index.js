@@ -210,9 +210,9 @@ const VERIFIED_ROLE_NAME = "Member";
 const LOGO_URL = "https://cdn.discordapp.com/attachments/1549051773438787724/1549403998686281808/IMG_5614.png";
 
 const commands = [
-  new SlashCommandBuilder().setName("wallet").setDescription("Semak baki wallet anda!"),
+  new SlashCommandBuilder().setName("wallet").setDescription("Semak baki PlatoMyBank anda! 🏦"),
   new SlashCommandBuilder().setName("leaderboard").setDescription("Papar papan pendahulu (Leaderboard EXP & Server Points) 📊"),
-  new SlashCommandBuilder().setName("admin-wallet").setDescription("Urus baki wallet ahli (Admin sahaja)")
+  new SlashCommandBuilder().setName("admin-wallet").setDescription("Urus baki akaun PlatoMyBank ahli (Admin sahaja)")
     .addStringOption(opt => opt.setName("action").setDescription("Tindakan").setRequired(true).addChoices(
       { name: "Add Coins", value: "add_coins" }, { name: "Deduct Coins", value: "deduct_coins" },
       { name: "Add Pips", value: "add_pips" }, { name: "Deduct Pips", value: "deduct_pips" }, { name: "Check", value: "check" }
@@ -393,8 +393,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const embed = new EmbedBuilder()
         .setColor("#ffb6c1")
         .setAuthor({ name: interaction.user.username, iconURL: interaction.user.displayAvatarURL({ size: 128, dynamic: true }) })
-        .setTitle("💰PlatoMy Wallet")
+        .setTitle("🏦 PlatoMyBank • Secure Vault")
         .setDescription(`🪙 **Plato Coins:** ${w.coins.toLocaleString()}\n💠 **Pips:** ${w.pips.toLocaleString()}\n✨ **Server Points:** ${w.serverPoints.toLocaleString()}`)
+        .setFooter({ text: "PlatoMyBank Official System ♡" })
         .setTimestamp();
       await interaction.reply({ embeds: [embed], ephemeral: true });
       return;
@@ -467,7 +468,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (action === "check") {
         const embed = new EmbedBuilder()
           .setColor("#ffb6c1")
-          .setTitle("🔍 Wallet Balance")
+          .setTitle("🏦 PlatoMyBank • Account Check")
           .setDescription(`• **Member:** ${target}\n🪙 Coins: ${w.coins.toLocaleString()}\n💠 Pips: ${w.pips.toLocaleString()}\n✨ Points: ${w.serverPoints.toLocaleString()}`);
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
@@ -488,11 +489,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await sendLevelUpLog(interaction.guild, target.id, newLevel, w.serverPoints);
       }
 
-      await interaction.reply({ content: `✅ Berjaya kemaskini baki ${target.tag}!`, ephemeral: true });
+      await interaction.reply({ content: `✅ Berjaya kemaskini baki akaun PlatoMyBank ${target.tag}!`, ephemeral: true });
       
       const logEmbed = new EmbedBuilder()
         .setColor("#ffb6c1")
-        .setTitle("📜 Wallet Log")
+        .setTitle("🏦 PlatoMyBank • Transaction Log")
         .setDescription(`• **Member:** ${target}\n• **Action:** ${action} ${amount}${cur}\n• **Reason:** ${reason}\n• **Admin:** ${interaction.user}`)
         .setTimestamp();
       
@@ -1255,7 +1256,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (!gw || gw.ended) return interaction.editReply({ content: "❌ Giveaway ini telah tamat atau tidak wujud." });
 
       if (gw.participants.includes(interaction.user.id)) {
-        return interaction.editReply({ content: "⚠️️ Awak sudah menyertai giveaway ini!" });
+        return interaction.editReply({ content: "⚠️ Awak sudah menyertai giveaway ini!" });
       }
 
       gw.participants.push(interaction.user.id);
