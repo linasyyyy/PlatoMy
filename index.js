@@ -50,10 +50,10 @@ const server = http.createServer(async (req, res) => {
       const guild = client.guilds.cache.first();
       if (guild) {
         let targetChannelName = "";
-        if (actionType === "giveaway") targetChannelName = "🎁・giveaway";
-        else if (actionType === "event") targetChannelName = "🗣・event-annoucement";
-        else if (actionType === "setup_verify") targetChannelName = "🫆・verify-here";
-        else if (actionType === "setup_birthday") targetChannelName = "🎂・birthday-corner";
+        if (actionType === "giveaway") targetChannelName = "giveaway";
+        else if (actionType === "event") targetChannelName = "event-promote";
+        else if (actionType === "setup_verify") targetChannelName = "verify-here";
+        else if (actionType === "setup_birthday") targetChannelName = "birthday-corner";
 
         let textChannel = guild.channels.cache.find(c => c.name.toLowerCase().includes(targetChannelName.toLowerCase()) && c.isTextBased());
         
@@ -151,7 +151,7 @@ const server = http.createServer(async (req, res) => {
             </div>
 
             <div class="card">
-                <h3>🎉 Cipta Giveaway (Hantar ke 🎁・giveaway)</h3>
+                <h3>🎉 Cipta Giveaway (Hantar ke giveaway)</h3>
                 <form action="/action" method="POST">
                     <input type="hidden" name="actionType" value="giveaway">
                     <input type="text" name="gwPrize" placeholder="Hadiah (Cth: 1,000 Coins)" required>
@@ -162,7 +162,7 @@ const server = http.createServer(async (req, res) => {
             </div>
 
             <div class="card">
-                <h3>🗣️ Cipta Event (Hantar ke 🗣️・event-annoucement)</h3>
+                <h3>🗣️ Cipta Event (Hantar ke event-promote)</h3>
                 <form action="/action" method="POST">
                     <input type="hidden" name="actionType" value="event">
                     <input type="text" name="evTitle" placeholder="Tajuk Event" required>
@@ -176,11 +176,11 @@ const server = http.createServer(async (req, res) => {
                 <h3>📌 Hantar Panel Setup Utama</h3>
                 <form action="/action" method="POST">
                     <input type="hidden" name="actionType" value="setup_verify">
-                    <button type="submit">Hantar Panel Verify (ke 🫆・verify-here)</button>
+                    <button type="submit">Hantar Panel Verify (ke verify-here)</button>
                 </form>
                 <form action="/action" method="POST" style="margin-top: 10px;">
                     <input type="hidden" name="actionType" value="setup_birthday">
-                    <button type="submit">Hantar Panel Birthday (ke 🎂・birthday-corner)</button>
+                    <button type="submit">Hantar Panel Birthday (ke birthday-corner)</button>
                 </form>
             </div>
 
@@ -201,10 +201,10 @@ server.listen(process.env.PORT || 3000);
 const VERIFY_CHANNEL_ID = ""; 
 const WALLET_LOG_ID = "";     
 const BIRTHDAY_CHANNEL_ID = ""; 
-const LEVEL_LOG_CHANNEL_NAME = "🆙・level-up";       
-const TRADING_LOG_CHANNEL_NAME = "🤝・blackmarket"; 
+const LEVEL_LOG_CHANNEL_NAME = "level-up";       
+const TRADING_LOG_CHANNEL_NAME = "trading-log"; 
 const REPORT_LOG_CHANNEL_NAME = "report-log";         
-const WELCOME_CHANNEL_NAME = "🤗・selamat-datang";
+const WELCOME_CHANNEL_NAME = "selamat-datang";
 const SERVER_LOGS_CHANNEL_NAME = "server-logs";
 const VERIFIED_ROLE_NAME = "Member";
 const LOGO_URL = "https://cdn.discordapp.com/attachments/1549051773438787724/1549403998686281808/IMG_5614.png";
@@ -214,16 +214,16 @@ const commands = [
   new SlashCommandBuilder().setName("leaderboard").setDescription("Papar papan pendahulu (Leaderboard EXP & Server Points) 📊"),
   new SlashCommandBuilder().setName("admin-wallet").setDescription("Urus baki akaun PlatoMy • Wallet ahli (Admin sahaja)")
     .addStringOption(opt => opt.setName("action").setDescription("Tindakan").setRequired(true).addChoices(
-      { name: "Add Donation / Sponsor", value: "add_donation" },
+      { name: "Add Sponsor", value: "add_sponsor" },
       { name: "Add Coins", value: "add_coins" }, 
       { name: "Deduct Coins", value: "deduct_coins" },
       { name: "Add Pips", value: "add_pips" }, 
       { name: "Deduct Pips", value: "deduct_pips" }, 
       { name: "Check", value: "check" }
     ))
-    .addUserOption(opt => opt.setName("target").setDescription("Ahli / Penderma").setRequired(true))
+    .addUserOption(opt => opt.setName("target").setDescription("Ahli / Penaja").setRequired(true))
     .addIntegerOption(opt => opt.setName("amount").setDescription("Jumlah").setRequired(true))
-    .addStringOption(opt => opt.setName("reason").setDescription("Sebab / Nama Penaja / Nota Donasi").setRequired(false)),
+    .addStringOption(opt => opt.setName("reason").setDescription("Sebab / Nama Penaja / Nota Sponsor").setRequired(false)),
   new SlashCommandBuilder().setName("setup-verify").setDescription("Hantar panel sahkan Plato ID (Admin sahaja)"),
   new SlashCommandBuilder().setName("setup-birthday").setDescription("Hantar panel Birthday Corner yang aesthetic (Admin sahaja)"),
   new SlashCommandBuilder().setName("setup-trading").setDescription("Hantar panel Trading Ticket sahaja (Admin sahaja)"),
@@ -258,7 +258,7 @@ client.once(Events.ClientReady, async (c) => {
 });
 
 function getWallet(id) {
-  if (!wallets.has(id)) wallets.set(id, { coins: 0, pips: 0, serverPoints: 0 });
+  if (!wallets.has(id)) wallets.set(id, { coins: 0, pips: 0, serverPoints: 0, sponsorTotal: 0 });
   return wallets.get(id);
 }
 
@@ -402,7 +402,7 @@ client.on(Events.MessageCreate, async (message) => {
       .setColor("#ffb6c1")
       .setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL({ size: 128, dynamic: true }) })
       .setTitle("💳 PlatoMy • Wallet")
-      .setDescription(`🪙 **Plato Coins:** ${w.coins.toLocaleString()}\n💠 **Pips:** ${w.pips.toLocaleString()}\n✨ **Server Points:** ${w.serverPoints.toLocaleString()} pts`)
+      .setDescription(`🪙 **Plato Coins:** ${w.coins.toLocaleString()}\n💠 **Pips:** ${w.pips.toLocaleString()}\n🎁 **Sponsor Total:** ${w.sponsorTotal.toLocaleString()}\n✨ **Server Points:** ${w.serverPoints.toLocaleString()} pts`)
       .setFooter({ text: "PlatoMy Wallet Official System ♡" })
       .setTimestamp();
     await message.reply({ embeds: [embed] });
@@ -458,7 +458,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setColor("#ffb6c1")
         .setAuthor({ name: interaction.user.username, iconURL: interaction.user.displayAvatarURL({ size: 128, dynamic: true }) })
         .setTitle("💳 PlatoMy • Wallet")
-        .setDescription(`🪙 **Plato Coins:** ${w.coins.toLocaleString()}\n💠 **Pips:** ${w.pips.toLocaleString()}\n✨ **Server Points:** ${w.serverPoints.toLocaleString()} pts`)
+        .setDescription(`🪙 **Plato Coins:** ${w.coins.toLocaleString()}\n💠 **Pips:** ${w.pips.toLocaleString()}\n🎁 **Sponsor Total:** ${w.sponsorTotal.toLocaleString()}\n✨ **Server Points:** ${w.serverPoints.toLocaleString()} pts`)
         .setFooter({ text: "PlatoMy Wallet Official System ♡" })
         .setTimestamp();
       await interaction.reply({ embeds: [embed], ephemeral: true });
@@ -533,15 +533,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const embed = new EmbedBuilder()
           .setColor("#ffb6c1")
           .setTitle("💳 PlatoMy • Wallet Account Check")
-          .setDescription(`• **Member:** ${target}\n🪙 Coins: ${w.coins.toLocaleString()}\n💠 Pips: ${w.pips.toLocaleString()}\n✨ Points: ${w.serverPoints.toLocaleString()} pts`);
+          .setDescription(`• **Member:** ${target}\n🪙 Coins: ${w.coins.toLocaleString()}\n💠 Pips: ${w.pips.toLocaleString()}\n🎁 Sponsor Total: ${w.sponsorTotal.toLocaleString()}\n✨ Points: ${w.serverPoints.toLocaleString()} pts`);
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
       const oldPoints = w.serverPoints;
       
-      if (action === "add_donation") { 
+      if (action === "add_sponsor") { 
         w.coins += amount; 
-        cur = "🪙 Plato Coins (Donation/Sponsor)"; 
+        w.sponsorTotal += amount;
+        cur = "🪙 Plato Coins (Sponsor)"; 
       }
       else if (action === "add_coins") { w.coins += amount; cur = "🪙 Coins"; }
       else if (action === "deduct_coins") { w.coins = Math.max(0, w.coins - amount); cur = "🪙 Coins"; }
@@ -558,15 +559,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await sendLevelUpLog(interaction.guild, target.id, newLevel, w.serverPoints);
       }
 
-      const successMsg = action === "add_donation" 
-        ? `💖 Berjaya masukkan rekod sumbangan/sponsor sebanyak ${amount.toLocaleString()} untuk${target.tag}!` 
+      const successMsg = action === "add_sponsor" 
+        ? `💖 Berjaya masukkan rekod sponsor sebanyak ${amount.toLocaleString()} untuk${target.tag}!` 
         : `✅ Berjaya kemaskini baki akaun PlatoMy • Wallet ${target.tag}!`;
 
       await interaction.reply({ content: successMsg, ephemeral: true });
       
       const logEmbed = new EmbedBuilder()
         .setColor("#ffb6c1")
-        .setTitle(action === "add_donation" ? "💖 PlatoMy • Donation / Sponsor Log" : "💳 PlatoMy • Transaction Log")
+        .setTitle(action === "add_sponsor" ? "💖 PlatoMy • Sponsor Log" : "💳 PlatoMy • Transaction Log")
         .setDescription(`• **Member / Sponsor:** ${target}\n• **Action:** ${action} ${amount.toLocaleString()}${cur}\n• **Note / Details:** ${reason}\n• **Admin:** ${interaction.user}`)
         .setTimestamp();
       
@@ -1304,7 +1305,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const disabledRow = new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId("join_event_v2").setLabel("🎟 Event Telah Tamat").setStyle(ButtonStyle.Secondary).setDisabled(true)
         );
-        await interaction.message.id.edit({ components: [disabledRow] }).catch(() => {});
+        await interaction.message.edit({ components: [disabledRow] }).catch(() => {});
         return interaction.editReply({ content: "❌ Maaf, masa untuk menyertai event ini sudah tamat!" });
       }
 
