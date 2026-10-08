@@ -460,7 +460,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setAuthor({ name: interaction.user.username, iconURL: interaction.user.displayAvatarURL({ size: 128, dynamic: true }) })
         .setTitle("💳 PlatoMy • Wallet")
         .setDescription(`🪙 **Plato Coins:** ${w.coins.toLocaleString()}\n💠 **Pips:** ${w.pips.toLocaleString()}\n🎁 **Sponsor Total:** ${w.sponsorTotal.toLocaleString()}\n✨ **Server Points:** ${w.serverPoints.toLocaleString()} pts`)
-        .setFooter({ text: "PlatoMy Wallet Official System ♡" })
+        .setFooter({ text: "PlatoMy Wallet Official System Official System ♡" })
         .setTimestamp();
       await interaction.reply({ embeds: [embed], ephemeral: true });
       return;
@@ -530,36 +530,39 @@ client.on(Events.InteractionCreate, async (interaction) => {
         { name: "Other Games", emoji: "✨" }
       ];
 
-      // Bahagikan kepada dua menu (maksimum 25 opsyen setiap satu dropdown dalam Discord)
-      const menu1Options = gameList.slice(0, 25).map(g => ({
-        label: g.name,
-        value: `role_${g.name.toLowerCase().replace(/\s+/g, '_')}`,
-        emoji: g.emoji
-      }));
-
-      const menu2Options = gameList.slice(25).map(g => ({
+      const options = gameList.map(g => ({
         label: g.name,
         value: `role_${g.name.toLowerCase().replace(/\s+/g, '_')}`,
         description: g.name === "Other Games" ? "Ping game yang tiada dalam list" : undefined,
         emoji: g.emoji
       }));
 
-      const row1 = new ActionRowBuilder().addComponents(
-        new StringSelectMenuBuilder()
-          .setCustomId("role_select_menu_1")
-          .setPlaceholder("✨ Pilih Game Role Anda (Bahagian 1)...")
-          .addOptions(menu1Options)
-      );
+      // Embed di bahagian atas dengan imej banner dan description yang aesthetic
+      const roleEmbed = new EmbedBuilder()
+        .setColor("#ffb6c1")
+        .setTitle("✨ PlatoMy Game Roles ✨")
+        .setDescription(
+          "✨ Pilih role game kegemaran korang untuk main bersama!\n" +
+          "👉 Tekan menu di bawah untuk pilih game.\n" +
+          "🤍 Korang bebas pilih lebih dari satu game.\n\n" +
+          "──────────────────────────────\n\n" +
+          "✨ Choose your favorite game roles to start playing together!\n" +
+          "👉 Select from the dropdown menu below.\n" +
+          "🤍 You are free to choose more than one game.\n\n" +
+          "🎮 Happy gaming & have fun! ♡"
+        )
+        .setImage("https://cdn.discordapp.com/attachments/1549051773438787724/1551515791910903918/Video.gif")
+        .setTimestamp();
 
-      const row2 = new ActionRowBuilder().addComponents(
-        new StringSelectMenuBuilder()
-          .setCustomId("role_select_menu_2")
-          .setPlaceholder("✨ Pilih Game Role Anda (Bahagian 2)...")
-          .addOptions(menu2Options)
-      );
+      const selectMenu = new StringSelectMenuBuilder()
+        .setCustomId("role_select_menu")
+        .setPlaceholder("✨ Sila pilih game role anda di sini...")
+        .addOptions(options);
 
-      await interaction.reply({ content: "✅ Menu dropdown game role berjaya dihantar!", ephemeral: true });
-      await interaction.channel.send({ content: "🎀 **Pilih Game Role Anda:**", components: [row1, row2] });
+      const row = new ActionRowBuilder().addComponents(selectMenu);
+
+      await interaction.reply({ content: "✅ Panel game role berjaya dihantar!", ephemeral: true });
+      await interaction.channel.send({ embeds: [roleEmbed], components: [row] });
       return;
     }
 
@@ -1056,7 +1059,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 
   if (interaction.isStringSelectMenu()) {
-    if (interaction.customId === "role_select_menu_1" || interaction.customId === "role_select_menu_2") {
+    if (interaction.customId === "role_select_menu") {
       await interaction.deferReply({ ephemeral: true });
       const selectedVal = interaction.values[0];
       
