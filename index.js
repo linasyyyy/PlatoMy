@@ -228,7 +228,7 @@ const commands = [
   new SlashCommandBuilder().setName("setup-birthday").setDescription("Hantar panel Birthday Corner yang aesthetic (Admin sahaja)"),
   new SlashCommandBuilder().setName("setup-trading").setDescription("Hantar panel Trading Ticket sahaja (Admin sahaja)"),
   new SlashCommandBuilder().setName("setup-report").setDescription("Hantar panel Report Ticket sahaja (Admin sahaja)"),
-  new SlashCommandBuilder().setName("setup-role").setDescription("Hantar menu dropdown game role Plato (Admin sahaja)"),
+  new SlashCommandBuilder().setName("setup-role-plato").setDescription("Hantar menu dropdown game role Plato (Admin sahaja)"),
   new SlashCommandBuilder().setName("embed-builder").setDescription("Cipta dan edit custom embed interaktif (Admin sahaja)")
     .addChannelOption(opt => opt.setName("channel").setDescription("Pilih channel untuk hantar embed").setRequired(true)),
   new SlashCommandBuilder().setName("birthday").setDescription("Urus tarikh lahir anda")
@@ -493,7 +493,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return;
     }
 
-    if (interaction.commandName === "setup-role") {
+    if (interaction.commandName === "setup-role-plato") {
       if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
         return interaction.reply({ content: "❌ Hanya Admin sahaja!", ephemeral: true });
       }
@@ -525,22 +525,33 @@ client.on(Events.InteractionCreate, async (interaction) => {
         { name: "Other Game", emoji: "✨" }
       ];
 
-      const options = gameList.map(g => ({
+      const otherRolesList = [
+        { name: "Daily Quest", emoji: "📅" },
+        { name: "Aura Swap", emoji: "💫" }
+      ];
+
+      const options1 = gameList.map(g => ({
         label: g.name,
         value: `role_${g.name.toLowerCase().replace(/\s+/g, '_')}`,
         description: g.name === "Other Game" ? "Ping game yang tiada dalam list" : undefined,
         emoji: g.emoji
       }));
 
+      const options2 = otherRolesList.map(r => ({
+        label: r.name,
+        value: `role_${r.name.toLowerCase().replace(/\s+/g, '_')}`,
+        emoji: r.emoji
+      }));
+
       const roleEmbed = new EmbedBuilder()
         .setColor("#ffb6c1")
-        .setTitle("ʚ・₊˚  PLATO GAME ROLES  ˚₊・ɞ")
+        .setTitle("ʚ・₊˚  PLATO ROLES  ˚₊・ɞ")
         .setDescription(
-          "✨ Pilih role game kegemaran korang untuk main bersama!\n" +
+          "✨ Pilih role game dan role lain untuk main bersama!\n" +
           "-# ଓ  Tekan *reaction* emoji yang disediakan di bawah.\n" +
-          "-# emojis  Korang bebas pilih lebih dari satu game.\n" +
+          "-# ଓ  Korang bebas pilih lebih dari satu game.\n" +
           "-\n" +
-          "✨ Choose your favorite game roles to start playing together!\n" +
+          "✨ Choose your game roles and another roles to start playing together!\n" +
           "-# ଓ  Click the reaction emojis provided below.\n" +
           "-# ଓ  You are free to choose more than one game.\n\n" +
           "🎮 Happy gaming & have fun! 🤍"
@@ -548,15 +559,21 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setImage("https://cdn.discordapp.com/attachments/1556946394239991848/1557655292093927434/DCFA8953-43AA-48D5-A25E-1DFAD6963D75.png")
         .setTimestamp();
 
-      const selectMenu = new StringSelectMenuBuilder()
-        .setCustomId("role_select_menu")
+      const selectMenu1 = new StringSelectMenuBuilder()
+        .setCustomId("role_select_menu_1")
         .setPlaceholder("✨ Sila pilih game role anda di sini...")
-        .addOptions(options);
+        .addOptions(options1);
 
-      const row = new ActionRowBuilder().addComponents(selectMenu);
+      const selectMenu2 = new StringSelectMenuBuilder()
+        .setCustomId("role_select_menu_2")
+        .setPlaceholder("✨ Sila pilih roles lain di sini…")
+        .addOptions(options2);
 
-      await interaction.reply({ content: "✅ Panel game role berjaya dihantar!", ephemeral: true });
-      await interaction.channel.send({ embeds: [roleEmbed], components: [row] });
+      const row1 = new ActionRowBuilder().addComponents(selectMenu1);
+      const row2 = new ActionRowBuilder().addComponents(selectMenu2);
+
+      await interaction.reply({ content: "✅ Panel game role plato berjaya dihantar!", ephemeral: true });
+      await interaction.channel.send({ embeds: [roleEmbed], components: [row1, row2] });
       return;
     }
 
@@ -1053,7 +1070,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 
   if (interaction.isStringSelectMenu()) {
-    if (interaction.customId === "role_select_menu") {
+    if (interaction.customId === "role_select_menu_1" || interaction.customId === "role_select_menu_2") {
       await interaction.deferReply({ ephemeral: true });
       const selectedVal = interaction.values[0];
       
@@ -1398,7 +1415,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const disabledRow = new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId("join_event_v2").setLabel("🎟 Event Telah Tamat").setStyle(ButtonStyle.Secondary).setDisabled(true)
         );
-        await interaction.message.id.edit({ components: [disabledRow] }).catch(() => {});
+        await interaction.message.edit({ components: [disabledRow] }).catch(() => {});
         return interaction.editReply({ content: "❌ Maaf, masa untuk menyertai event ini sudah tamat!" });
       }
 
