@@ -228,7 +228,7 @@ const commands = [
   new SlashCommandBuilder().setName("setup-birthday").setDescription("Hantar panel Birthday Corner yang aesthetic (Admin sahaja)"),
   new SlashCommandBuilder().setName("setup-trading").setDescription("Hantar panel Trading Ticket sahaja (Admin sahaja)"),
   new SlashCommandBuilder().setName("setup-report").setDescription("Hantar panel Report Ticket sahaja (Admin sahaja)"),
-  new SlashCommandBuilder().setName("setup-role").setDescription("Hantar menu dropdown role pilihan sahaja (Admin sahaja)"),
+  new SlashCommandBuilder().setName("setup-role").setDescription("Hantar menu dropdown role game Plato (Admin sahaja)"),
   new SlashCommandBuilder().setName("embed-builder").setDescription("Cipta dan edit custom embed interaktif (Admin sahaja)")
     .addChannelOption(opt => opt.setName("channel").setDescription("Pilih channel untuk hantar embed").setRequired(true)),
   new SlashCommandBuilder().setName("birthday").setDescription("Urus tarikh lahir anda")
@@ -498,18 +498,30 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return interaction.reply({ content: "❌ Hanya Admin sahaja!", ephemeral: true });
       }
 
+      // Discord hadkan maksimum 25 opsyen untuk satu dropdown menu
+      const gameList = [
+        "Archery", "Bankroll", "Bingo", "Bounce", "Bowling", 
+        "Brawlbots", "Carrom", "Cribbage", "Darts", "Dice Party", 
+        "Dominoes", "Dungeon Tales", "Gin Rummy", "Go Fish", "Ludo", 
+        "Match It", "Match Monsters", "Mini Golf", "Minesweeper", "Ocho", 
+        "Old Zombie", "Plox", "Pool", "Sea Battle", "Skeeball"
+      ];
+
+      const options = gameList.map(game => ({
+        label: game,
+        value: `role_${game.toLowerCase().replace(/\s+/g, '_')}`,
+        description: `Pilih role ${game}`,
+        emoji: "🎮"
+      }));
+
       const selectMenu = new StringSelectMenuBuilder()
         .setCustomId("role_select_menu")
-        .setPlaceholder("✨ Sila pilih role anda di sini...")
-        .addOptions([
-          { label: "Notification Ping", value: "role_notif", description: "Dapatkan notifikasi pengumuman terkini", emoji: "🔔" },
-          { label: "VIP Member", value: "role_vip", description: "Role khas ahli komuniti", emoji: "🌸" },
-          { label: "Gamer", value: "role_gamer", description: "Role untuk penggiat game Plato", emoji: "🎮" }
-        ]);
+        .setPlaceholder("✨ Sila pilih game role anda di sini...")
+        .addOptions(options);
 
       const row = new ActionRowBuilder().addComponents(selectMenu);
-      await interaction.reply({ content: "✅ Menu dropdown role berjaya dihantar!", ephemeral: true });
-      await interaction.channel.send({ content: "🎀 **Pilih Role Anda:**", components: [row] });
+      await interaction.reply({ content: "✅ Menu dropdown game role berjaya dihantar!", ephemeral: true });
+      await interaction.channel.send({ content: "🎀 **Pilih Game Role Anda:**", components: [row] });
       return;
     }
 
@@ -1009,11 +1021,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.customId === "role_select_menu") {
       await interaction.deferReply({ ephemeral: true });
       const selectedVal = interaction.values[0];
-      let roleName = "";
-
-      if (selectedVal === "role_notif") roleName = "Notification Ping";
-      else if (selectedVal === "role_vip") roleName = "VIP Member";
-      else if (selectedVal === "role_gamer") roleName = "Gamer";
+      
+      // Tukar value balik kepada nama asal role (buang 'role_' dan tukar '_' kepada space serta Capitalize)
+      const rawName = selectedVal.replace("role_", "").replace(/_/g, " ");
+      const roleName = rawName.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 
       const role = interaction.guild.roles.cache.find(r => r.name.toLowerCase() === roleName.toLowerCase());
       if (!role) {
