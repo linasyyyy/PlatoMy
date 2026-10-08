@@ -228,6 +228,7 @@ const commands = [
   new SlashCommandBuilder().setName("setup-birthday").setDescription("Hantar panel Birthday Corner yang aesthetic (Admin sahaja)"),
   new SlashCommandBuilder().setName("setup-trading").setDescription("Hantar panel Trading Ticket sahaja (Admin sahaja)"),
   new SlashCommandBuilder().setName("setup-report").setDescription("Hantar panel Report Ticket sahaja (Admin sahaja)"),
+  new SlashCommandBuilder().setName("setup-role").setDescription("Hantar panel Select Menu (Dropdown) untuk Role Pilihan (Admin sahaja)"),
   new SlashCommandBuilder().setName("embed-builder").setDescription("Cipta dan edit custom embed interaktif (Admin sahaja)")
     .addChannelOption(opt => opt.setName("channel").setDescription("Pilih channel untuk hantar embed").setRequired(true)),
   new SlashCommandBuilder().setName("birthday").setDescription("Urus tarikh lahir anda")
@@ -489,6 +490,31 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setTimestamp();
 
       await interaction.reply({ embeds: [lbEmbed] });
+      return;
+    }
+
+    if (interaction.commandName === "setup-role") {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return interaction.reply({ content: "❌ Hanya Admin sahaja!", ephemeral: true });
+      }
+
+      const embed = new EmbedBuilder()
+        .setColor("#ffb6c1")
+        .setTitle("🎀 PlatoMy • Select Your Role ✨")
+        .setDescription("Sila pilih *role* anda melalui menu di bawah! Pilih sekali lagi untuk buang *role* tersebut. ♡");
+
+      const selectMenu = new StringSelectMenuBuilder()
+        .setCustomId("role_select_menu")
+        .setPlaceholder("Sila pilih role anda di sini...")
+        .addOptions([
+          { label: "Notification Ping", value: "role_notif", description: "Dapatkan notifikasi pengumuman terkini", emoji: "🔔" },
+          { label: "VIP Member", value: "role_vip", description: "Role khas ahli komuniti", emoji: "🌸" },
+          { label: "Gamer", value: "role_gamer", description: "Role untuk penggiat game Plato", emoji: "🎮" }
+        ]);
+
+      const row = new ActionRowBuilder().addComponents(selectMenu);
+      await interaction.reply({ content: "✅ Panel Role Select Menu berjaya dihantar!", ephemeral: true });
+      await interaction.channel.send({ embeds: [embed], components: [row] });
       return;
     }
 
@@ -922,7 +948,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const prize = interaction.fields.getTextInputValue("event_prize");
       const desc = interaction.fields.getTextInputValue("event_desc");
 
-      const parsedTargetDate = new Date(`${dateStr} ${timeStr}`);
+      const parsedTargetDate = new Date(`${dateStr}${timeStr}`);
       const endTimeMs = isNaN(parsedTargetDate.getTime()) ? Date.now() + 86400000 : parsedTargetDate.getTime();
 
       const eventEmbed = new EmbedBuilder()
@@ -984,33 +1010,60 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
   }
 
-  if (interaction.isStringSelectMenu() && interaction.customId === "report_category_select") {
-    const selectedCategory = interaction.values[0];
-    const modal = new ModalBuilder()
-      .setCustomId(`report_modal_${selectedCategory}`)
-      .setTitle(`Report: ${selectedCategory}`);
+  if (interaction.isStringSelectMenu()) {
+    if (interaction.customId === "role_select_menu") {
+      await interaction.deferReply({ ephemeral: true });
+      const selectedVal = interaction.values[0];
+      let roleName = "";
 
-    const detailsInput = new TextInputBuilder()
-      .setCustomId("report_details")
-      .setLabel("Butiran / Isu Laporan")
-      .setStyle(TextInputStyle.Paragraph)
-      .setPlaceholder("Terangkan masalah atau pengguna yang ingin dilapor...")
-      .setRequired(true);
+      if (selectedVal === "role_notif") roleName = "Notification Ping";
+      else if (selectedVal === "role_vip") roleName = "VIP Member";
+      else if (selectedVal === "role_gamer") roleName = "Gamer";
 
-    const evidenceInput = new TextInputBuilder()
-      .setCustomId("report_evidence")
-      .setLabel("Link Bukti / Screenshot")
-      .setStyle(TextInputStyle.Short)
-      .setPlaceholder("https://imgur.com/... atau lampiran pautan")
-      .setRequired(false);
+      const role = interaction.guild.roles.cache.find(r => r.name.toLowerCase() === roleName.toLowerCase());
+      if (!role) {
+        return interaction.editReply({ content: `❌ Ralat: Role **${roleName}`} di dalam server tidak dijumpai! Sila pastikan role dengan nama tersebut telah dicipta di tetapan server.` });
+      }
 
-    modal.addComponents(
-      new ActionRowBuilder().addComponents(detailsInput),
-      new ActionRowBuilder().addComponents(evidenceInput)
-    );
+      const member = interaction.member;
+      if (member.roles.cache.has(role.id)) {
+        await member.roles.remove(role);
+        await interaction.editReply({ content: `✅ Role **${roleName}** telah dibuang daripada akaun awak!` });
+      } else {
+        await member.roles.add(role);
+        await interaction.editReply({ content: `🎉 Berjaya! Role **${roleName}** telah diberikan kepada awak!` });
+      }
+      return;
+    }
 
-    await interaction.showModal(modal);
-    return;
+    if (interaction.customId === "report_category_select") {
+      const selectedCategory = interaction.values[0];
+      const modal = new ModalBuilder()
+        .setCustomId(`report_modal_${selectedCategory}`)
+        .setTitle(`Report: ${selectedCategory}`);
+
+      const detailsInput = new TextInputBuilder()
+        .setCustomId("report_details")
+        .setLabel("Butiran / Isu Laporan")
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder("Terangkan masalah atau pengguna yang ingin dilapor...")
+        .setRequired(true);
+
+      const evidenceInput = new TextInputBuilder()
+        .setCustomId("report_evidence")
+        .setLabel("Link Bukti / Screenshot")
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder("https://imgur.com/... atau lampiran pautan")
+        .setRequired(false);
+
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(detailsInput),
+        new ActionRowBuilder().addComponents(evidenceInput)
+      );
+
+      await interaction.showModal(modal);
+      return;
+    }
   }
 
   if (interaction.isButton()) {
@@ -1330,7 +1383,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (!gw || gw.ended) return interaction.editReply({ content: "❌ Giveaway ini telah tamat atau tidak wujud." });
 
       if (gw.participants.includes(interaction.user.id)) {
-        return interaction.editReply({ content: "⚠️ Awak sudah menyertai giveaway ini!" });
+        return interaction.exitReply({ content: "⚠️ Awak sudah menyertai giveaway ini!" });
       }
 
       gw.participants.push(interaction.user.id);
