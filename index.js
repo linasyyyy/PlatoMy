@@ -228,7 +228,7 @@ const commands = [
   new SlashCommandBuilder().setName("setup-birthday").setDescription("Hantar panel Birthday Corner yang aesthetic (Admin sahaja)"),
   new SlashCommandBuilder().setName("setup-trading").setDescription("Hantar panel Trading Ticket sahaja (Admin sahaja)"),
   new SlashCommandBuilder().setName("setup-report").setDescription("Hantar panel Report Ticket sahaja (Admin sahaja)"),
-  new SlashCommandBuilder().setName("setup-role").setDescription("Hantar menu dropdown role game Plato (Admin sahaja)"),
+  new SlashCommandBuilder().setName("setup-role").setDescription("Hantar menu dropdown game role Plato (Admin sahaja)"),
   new SlashCommandBuilder().setName("embed-builder").setDescription("Cipta dan edit custom embed interaktif (Admin sahaja)")
     .addChannelOption(opt => opt.setName("channel").setDescription("Pilih channel untuk hantar embed").setRequired(true)),
   new SlashCommandBuilder().setName("birthday").setDescription("Urus tarikh lahir anda")
@@ -498,30 +498,68 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return interaction.reply({ content: "❌ Hanya Admin sahaja!", ephemeral: true });
       }
 
-      // Discord hadkan maksimum 25 opsyen untuk satu dropdown menu
       const gameList = [
-        "Archery", "Bankroll", "Bingo", "Bounce", "Bowling", 
-        "Brawlbots", "Carrom", "Cribbage", "Darts", "Dice Party", 
-        "Dominoes", "Dungeon Tales", "Gin Rummy", "Go Fish", "Ludo", 
-        "Match It", "Match Monsters", "Mini Golf", "Minesweeper", "Ocho", 
-        "Old Zombie", "Plox", "Pool", "Sea Battle", "Skeeball"
+        { name: "Archery", emoji: "🏹" },
+        { name: "Bankroll", emoji: "💰" },
+        { name: "Bingo", emoji: "🎯" },
+        { name: "Bounce", emoji: "🏀" },
+        { name: "Bowling", emoji: "🎳" },
+        { name: "Brawlbots", emoji: "🤖" },
+        { name: "Carrom", emoji: "🥏" },
+        { name: "Cribbage", emoji: "🃏" },
+        { name: "Darts", emoji: "🎯" },
+        { name: "Dice Party", emoji: "🎲" },
+        { name: "Dominoes", emoji: "🀄" },
+        { name: "Dungeon Tales", emoji: "⚔️" },
+        { name: "Gin Rummy", emoji: "🎴" },
+        { name: "Go Fish", emoji: "🎣" },
+        { name: "Ludo", emoji: "🎲" },
+        { name: "Match It", emoji: "🧩" },
+        { name: "Match Monsters", emoji: "👾" },
+        { name: "Mini Golf", emoji: "⛳" },
+        { name: "Minesweeper", emoji: "💣" },
+        { name: "Ocho", emoji: "🎴" },
+        { name: "Old Zombie", emoji: "🧟" },
+        { name: "Plox", emoji: "🔮" },
+        { name: "Pool", emoji: "🎱" },
+        { name: "Sea Battle", emoji: "🚢" },
+        { name: "Skeeball", emoji: "🎳" },
+        { name: "Soccer", emoji: "⚽" },
+        { name: "Spades", emoji: "♠️" },
+        { name: "The Island", emoji: "🏝️" },
+        { name: "Other Games", emoji: "✨" }
       ];
 
-      const options = gameList.map(game => ({
-        label: game,
-        value: `role_${game.toLowerCase().replace(/\s+/g, '_')}`,
-        description: `Pilih role ${game}`,
-        emoji: "🎮"
+      // Bahagikan kepada dua menu (maksimum 25 opsyen setiap satu dropdown dalam Discord)
+      const menu1Options = gameList.slice(0, 25).map(g => ({
+        label: g.name,
+        value: `role_${g.name.toLowerCase().replace(/\s+/g, '_')}`,
+        emoji: g.emoji
       }));
 
-      const selectMenu = new StringSelectMenuBuilder()
-        .setCustomId("role_select_menu")
-        .setPlaceholder("✨ Sila pilih game role anda di sini...")
-        .addOptions(options);
+      const menu2Options = gameList.slice(25).map(g => ({
+        label: g.name,
+        value: `role_${g.name.toLowerCase().replace(/\s+/g, '_')}`,
+        description: g.name === "Other Games" ? "Ping game yang tiada dalam list" : undefined,
+        emoji: g.emoji
+      }));
 
-      const row = new ActionRowBuilder().addComponents(selectMenu);
+      const row1 = new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId("role_select_menu_1")
+          .setPlaceholder("✨ Pilih Game Role Anda (Bahagian 1)...")
+          .addOptions(menu1Options)
+      );
+
+      const row2 = new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId("role_select_menu_2")
+          .setPlaceholder("✨ Pilih Game Role Anda (Bahagian 2)...")
+          .addOptions(menu2Options)
+      );
+
       await interaction.reply({ content: "✅ Menu dropdown game role berjaya dihantar!", ephemeral: true });
-      await interaction.channel.send({ content: "🎀 **Pilih Game Role Anda:**", components: [row] });
+      await interaction.channel.send({ content: "🎀 **Pilih Game Role Anda:**", components: [row1, row2] });
       return;
     }
 
@@ -1018,13 +1056,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 
   if (interaction.isStringSelectMenu()) {
-    if (interaction.customId === "role_select_menu") {
+    if (interaction.customId === "role_select_menu_1" || interaction.customId === "role_select_menu_2") {
       await interaction.deferReply({ ephemeral: true });
       const selectedVal = interaction.values[0];
       
-      // Tukar value balik kepada nama asal role (buang 'role_' dan tukar '_' kepada space serta Capitalize)
       const rawName = selectedVal.replace("role_", "").replace(/_/g, " ");
-      const roleName = rawName.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+      const roleName = rawName === "other games" ? "Other Games" : rawName.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 
       const role = interaction.guild.roles.cache.find(r => r.name.toLowerCase() === roleName.toLowerCase());
       if (!role) {
