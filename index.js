@@ -534,11 +534,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       const roleEmbed = new EmbedBuilder()
         .setColor("#ffb6c1")
-        .setTitle("## ʚ・₊˚  PLATO GAME ROLES  ˚₊・ɞ")
+        .setTitle("ʚ・₊˚  PLATO GAME ROLES  ˚₊・ɞ")
         .setDescription(
           "✨ Pilih role game kegemaran korang untuk main bersama!\n" +
           "-# ଓ  Tekan *reaction* emoji yang disediakan di bawah.\n" +
-          "-# ଓ  Korang bebas pilih lebih dari satu game.\n" +
+          "-# emojis  Korang bebas pilih lebih dari satu game.\n" +
           "-\n" +
           "✨ Choose your favorite game roles to start playing together!\n" +
           "-# ଓ  Click the reaction emojis provided below.\n" +
@@ -1398,7 +1398,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const disabledRow = new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId("join_event_v2").setLabel("🎟 Event Telah Tamat").setStyle(ButtonStyle.Secondary).setDisabled(true)
         );
-        await interaction.message.edit({ components: [disabledRow] }).catch(() => {});
+        await interaction.message.id.edit({ components: [disabledRow] }).catch(() => {});
         return interaction.editReply({ content: "❌ Maaf, masa untuk menyertai event ini sudah tamat!" });
       }
 
