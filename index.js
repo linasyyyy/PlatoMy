@@ -534,18 +534,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       const roleEmbed = new EmbedBuilder()
         .setColor("#ffb6c1")
-        .setTitle("✨ PlatoMy Game Roles ✨")
+        .setTitle("## ʚ・₊˚  PLATO GAME ROLES  ˚₊・ɞ")
         .setDescription(
           "✨ Pilih role game kegemaran korang untuk main bersama!\n" +
-          "👉 Tekan menu di bawah untuk pilih game.\n" +
-          "🤍 Korang bebas pilih lebih dari satu game.\n\n" +
-          "──────────────────────────────\n\n" +
+          "-# ଓ  Tekan *reaction* emoji yang disediakan di bawah.\n" +
+          "-# ଓ  Korang bebas pilih lebih dari satu game.\n" +
+          "-\n" +
           "✨ Choose your favorite game roles to start playing together!\n" +
-          "👉 Select from the dropdown menu below.\n" +
-          "🤍 You are free to choose more than one game.\n\n" +
-          "🎮 Happy gaming & have fun! ♡"
+          "-# ଓ  Click the reaction emojis provided below.\n" +
+          "-# ଓ  You are free to choose more than one game.\n\n" +
+          "🎮 Happy gaming & have fun! 🤍"
         )
-        .setImage("https://cdn.discordapp.com/attachments/1549051773438787724/1551515791910903918/Video.gif")
+        .setImage("https://cdn.discordapp.com/attachments/1556946394239991848/1557655292093927434/DCFA8953-43AA-48D5-A25E-1DFAD6963D75.png")
         .setTimestamp();
 
       const selectMenu = new StringSelectMenuBuilder()
