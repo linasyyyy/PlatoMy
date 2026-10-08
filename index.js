@@ -228,7 +228,7 @@ const commands = [
   new SlashCommandBuilder().setName("setup-birthday").setDescription("Hantar panel Birthday Corner yang aesthetic (Admin sahaja)"),
   new SlashCommandBuilder().setName("setup-trading").setDescription("Hantar panel Trading Ticket sahaja (Admin sahaja)"),
   new SlashCommandBuilder().setName("setup-report").setDescription("Hantar panel Report Ticket sahaja (Admin sahaja)"),
-  new SlashCommandBuilder().setName("setup-role").setDescription("Hantar panel Select Menu (Dropdown) untuk Role Pilihan (Admin sahaja)"),
+  new SlashCommandBuilder().setName("setup-role").setDescription("Hantar menu dropdown role pilihan sahaja (Admin sahaja)"),
   new SlashCommandBuilder().setName("embed-builder").setDescription("Cipta dan edit custom embed interaktif (Admin sahaja)")
     .addChannelOption(opt => opt.setName("channel").setDescription("Pilih channel untuk hantar embed").setRequired(true)),
   new SlashCommandBuilder().setName("birthday").setDescription("Urus tarikh lahir anda")
@@ -498,14 +498,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return interaction.reply({ content: "❌ Hanya Admin sahaja!", ephemeral: true });
       }
 
-      const embed = new EmbedBuilder()
-        .setColor("#ffb6c1")
-        .setTitle("🎀 PlatoMy • Select Your Role ✨")
-        .setDescription("Sila pilih *role* anda melalui menu di bawah! Pilih sekali lagi untuk buang *role* tersebut. ♡");
-
       const selectMenu = new StringSelectMenuBuilder()
         .setCustomId("role_select_menu")
-        .setPlaceholder("Sila pilih role anda di sini...")
+        .setPlaceholder("✨ Sila pilih role anda di sini...")
         .addOptions([
           { label: "Notification Ping", value: "role_notif", description: "Dapatkan notifikasi pengumuman terkini", emoji: "🔔" },
           { label: "VIP Member", value: "role_vip", description: "Role khas ahli komuniti", emoji: "🌸" },
@@ -513,8 +508,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         ]);
 
       const row = new ActionRowBuilder().addComponents(selectMenu);
-      await interaction.reply({ content: "✅ Panel Role Select Menu berjaya dihantar!", ephemeral: true });
-      await interaction.channel.send({ embeds: [embed], components: [row] });
+      await interaction.reply({ content: "✅ Menu dropdown role berjaya dihantar!", ephemeral: true });
+      await interaction.channel.send({ content: "🎀 **Pilih Role Anda:**", components: [row] });
       return;
     }
 
@@ -948,7 +943,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const prize = interaction.fields.getTextInputValue("event_prize");
       const desc = interaction.fields.getTextInputValue("event_desc");
 
-      const parsedTargetDate = new Date(`${dateStr}${timeStr}`);
+      const parsedTargetDate = new Date(`${dateStr} ${timeStr}`);
       const endTimeMs = isNaN(parsedTargetDate.getTime()) ? Date.now() + 86400000 : parsedTargetDate.getTime();
 
       const eventEmbed = new EmbedBuilder()
@@ -1022,7 +1017,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       const role = interaction.guild.roles.cache.find(r => r.name.toLowerCase() === roleName.toLowerCase());
       if (!role) {
-        return interaction.editReply({ content: `❌ Ralat: Role **${roleName}`} di dalam server tidak dijumpai! Sila pastikan role dengan nama tersebut telah dicipta di tetapan server.` });
+        return interaction.editReply({ content: `❌ Ralat: Role **${roleName}** di dalam server tidak dijumpai! Sila pastikan role dengan nama tersebut telah dicipta di tetapan server.` });
       }
 
       const member = interaction.member;
@@ -1383,7 +1378,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (!gw || gw.ended) return interaction.editReply({ content: "❌ Giveaway ini telah tamat atau tidak wujud." });
 
       if (gw.participants.includes(interaction.user.id)) {
-        return interaction.exitReply({ content: "⚠️ Awak sudah menyertai giveaway ini!" });
+        return interaction.editReply({ content: "⚠️ Awak sudah menyertai giveaway ini!" });
       }
 
       gw.participants.push(interaction.user.id);
