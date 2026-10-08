@@ -460,7 +460,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setAuthor({ name: interaction.user.username, iconURL: interaction.user.displayAvatarURL({ size: 128, dynamic: true }) })
         .setTitle("💳 PlatoMy • Wallet")
         .setDescription(`🪙 **Plato Coins:** ${w.coins.toLocaleString()}\n💠 **Pips:** ${w.pips.toLocaleString()}\n🎁 **Sponsor Total:** ${w.sponsorTotal.toLocaleString()}\n✨ **Server Points:** ${w.serverPoints.toLocaleString()} pts`)
-        .setFooter({ text: "PlatoMy Wallet Official System Official System ♡" })
+        .setFooter({ text: "PlatoMy Wallet Official System ♡" })
         .setTimestamp();
       await interaction.reply({ embeds: [embed], ephemeral: true });
       return;
@@ -500,13 +500,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       const gameList = [
         { name: "Archery", emoji: "🏹" },
-        { name: "Bankroll", emoji: "💰" },
         { name: "Bingo", emoji: "🎯" },
         { name: "Bounce", emoji: "🏀" },
         { name: "Bowling", emoji: "🎳" },
         { name: "Brawlbots", emoji: "🤖" },
         { name: "Carrom", emoji: "🥏" },
-        { name: "Cribbage", emoji: "🃏" },
         { name: "Darts", emoji: "🎯" },
         { name: "Dice Party", emoji: "🎲" },
         { name: "Dominoes", emoji: "🀄" },
@@ -522,22 +520,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
         { name: "Old Zombie", emoji: "🧟" },
         { name: "Plox", emoji: "🔮" },
         { name: "Pool", emoji: "🎱" },
-        { name: "Sea Battle", emoji: "🚢" },
-        { name: "Skeeball", emoji: "🎳" },
         { name: "Soccer", emoji: "⚽" },
         { name: "Spades", emoji: "♠️" },
-        { name: "The Island", emoji: "🏝️" },
-        { name: "Other Games", emoji: "✨" }
+        { name: "Other Game", emoji: "✨" }
       ];
 
       const options = gameList.map(g => ({
         label: g.name,
         value: `role_${g.name.toLowerCase().replace(/\s+/g, '_')}`,
-        description: g.name === "Other Games" ? "Ping game yang tiada dalam list" : undefined,
+        description: g.name === "Other Game" ? "Ping game yang tiada dalam list" : undefined,
         emoji: g.emoji
       }));
 
-      // Embed di bahagian atas dengan imej banner dan description yang aesthetic
       const roleEmbed = new EmbedBuilder()
         .setColor("#ffb6c1")
         .setTitle("✨ PlatoMy Game Roles ✨")
@@ -1064,7 +1058,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const selectedVal = interaction.values[0];
       
       const rawName = selectedVal.replace("role_", "").replace(/_/g, " ");
-      const roleName = rawName === "other games" ? "Other Games" : rawName.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+      const roleName = rawName === "other game" ? "Other Game" : rawName.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 
       const role = interaction.guild.roles.cache.find(r => r.name.toLowerCase() === roleName.toLowerCase());
       if (!role) {
@@ -1429,7 +1423,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (!gw || gw.ended) return interaction.editReply({ content: "❌ Giveaway ini telah tamat atau tidak wujud." });
 
       if (gw.participants.includes(interaction.user.id)) {
-        return interaction.editReply({ content: "⚠️ Awak sudah menyertai giveaway ini!" });
+        return interaction.reply({ content: "⚠️ Awak sudah menyertai giveaway ini!" });
       }
 
       gw.participants.push(interaction.user.id);
