@@ -19,7 +19,6 @@ import {
 import http from "http";
 import url from "url";
 import querystring from "querystring";
-import fetch from "node-fetch";
 
 const token = process.env.DISCORD_TOKEN;
 const client = new Client({ 
@@ -236,7 +235,6 @@ async function checkPlatoUpdates() {
           );
 
           if (targetChannel) {
-            // Cari role bernama "plato" untuk di-ping, jika tiada ia fallback kepada teks "@plato"
             const platoRole = guild.roles.cache.find(r => r.name.toLowerCase() === "plato");
             const pingTarget = platoRole ? `<@&${platoRole.id}>` : "@plato";
 
