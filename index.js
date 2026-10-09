@@ -19,6 +19,7 @@ import {
 import http from "http";
 import url from "url";
 import querystring from "querystring";
+import fetch from "node-fetch";
 
 const token = process.env.DISCORD_TOKEN;
 const client = new Client({ 
@@ -206,8 +207,58 @@ const TRADING_LOG_CHANNEL_NAME = "trading-log";
 const REPORT_LOG_CHANNEL_NAME = "report-log";         
 const WELCOME_CHANNEL_NAME = "selamat-datang";
 const SERVER_LOGS_CHANNEL_NAME = "server-logs";
+const UPDATE_CHANNEL_NAME = "plato-update";
 const VERIFIED_ROLE_NAME = "Member";
 const LOGO_URL = "https://cdn.discordapp.com/attachments/1549051773438787724/1549403998686281808/IMG_5614.png";
+
+let lastPostedUpdateId = null;
+
+async function checkPlatoUpdates() {
+  try {
+    const rssUrl = "https://nitter.poast.org/platochat/rss";
+    const response = await fetch(rssUrl);
+    if (!response.ok) return;
+    const text = await response.text();
+
+    const matchLink = text.match(/<link>(.*?)<\/link>/);
+    const matchTitle = text.match(/<title>(.*?)<\/title>/);
+
+    if (matchLink && matchTitle) {
+      const updateUrl = matchLink[1];
+      const updateContent = matchTitle[1];
+
+      if (updateUrl !== lastPostedUpdateId && !updateUrl.includes("/rss")) {
+        lastPostedUpdateId = updateUrl;
+
+        for (const [_, guild] of client.guilds.cache) {
+          const targetChannel = guild.channels.cache.find(
+            c => c.name.toLowerCase().includes(UPDATE_CHANNEL_NAME.toLowerCase()) && c.isTextBased()
+          );
+
+          if (targetChannel) {
+            // Cari role bernama "plato" untuk di-ping, jika tiada ia fallback kepada teks "@plato"
+            const platoRole = guild.roles.cache.find(r => r.name.toLowerCase() === "plato");
+            const pingTarget = platoRole ? `<@&${platoRole.id}>` : "@plato";
+
+            const updateEmbed = new EmbedBuilder()
+              .setColor("#ffb6c1")
+              .setTitle("🛠️・Plato Official Update")
+              .setDescription(`${updateContent}\n\n[🔗 Baca Update Penuh di X](${updateUrl})`)
+              .setThumbnail(LOGO_URL)
+              .setTimestamp();
+
+            await targetChannel.send({ 
+              content: `${pingTarget} ✨ **Terdapat update baharu daripada Plato!**`, 
+              embeds: [updateEmbed] 
+            }).catch(() => {});
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Gagal mengambil update Plato:", error);
+  }
+}
 
 const commands = [
   new SlashCommandBuilder().setName("wallet").setDescription("Semak baki akaun PlatoMy • Wallet anda! 🏦"),
@@ -229,6 +280,7 @@ const commands = [
   new SlashCommandBuilder().setName("setup-trading").setDescription("Hantar panel Trading Ticket sahaja (Admin sahaja)"),
   new SlashCommandBuilder().setName("setup-report").setDescription("Hantar panel Report Ticket sahaja (Admin sahaja)"),
   new SlashCommandBuilder().setName("setup-role-plato").setDescription("Hantar menu dropdown game role Plato (Admin sahaja)"),
+  new SlashCommandBuilder().setName("setup-update").setDescription("Hantar panel atau tetapan update rasmi (Admin sahaja)"),
   new SlashCommandBuilder().setName("embed-builder").setDescription("Cipta dan edit custom embed interaktif (Admin sahaja)")
     .addChannelOption(opt => opt.setName("channel").setDescription("Pilih channel untuk hantar embed").setRequired(true)),
   new SlashCommandBuilder().setName("birthday").setDescription("Urus tarikh lahir anda")
@@ -256,6 +308,10 @@ client.once(Events.ClientReady, async (c) => {
   setInterval(() => {
     checkBirthdays();
   }, 1000 * 60 * 60);
+
+  setInterval(() => {
+    checkPlatoUpdates();
+  }, 1000 * 60 * 5);
 });
 
 function getWallet(id) {
@@ -574,6 +630,21 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       await interaction.reply({ content: "✅ Panel game role plato berjaya dihantar!", ephemeral: true });
       await interaction.channel.send({ embeds: [roleEmbed], components: [row1, row2] });
+      return;
+    }
+
+    if (interaction.commandName === "setup-update") {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return interaction.reply({ content: "❌ Hanya Admin sahaja!", ephemeral: true });
+      }
+
+      const embed = new EmbedBuilder()
+        .setColor("#ffb6c1")
+        .setTitle("🛠️・Plato Updates Integration")
+        .setDescription("Sistem sedang aktif! Setiap hantaran baharu daripada akaun rasmi **@platochat** akan dikemas kini secara automatik ke channel **`🛠️・plato-update`** lengkap dengan ping `@plato` ♡");
+
+      await interaction.reply({ content: "✅ Tetapan update berjaya diaktifkan!", ephemeral: true });
+      await interaction.channel.send({ embeds: [embed] });
       return;
     }
 
