@@ -289,6 +289,10 @@ const commands = [
     .addIntegerOption(opt => opt.setName("duration").setDescription("Tempoh masa (minit)").setRequired(true)),
   new SlashCommandBuilder().setName("embed-builder").setDescription("Cipta dan edit custom embed interaktif (Admin sahaja)")
     .addChannelOption(opt => opt.setName("channel").setDescription("Pilih channel untuk hantar embed").setRequired(true)),
+  new SlashCommandBuilder().setName("embed-image").setDescription("Hantar embed gambar sahaja ke channel pilihan (Admin sahaja)")
+    .addChannelOption(opt => opt.setName("channel").setDescription("Pilih channel tujuan").setRequired(true))
+    .addStringOption(opt => opt.setName("image_url").setDescription("Link URL gambar/GIF").setRequired(true))
+    .addStringOption(opt => opt.setName("title").setDescription("Tajuk ringkas (pilihan)").setRequired(false)),
   new SlashCommandBuilder().setName("birthday").setDescription("Urus tarikh lahir anda")
     .addSubcommand(sub => sub.setName("set").setDescription("Tetapkan tarikh lahir anda")),
   new SlashCommandBuilder().setName("event").setDescription("Urus event komuniti")
@@ -671,8 +675,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setTitle("🌸・PlatoMy Rumble Arena")
         .setDescription(
           `🎁 **Total Prize:** ${totalPrize.toLocaleString()}${currencyName}\n` +
-          `⏳ **Berakhir Pada:** <t:${endTimeSeconds}:R> (<t:${endTimeSeconds}:f>)\n` +
-          `🔥 **Konsep:** Masuk percuma, pertarungan hidup/mati pusingan demi pusingan!\n\n` +
+          `⏳ **Berakhir Pada:** <t:${endTimeSeconds}:R> (<t:${endTimeSeconds}:f>)\n\n` +
           `👥 **Penyertaan:** 0 pemain`
         )
         .setTimestamp();
@@ -805,6 +808,28 @@ client.on(Events.InteractionCreate, async (interaction) => {
       );
 
       await interaction.reply({ content: `✨ Embed Builder diaktifkan untuk channel **${targetChannel.name}**:`, embeds: [defaultEmbed], components: [row1, row2], ephemeral: true });
+      return;
+    }
+
+    if (interaction.commandName === "embed-image") {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return interaction.reply({ content: "❌ Hanya Admin sahaja!", ephemeral: true });
+      }
+
+      const targetChannel = interaction.options.getChannel("channel");
+      const imageUrl = interaction.options.getString("image_url");
+      const titleText = interaction.options.getString("title");
+
+      const imageEmbed = new EmbedBuilder()
+        .setColor("#ffb6c1")
+        .setImage(imageUrl);
+
+      if (titleText) {
+        imageEmbed.setTitle(titleText);
+      }
+
+      await targetChannel.send({ embeds: [imageEmbed] });
+      await interaction.reply({ content: `✅ Embed gambar berjaya dihantar ke channel <#${targetChannel.id}>!`, ephemeral: true });
       return;
     }
 
@@ -1350,7 +1375,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setDescription(oldEmb.description.replace(/👥 \*\*Penyertaan:\*\* \d+ pemain/, `👥 **Penyertaan:** ${game.participants.length} pemain`));
 
       await interaction.message.edit({ embeds: [newEmb] }).catch(() => {});
-      await interaction.editReply({ content: `✅ Berjaya menyertai PlatoMy Rumble secara percuma! Good luck! ⚔️` });
+      await interaction.editReply({ content: `✅ Berjaya menyertai PlatoMy Rumble! Good luck! ⚔️` });
       return;
     }
 
@@ -1575,7 +1600,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return;
     }
 
-    // --- LOGIK BUTTON ACCEPT TRADE ---
     if (interaction.customId.startsWith("accept_trade_")) {
       await interaction.deferReply({ ephemeral: true });
       const ownerId = interaction.customId.replace("accept_trade_", "");
@@ -1587,7 +1611,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const guild = interaction.guild;
       const traderRole = guild.roles.cache.find(r => r.name.toLowerCase() === "trader");
 
-      // Cipta channel eksklusif baharu untuk mereka berdua sahaja
       const exclusiveChannel = await guild.channels.create({
         name: `deal-${interaction.user.username}`,
         type: ChannelType.GuildText,
@@ -1721,7 +1744,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const disabledRow = new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId("join_event_v2").setLabel("🎟 Event Telah Tamat").setStyle(ButtonStyle.Secondary).setDisabled(true)
         );
-        await interaction.message.end?.().catch(() => {});
         await interaction.message.edit({ components: [disabledRow] }).catch(() => {});
         return interaction.editReply({ content: "❌ Maaf, masa untuk menyertai event ini sudah tamat!" });
       }
