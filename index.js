@@ -593,7 +593,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       const otherRolesList = [
         { name: "Daily Quest", emoji: "📅" },
-        { name: "Aura Swap", emoji: "💫" }
+        { name: "Aura Swap", emoji: "💫" },
+        { name: "Plato Rumble", emoji: "⚔️" }
       ];
 
       const options1 = gameList.map(g => ({
@@ -622,7 +623,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
           "-# ଓ  You are free to choose more than one game.\n\n" +
           "🎮 Happy gaming & have fun! 🤍"
         )
-        .setImage("https://cdn.discordapp.com/attachments/1556946394239991848/1557655292093927434/DCFA8953-43AA-48D5-A25E-1DFAD6963D75.png")
         .setTimestamp();
 
       const selectMenu1 = new StringSelectMenuBuilder()
