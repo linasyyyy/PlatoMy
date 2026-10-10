@@ -34,6 +34,7 @@ const wallets = new Map();
 const eventsMap = new Map();
 const birthdaysMap = new Map(); 
 const giveawaysMap = new Map(); 
+const rumbleMap = new Map(); // Untuk simpan data Rumble Royale
 
 // --- LAMAN WEB DASHBOARD INTERAKTIF ---
 const server = http.createServer(async (req, res) => {
@@ -279,6 +280,13 @@ const commands = [
   new SlashCommandBuilder().setName("setup-report").setDescription("Hantar panel Report Ticket sahaja (Admin sahaja)"),
   new SlashCommandBuilder().setName("setup-role-plato").setDescription("Hantar menu dropdown game role Plato (Admin sahaja)"),
   new SlashCommandBuilder().setName("setup-update").setDescription("Hantar panel atau tetapan update rasmi (Admin sahaja)"),
+  new SlashCommandBuilder().setName("rumble").setDescription("Mula permainan Rumble Royale dengan Total Prize (Admin sahaja)")
+    .addStringOption(opt => opt.setName("currency").setDescription("Jenis mata wang hadiah").setRequired(true).addChoices(
+      { name: "🪙 Plato Coins", value: "coins" },
+      { name: "💠 Pips", value: "pips" }
+    ))
+    .addIntegerOption(opt => opt.setName("prize").setDescription("Jumlah Hadiah Utama (Total Prize)").setRequired(true))
+    .addIntegerOption(opt => opt.setName("duration").setDescription("Tempoh masa (minit)").setRequired(true)),
   new SlashCommandBuilder().setName("embed-builder").setDescription("Cipta dan edit custom embed interaktif (Admin sahaja)")
     .addChannelOption(opt => opt.setName("channel").setDescription("Pilih channel untuk hantar embed").setRequired(true)),
   new SlashCommandBuilder().setName("birthday").setDescription("Urus tarikh lahir anda")
@@ -643,6 +651,134 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       await interaction.reply({ content: "✅ Tetapan update berjaya diaktifkan!", ephemeral: true });
       await interaction.channel.send({ embeds: [embed] });
+      return;
+    }
+
+    if (interaction.commandName === "rumble") {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return interaction.reply({ content: "❌ Hanya Admin sahaja yang boleh memulakan Rumble Royale!", ephemeral: true });
+      }
+
+      const currencyType = interaction.options.getString("currency");
+      const totalPrize = interaction.options.getInteger("prize");
+      const durationMins = interaction.options.getInteger("duration");
+
+      const currencyName = currencyType === "coins" ? "🪙 Plato Coins" : "💠 Pips";
+      const endTimeSeconds = Math.floor((Date.now() + durationMins * 60 * 1000) / 1000);
+
+      const rumbleEmbed = new EmbedBuilder()
+        .setColor("#ffb6c1")
+        .setTitle("⚔️・Rumble Royale Arena")
+        .setDescription(
+          `🎁 **Total Prize:** ${totalPrize.toLocaleString()}${currencyName}\n` +
+          `⏳ **Berakhir Pada:** <t:${endTimeSeconds}:R> (<t:${endTimeSeconds}:f>)\n` +
+          `🔥 **Konsep:** Masuk percuma, pertarungan hidup/mati pusingan demi pusingan!\n\n` +
+          `👥 **Penyertaan:** 0 pemain`
+        )
+        .setTimestamp();
+
+      const joinBtn = new ButtonBuilder()
+        .setCustomId(`join_rumble_${currencyType}_${totalPrize}`)
+        .setLabel("🎟️ Enter Free Rumble")
+        .setStyle(ButtonStyle.Success);
+
+      const row = new ActionRowBuilder().addComponents(joinBtn);
+
+      await interaction.reply({ content: "✅ Rumble Royale berjaya dimulakan!", ephemeral: true });
+      const rumbleMsg = await interaction.channel.send({ embeds: [rumbleEmbed], components: [row] });
+
+      rumbleMap.set(rumbleMsg.id, {
+        currencyType,
+        totalPrize,
+        participants: [],
+        ended: false
+      });
+
+      // Timer untuk jalankan simulasi Rumble Royale
+      setTimeout(async () => {
+        const game = rumbleMap.get(rumbleMsg.id);
+        if (!game || game.ended) return;
+        game.ended = true;
+
+        const players = [...game.participants];
+        if (players.length === 0) {
+          const emptyEmbed = new EmbedBuilder()
+            .setColor("#ffb6c1")
+            .setTitle("⚔️・Rumble Royale Tamat")
+            .setDescription("• *Tiada sesiapa menyertai Rumble Royale kali ini.*");
+          const disabledRow = new ActionRowBuilder().addComponents(
+            ButtonBuilder.from(joinBtn).setDisabled(true).setStyle(ButtonStyle.Secondary).setLabel("🔒 Rumble Closed")
+          );
+          await rumbleMsg.edit({ embeds: [emptyEmbed], components: [disabledRow] }).catch(() => {});
+          rumbleMap.delete(rumbleMsg.id);
+          return;
+        }
+
+        if (players.length === 1) {
+          const soloId = players[0];
+          const soloWallet = getWallet(soloId);
+          if (game.currencyType === "coins") soloWallet.coins += game.totalPrize;
+          else soloWallet.pips += game.totalPrize;
+
+          const soloEmbed = new EmbedBuilder()
+            .setColor("#ffb6c1")
+            .setTitle("⚔️・Rumble Royale Tamat")
+            .setDescription(`⚠️ Hanya seorang sahaja (<@${soloId}>) yang menyertai. Beliau terus memenangi **${game.totalPrize.toLocaleString()}${currencyName}**!`);
+          const disabledRow = new ActionRowBuilder().addComponents(
+            ButtonBuilder.from(joinBtn).setDisabled(true).setStyle(ButtonStyle.Secondary).setLabel("🔒 Rumble Closed")
+          );
+          await rumbleMsg.edit({ embeds: [soloEmbed], components: [disabledRow] }).catch(() => {});
+          rumbleMap.delete(rumbleMsg.id);
+          return;
+        }
+
+        const deathEvents = [
+          (p) => `💥 <@${p}> tergelincir kulit pisang lalu tersingkir daripada gelanggang.`,
+          (p) => `💀 <@${p}> asyik main telefon pintar sampai tidak perasan zon bahaya sedang mengecil.`,
+          (p) => `🗡️ <@${p}> kena serang secara senyap oleh bayang-bayang sendiri lalu rebah.`,
+          (p) => `💨 <@${p}> lari terlalu laju merempuh dinding dan pengsan.`,
+          (p) => `💣 <@${p}> salah pijak perangkap bom dan terpelanting jauh keluar arena!`,
+          (p) => `💤 <@${p}> ketiduran di penjuru dinding dan disingkirkan tanpa sempat melawan.`
+        ];
+
+        let activePlayers = [...players];
+        let storyLogs = [];
+
+        while (activePlayers.length > 1) {
+          const dropCount = activePlayers.length > 4 ? 2 : 1;
+          for (let i = 0; i < dropCount && activePlayers.length > 1; i++) {
+            const randomIndex = Math.floor(Math.random() * activePlayers.length);
+            const eliminated = activePlayers.splice(randomIndex, 1)[0];
+            const randomEvent = deathEvents[Math.floor(Math.random() * deathEvents.length)];
+            storyLogs.push(randomEvent(eliminated));
+          }
+        }
+
+        const winnerId = activePlayers[0];
+        const winnerWallet = getWallet(winnerId);
+
+        if (game.currencyType === "coins") {
+          winnerWallet.coins += game.totalPrize;
+        } else {
+          winnerWallet.pips += game.totalPrize;
+        }
+
+        let finalDesc = `🎁 **Total Prize:** \`${game.totalPrize.toLocaleString()} ${currencyName}\`\n\n📜 **Kronologi Pertarungan:**\n` + storyLogs.join("\n") + `\n\n🏆 **Pemenang Terakhir (Champion):**\n👑 <@${winnerId}> berjaya bertahan dan membawa pulang hadiah utama! 🎉`;
+
+        const endedEmbed = new EmbedBuilder()
+          .setColor("#ffb6c1")
+          .setTitle("⚔️・Rumble Royale Selesai!")
+          .setDescription(finalDesc)
+          .setTimestamp();
+
+        const disabledRow = new ActionRowBuilder().addComponents(
+          ButtonBuilder.from(joinBtn).setDisabled(true).setStyle(ButtonStyle.Secondary).setLabel("🔒 Rumble Ended")
+        );
+
+        await rumbleMsg.edit({ embeds: [endedEmbed], components: [disabledRow] }).catch(() => {});
+        rumbleMap.delete(rumbleMsg.id);
+      }, durationMins * 60 * 1000);
+
       return;
     }
 
@@ -1193,6 +1329,32 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 
   if (interaction.isButton()) {
+    if (interaction.customId.startsWith("join_rumble_")) {
+      await interaction.deferReply({ ephemeral: true });
+      const parts = interaction.customId.split("_");
+      const currencyType = parts[2]; // coins atau pips
+      const totalPrize = parseInt(parts[3]);
+
+      const game = rumbleMap.get(interaction.message.id);
+      if (!game || game.ended) {
+        return interaction.editReply({ content: "❌ Permainan Rumble Royale ini telah tamat atau tidak wujud." });
+      }
+
+      if (game.participants.includes(interaction.user.id)) {
+        return interaction.editReply({ content: "⚠️ Awak sudah menyertai Rumble Royale ini!" });
+      }
+
+      game.participants.push(interaction.user.id);
+
+      const oldEmb = interaction.message.embeds[0];
+      const newEmb = EmbedBuilder.from(oldEmb)
+        .setDescription(oldEmb.description.replace(/👥 \*\*Penyertaan:\*\* \d+ pemain/, `👥 **Penyertaan:** ${game.participants.length} pemain`));
+
+      await interaction.message.edit({ embeds: [newEmb] }).catch(() => {});
+      await interaction.editReply({ content: `✅ Berjaya menyertai Rumble Royale secara percuma! Good luck! ⚔️` });
+      return;
+    }
+
     if (interaction.customId.startsWith("eb_edit_basic_")) {
       const channelId = interaction.customId.replace("eb_edit_basic_", "");
       const currentEmbed = interaction.message.embeds[0];
