@@ -34,7 +34,7 @@ const wallets = new Map();
 const eventsMap = new Map();
 const birthdaysMap = new Map(); 
 const giveawaysMap = new Map(); 
-const rumbleMap = new Map(); // Untuk simpan data Rumble Royale
+const rumbleMap = new Map(); 
 
 // --- LAMAN WEB DASHBOARD INTERAKTIF ---
 const server = http.createServer(async (req, res) => {
@@ -280,7 +280,7 @@ const commands = [
   new SlashCommandBuilder().setName("setup-report").setDescription("Hantar panel Report Ticket sahaja (Admin sahaja)"),
   new SlashCommandBuilder().setName("setup-role-plato").setDescription("Hantar menu dropdown game role Plato (Admin sahaja)"),
   new SlashCommandBuilder().setName("setup-update").setDescription("Hantar panel atau tetapan update rasmi (Admin sahaja)"),
-  new SlashCommandBuilder().setName("rumble").setDescription("Mula permainan Rumble Royale dengan Total Prize (Admin sahaja)")
+  new SlashCommandBuilder().setName("rumble").setDescription("Mula permainan PlatoMy Rumble dengan Total Prize (Admin sahaja)")
     .addStringOption(opt => opt.setName("currency").setDescription("Jenis mata wang hadiah").setRequired(true).addChoices(
       { name: "🪙 Plato Coins", value: "coins" },
       { name: "💠 Pips", value: "pips" }
@@ -656,7 +656,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     if (interaction.commandName === "rumble") {
       if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return interaction.reply({ content: "❌ Hanya Admin sahaja yang boleh memulakan Rumble Royale!", ephemeral: true });
+        return interaction.reply({ content: "❌ Hanya Admin sahaja yang boleh memulakan PlatoMy Rumble!", ephemeral: true });
       }
 
       const currencyType = interaction.options.getString("currency");
@@ -668,7 +668,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       const rumbleEmbed = new EmbedBuilder()
         .setColor("#ffb6c1")
-        .setTitle("⚔️・Rumble Royale Arena")
+        .setTitle("🌸・PlatoMy Rumble Arena")
         .setDescription(
           `🎁 **Total Prize:** ${totalPrize.toLocaleString()}${currencyName}\n` +
           `⏳ **Berakhir Pada:** <t:${endTimeSeconds}:R> (<t:${endTimeSeconds}:f>)\n` +
@@ -684,7 +684,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       const row = new ActionRowBuilder().addComponents(joinBtn);
 
-      await interaction.reply({ content: "✅ Rumble Royale berjaya dimulakan!", ephemeral: true });
+      await interaction.reply({ content: "✅ PlatoMy Rumble berjaya dimulakan!", ephemeral: true });
       const rumbleMsg = await interaction.channel.send({ embeds: [rumbleEmbed], components: [row] });
 
       rumbleMap.set(rumbleMsg.id, {
@@ -694,7 +694,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         ended: false
       });
 
-      // Timer untuk jalankan simulasi Rumble Royale
       setTimeout(async () => {
         const game = rumbleMap.get(rumbleMsg.id);
         if (!game || game.ended) return;
@@ -704,8 +703,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         if (players.length === 0) {
           const emptyEmbed = new EmbedBuilder()
             .setColor("#ffb6c1")
-            .setTitle("⚔️・Rumble Royale Tamat")
-            .setDescription("• *Tiada sesiapa menyertai Rumble Royale kali ini.*");
+            .setTitle("🌸・PlatoMy Rumble Tamat")
+            .setDescription("• *Tiada sesiapa menyertai PlatoMy Rumble kali ini.*");
           const disabledRow = new ActionRowBuilder().addComponents(
             ButtonBuilder.from(joinBtn).setDisabled(true).setStyle(ButtonStyle.Secondary).setLabel("🔒 Rumble Closed")
           );
@@ -722,7 +721,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
           const soloEmbed = new EmbedBuilder()
             .setColor("#ffb6c1")
-            .setTitle("⚔️・Rumble Royale Tamat")
+            .setTitle("🌸・PlatoMy Rumble Tamat")
             .setDescription(`⚠️ Hanya seorang sahaja (<@${soloId}>) yang menyertai. Beliau terus memenangi **${game.totalPrize.toLocaleString()}${currencyName}**!`);
           const disabledRow = new ActionRowBuilder().addComponents(
             ButtonBuilder.from(joinBtn).setDisabled(true).setStyle(ButtonStyle.Secondary).setLabel("🔒 Rumble Closed")
@@ -767,7 +766,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         const endedEmbed = new EmbedBuilder()
           .setColor("#ffb6c1")
-          .setTitle("⚔️・Rumble Royale Selesai!")
+          .setTitle("🌸・PlatoMy Rumble Selesai!")
           .setDescription(finalDesc)
           .setTimestamp();
 
@@ -1332,16 +1331,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.customId.startsWith("join_rumble_")) {
       await interaction.deferReply({ ephemeral: true });
       const parts = interaction.customId.split("_");
-      const currencyType = parts[2]; // coins atau pips
+      const currencyType = parts[2]; 
       const totalPrize = parseInt(parts[3]);
 
       const game = rumbleMap.get(interaction.message.id);
       if (!game || game.ended) {
-        return interaction.editReply({ content: "❌ Permainan Rumble Royale ini telah tamat atau tidak wujud." });
+        return interaction.editReply({ content: "❌ Permainan PlatoMy Rumble ini telah tamat atau tidak wujud." });
       }
 
       if (game.participants.includes(interaction.user.id)) {
-        return interaction.editReply({ content: "⚠️ Awak sudah menyertai Rumble Royale ini!" });
+        return interaction.editReply({ content: "⚠️ Awak sudah menyertai PlatoMy Rumble ini!" });
       }
 
       game.participants.push(interaction.user.id);
@@ -1351,7 +1350,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setDescription(oldEmb.description.replace(/👥 \*\*Penyertaan:\*\* \d+ pemain/, `👥 **Penyertaan:** ${game.participants.length} pemain`));
 
       await interaction.message.edit({ embeds: [newEmb] }).catch(() => {});
-      await interaction.editReply({ content: `✅ Berjaya menyertai Rumble Royale secara percuma! Good luck! ⚔️` });
+      await interaction.editReply({ content: `✅ Berjaya menyertai PlatoMy Rumble secara percuma! Good luck! ⚔️` });
       return;
     }
 
@@ -1537,29 +1536,105 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.customId === "open_trading_ticket") {
       await interaction.deferReply({ ephemeral: true });
       const guild = interaction.guild;
+      const traderRole = guild.roles.cache.find(r => r.name.toLowerCase() === "trader");
+      const traderPing = traderRole ? `<@&${traderRole.id}>` : "@trader";
+
       const ticketChannel = await guild.channels.create({
         name: `trade-${interaction.user.username}`,
         type: ChannelType.GuildText,
+        parent: interaction.channel.parentKey, 
         permissionOverwrites: [
           { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
           { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
+          ...(traderRole ? [{ id: traderRole.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] }] : []),
         ],
       });
 
       const embed = new EmbedBuilder()
         .setColor("#ffb6c1")
         .setTitle("🛍 Trading Ticket Lounge")
-        .setDescription(`Hai ${interaction.user}! Selamat datang ke Trading Lounge.\n\nSila nyatakan item yang anda inginkan/Hi please list item that you want to trade here.`);
+        .setDescription(`Hai ${interaction.user}! Selamat datang ke Trading Lounge.\n\nSila nyatakan item yang anda inginkan / Hi please list item that you want to trade here.`);
+
+      const acceptBtn = new ButtonBuilder()
+        .setCustomId(`accept_trade_${interaction.user.id}`)
+        .setLabel("🤝 Accept Trade")
+        .setStyle(ButtonStyle.Success);
 
       const closeBtn = new ButtonBuilder()
         .setCustomId("close_ticket")
-        .setLabel("🔒 Trading Selesai/Trading Done")
+        .setLabel("🔒 Trading Selesai / Trading Done")
         .setStyle(ButtonStyle.Danger);
 
-      await ticketChannel.send({ content: `${interaction.user}`, embeds: [embed], components: [new ActionRowBuilder().addComponents(closeBtn)] });
-      await interaction.editReply({ content: `✅ Tiket peribadi anda telah dibuka: <#${ticketChannel.id}>` });
+      await ticketChannel.send({ 
+        content: `${interaction.user} ${traderPing}`, 
+        embeds: [embed], 
+        components: [new ActionRowBuilder().addComponents(acceptBtn, closeBtn)] 
+      });
+
+      await interaction.editReply({ content: `✅ Tiket peribadi anda telah dibuka di bawah kategori trading: <#${ticketChannel.id}>` });
       return;
     }
+
+    // --- LOGIK BUTTON ACCEPT TRADE ---
+    if (interaction.customId.startsWith("accept_trade_")) {
+      await interaction.deferReply({ ephemeral: true });
+      const ownerId = interaction.customId.replace("accept_trade_", "");
+
+      if (interaction.user.id === ownerId) {
+        return interaction.editReply({ content: "❌ Anda adalah pemilik tiket ini!" });
+      }
+
+      const guild = interaction.guild;
+      const traderRole = guild.roles.cache.find(r => r.name.toLowerCase() === "trader");
+
+      // Cipta channel eksklusif baharu untuk mereka berdua sahaja
+      const exclusiveChannel = await guild.channels.create({
+        name: `deal-${interaction.user.username}`,
+        type: ChannelType.GuildText,
+        parent: interaction.channel.parentKey,
+        permissionOverwrites: [
+          { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
+          { id: ownerId, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
+          { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
+          ...(traderRole ? [{ id: traderRole.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] }] : []),
+        ],
+      });
+
+      const privateEmbed = new EmbedBuilder()
+        .setColor("#ffb6c1")
+        .setTitle("🤝 Exclusive Trade Room")
+        .setDescription(`Trade diterima oleh <@${interaction.user.id}>!\n\nChannel ini hanya boleh dilihat oleh Pemilik (<@${ownerId}>) dan Pembeli (<@${interaction.user.id}>) sahaja. Selamat berdagang! ♡`);
+
+      const closeBtn = new ButtonBuilder()
+        .setCustomId("close_ticket")
+        .setLabel("🔒 Trading Selesai / Trading Done")
+        .setStyle(ButtonStyle.Danger);
+
+      await exclusiveChannel.send({ 
+        content: `<@${ownerId}> <@${interaction.user.id}>`, 
+        embeds: [privateEmbed], 
+        components: [new ActionRowBuilder().addComponents(closeBtn)] 
+      });
+
+      await interaction.editReply({ content: `✨ Deal berjaya! Channel eksklusif anda telah dibuka: <#${exclusiveChannel.id}>` });
+      return;
+    }
+
+    if (interaction.commandName === "setup-report") {       
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) return;       
+      const embed = new EmbedBuilder()         
+        .setColor("#ffb6c1")         
+        .setTitle("🚨 PlatoMy • Report  🎫")         
+        .setDescription("Menghadapi sebarang isu atau masalah? Sila klik butang di bawah untuk membuat laporan kepada Leader!");        
+      
+      const row = new ActionRowBuilder().addComponents(         
+        new ButtonBuilder().setCustomId("open_report_ticket").setLabel("🚨 Submit Report").setStyle(ButtonStyle.Danger)
+      );        
+      
+      await interaction.reply({ content: "✅ Panel Report Ticket berjaya dihantar!", ephemeral: true });       
+      await interaction.channel.send({ embeds: [embed], components: [row] });       
+      return;     
+    }      
 
     if (interaction.customId === "open_report_ticket") {
       const selectMenu = new StringSelectMenuBuilder()
@@ -1646,6 +1721,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const disabledRow = new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId("join_event_v2").setLabel("🎟 Event Telah Tamat").setStyle(ButtonStyle.Secondary).setDisabled(true)
         );
+        await interaction.message.end?.().catch(() => {});
         await interaction.message.edit({ components: [disabledRow] }).catch(() => {});
         return interaction.editReply({ content: "❌ Maaf, masa untuk menyertai event ini sudah tamat!" });
       }
@@ -1671,7 +1747,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (!gw || gw.ended) return interaction.editReply({ content: "❌ Giveaway ini telah tamat atau tidak wujud." });
 
       if (gw.participants.includes(interaction.user.id)) {
-        return interaction.reply({ content: "⚠️ Awak sudah menyertai giveaway ini!" });
+        return interaction.editReply({ content: "⚠️ Awak sudah menyertai giveaway ini!" });
       }
 
       gw.participants.push(interaction.user.id);
