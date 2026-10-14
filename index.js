@@ -1665,8 +1665,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setPlaceholder("Sila pilih kategori laporan...")
         .addOptions([
           { label: "Player / User Report", value: "Player Report", description: "Lapor salah laku pemain" },
-          { label: "Scam / Trading Issue", value: "Scam Issue", description: "Isu penipuan atau perdagangan" },
-          { label: "Harassment", value: "Harassment", description: "Gangguan atau ancaman" },
           { label: "Bug / Technical Issue", value: "Technical Bug", description: "Isu teknikal atau pepijat" },
           { label: "Other", value: "Other", description: "Lain-lain isu" },
         ]);
