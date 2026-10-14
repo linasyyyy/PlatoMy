@@ -1,9 +1,8 @@
 {
-  "name": "platomy-bot",
+  "name": "platomy",
   "version": "1.0.0",
-  "description": "Discord Bot for PlatoMy Community",
-  "main": "index.js",
   "type": "module",
+  "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
