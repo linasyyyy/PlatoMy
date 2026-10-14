@@ -21,6 +21,10 @@ import url from "url";
 import querystring from "querystring";
 
 const token = process.env.DISCORD_TOKEN;
+if (!token) {
+  console.error("RALAT: DISCORD_TOKEN tidak ditemui di dalam Environment Variables Render!");
+}
+
 const client = new Client({ 
   intents: [
     GatewayIntentBits.Guilds, 
@@ -307,7 +311,8 @@ const commands = [
 ].map(c => c.toJSON());
 
 client.once(Events.ClientReady, async (c) => {
-  const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
+  console.log(`Bot telah berjaya log masuk sebagai ${c.user.tag}!`);
+  const rest = new REST({ version: "10" }).setToken(token);
   try {
     await rest.put(Routes.applicationCommands(c.user.id), { body: commands });
     console.log("Slash commands berjaya di-register!");
@@ -457,7 +462,6 @@ client.on(Events.GuildMemberRemove, async (member) => {
   await channel.send({ embeds: [goodbyeEmbed] });
 });
 
-// --- SOKONGAN PREFIX MESSAGE COMMANDS (!wallet, !lb, !level) ---
 client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot || !message.guild) return;
 
@@ -1802,4 +1806,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
-client.login(token);
+client.login(token).catch(err => {
+  console.error("GAGAL LOGIN KE DISCORD:", err);
+});
