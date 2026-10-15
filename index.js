@@ -240,8 +240,9 @@ async function checkPlatoUpdates() {
           );
 
           if (targetChannel) {
-            const platoRole = guild.roles.cache.find(r => r.name.toLowerCase() === "plato");
-            const pingTarget = platoRole ? `<@&${platoRole.id}>` : "@plato";
+            // Mencari role baharu @Plato Update
+            const updateRole = guild.roles.cache.find(r => r.name.toLowerCase() === "plato update" || r.name.toLowerCase() === "@plato update");
+            const pingTarget = updateRole ? `<@&${updateRole.id}>` : "@Plato Update";
 
             const updateEmbed = new EmbedBuilder()
               .setColor("#ffb6c1")
@@ -577,8 +578,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
         { name: "Pool", emoji: "🎱" }, { name: "Soccer", emoji: "⚽" }, { name: "Spades", emoji: "♠️" }, { name: "Other Game", emoji: "✨" }
       ];
 
+      // Susunan baharu: Plato Update diletakkan di atas Daily Quest
       const otherRolesList = [
-        { name: "Daily Quest", emoji: "📅" }, { name: "Aura Swap", emoji: "💫" }, { name: "Plato Rumble", emoji: "⚔️" }
+        { name: "Plato Update", emoji: "🛠️" }, { name: "Daily Quest", emoji: "📅" }, { name: "Aura Swap", emoji: "💫" }, { name: "Plato Rumble", emoji: "⚔️" }
       ];
 
       const options1 = gameList.map(g => ({
@@ -630,7 +632,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const embed = new EmbedBuilder()
         .setColor("#ffb6c1")
         .setTitle("🛠️・Plato Updates Integration")
-        .setDescription("Sistem sedang aktif! Setiap hantaran baharu daripada akaun rasmi **@platochat** akan dikemas kini secara automatik ke channel **`🛠️・plato-update`** lengkap dengan ping `@plato` ♡");
+        .setDescription("Sistem sedang aktif! Setiap hantaran baharu daripada akaun rasmi **@platochat** akan dikemas kini secara automatik ke channel **`🛠️・plato-update`** lengkap dengan ping `@Plato Update` ♡");
 
       await interaction.reply({ content: "✅ Tetapan update berjaya diaktifkan!", ephemeral: true });
       await interaction.channel.send({ embeds: [embed] });
