@@ -584,7 +584,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const options1 = gameList.map(g => ({
         label: g.name,
         value: `role_${g.name.toLowerCase().replace(/\s+/g, '_')}`,
-        description: g.name === "Other Game" ? "Ping game yang tiada dalam list" : undefined,
         emoji: g.emoji
       }));
 
@@ -599,12 +598,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setTitle("ʚ・₊˚  PLATO ROLES  ˚₊・ɞ")
         .setDescription(
           "✨ Pilih role game dan role lain untuk main bersama!\n" +
-          "-# ଓ  Tekan *reaction* emoji yang disediakan di bawah.\n" +
-          "-# ଓ  Korang bebas pilih lebih dari satu game.\n" +
-          "-\n" +
-          "✨ Choose your game roles and another roles to start playing together!\n" +
-          "-# ଓ  Click the reaction emojis provided below.\n" +
-          "-# ଓ  You are free to choose more than one game.\n\n" +
+          "-# Tekan reaction emoji yang disediakan di bawah.\n" +
+          "-# Korang bebas pilih lebih dari satu game.\n\n" +
           "🎮 Happy gaming & have fun! 🤍"
         )
         .setTimestamp();
@@ -1627,30 +1622,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return;
     }
 
-    if (interaction.commandName === "setup-report") {       
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) return;       
-      const embed = new EmbedBuilder()         
-        .setColor("#ffb6c1")         
-        .setTitle("🚨 PlatoMy • Report  🎫")         
-        .setDescription("Menghadapi sebarang isu atau masalah? Sila klik butang di bawah untuk membuat laporan kepada Leader!");        
-      
-      const row = new ActionRowBuilder().addComponents(         
-        new ButtonBuilder().setCustomId("open_report_ticket").setLabel("🚨 Submit Report").setStyle(ButtonStyle.Danger)
-      );        
-      
-      await interaction.reply({ content: "✅ Panel Report Ticket berjaya dihantar!", ephemeral: true });       
-      await interaction.channel.send({ embeds: [embed], components: [row] });       
-      return;     
-    }      
-
     if (interaction.customId === "open_report_ticket") {
       const selectMenu = new StringSelectMenuBuilder()
         .setCustomId("report_category_select")
         .setPlaceholder("Sila pilih kategori laporan...")
         .addOptions([
-          { label: "Player / User Report", value: "Player Report", description: "Lapor salah laku pemain" },
-          { label: "Bug / Technical Issue", value: "Technical Bug", description: "Isu teknikal atau pepijat" },
-          { label: "Other", value: "Other", description: "Lain-lain isu" },
+          { label: "Player / User Report", value: "Player Report" },
+          { label: "Bug / Technical Issue", value: "Technical Bug" },
+          { label: "Other", value: "Other" },
         ]);
 
       const row = new ActionRowBuilder().addComponents(selectMenu);
