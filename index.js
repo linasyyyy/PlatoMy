@@ -240,7 +240,6 @@ async function checkPlatoUpdates() {
           );
 
           if (targetChannel) {
-            // Mencari role baharu @Plato Update
             const updateRole = guild.roles.cache.find(r => r.name.toLowerCase() === "plato update" || r.name.toLowerCase() === "@plato update");
             const pingTarget = updateRole ? `<@&${updateRole.id}>` : "@Plato Update";
 
@@ -307,6 +306,7 @@ const commands = [
       .addStringOption(opt => opt.setName("prize").setDescription("Hadiah giveaway").setRequired(true))
       .addIntegerOption(opt => opt.setName("duration").setDescription("Tempoh masa dalam minit").setRequired(true))
       .addIntegerOption(opt => opt.setName("winners").setDescription("Bilangan pemenang").setRequired(true))
+      .addStringOption(opt => opt.setName("requirement").setDescription("Syarat penyertaan (Cth: Tag 2 kawan di general)").setRequired(false))
       .addStringOption(opt => opt.setName("image").setDescription("Link URL imej besar banner giveaway").setRequired(false))
     ),
 ].map(c => c.toJSON());
@@ -578,7 +578,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         { name: "Pool", emoji: "🎱" }, { name: "Soccer", emoji: "⚽" }, { name: "Spades", emoji: "♠️" }, { name: "Other Game", emoji: "✨" }
       ];
 
-      // Susunan baharu: Plato Update diletakkan di atas Daily Quest
       const otherRolesList = [
         { name: "Plato Update", emoji: "🛠️" }, { name: "Daily Quest", emoji: "📅" }, { name: "Aura Swap", emoji: "💫" }, { name: "Plato Rumble", emoji: "⚔️" }
       ];
@@ -1030,6 +1029,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const prize = interaction.options.getString("prize");
         const durationMins = interaction.options.getInteger("duration");
         const winnersCount = interaction.options.getInteger("winners");
+        const requirement = interaction.options.getString("requirement") || "Tiada syarat khusus";
         const imageUrl = interaction.options.getString("image");
 
         const endTime = Date.now() + durationMins * 60 * 1000;
@@ -1038,7 +1038,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const giveawayEmbed = new EmbedBuilder()
           .setColor("#ffb6c1")
           .setTitle("˚.🎀༘⋆ GIVEAWAY ˚.🎀༘⋆")
-          .setDescription(`🎁 **Hadiah:** ${prize}\n👑 **Bilangan Pemenang:** ${winnersCount}\n⏳ **Berakhir Pada:** <t:${endTimeSeconds}:R> (<t:${endTimeSeconds}:f>)\n\n✨ Klik butang **"🎉 Sertai Giveaway"** di bawah untuk menyertai!\n👥 **Penyertaan:** 0`)
+          .setDescription(`🎁 **Hadiah:** ${prize}\n👑 **Bilangan Pemenang:** ${winnersCount}\n📌 **Syarat:** ${requirement}\n⏳ **Berakhir Pada:** <t:${endTimeSeconds}:R> (<t:${endTimeSeconds}:f>)\n\n✨ Klik butang **"🎉 Sertai Giveaway"** di bawah!\n👥 **Penyertaan:** 0`)
           .setTimestamp();
 
         if (imageUrl) {
@@ -1090,13 +1090,19 @@ client.on(Events.InteractionCreate, async (interaction) => {
             endedEmbed.setThumbnail(LOGO_URL);
           }
 
+          // Butang Reroll untuk Admin cabut semula pemenang jika perlu
+          const rerollBtn = new ButtonBuilder()
+            .setCustomId(`reroll_gw_${giveawayMessage.id}`)
+            .setLabel("🎲 Reroll Winner")
+            .setStyle(ButtonStyle.Primary);
+
           const disabledRow = new ActionRowBuilder().addComponents(
-            ButtonBuilder.from(joinBtn).setDisabled(true).setStyle(ButtonStyle.Secondary)
+            ButtonBuilder.from(joinBtn).setDisabled(true).setStyle(ButtonStyle.Secondary),
+            rerollBtn
           );
 
           await giveawayMessage.edit({ embeds: [endedEmbed], components: [disabledRow] }).catch(() => {});
           await giveawayMessage.reply({ content: `🎉 Tahniah kepada pemenang giveaway: ${winnersText}!` }).catch(() => {});
-          giveawaysMap.delete(giveawayMessage.id);
         }, durationMins * 60 * 1000);
 
         return;
@@ -1334,6 +1340,24 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 
   if (interaction.isButton()) {
+    // --- FUNGSI REROLL GIVEAWAY ---
+    if (interaction.customId.startsWith("reroll_gw_")) {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return interaction.reply({ content: "❌ Hanya Admin sahaja yang boleh melakukan reroll!", ephemeral: true });
+      }
+
+      const msgId = interaction.customId.replace("reroll_gw_", "");
+      const gw = giveawaysMap.get(msgId);
+
+      if (!gw || gw.participants.length === 0) {
+        return interaction.reply({ content: "❌ Tiada data peserta dijumpai untuk reroll ini.", ephemeral: true });
+      }
+
+      const randomWinner = gw.participants[Math.floor(Math.random() * gw.participants.length)];
+      await interaction.reply({ content: `🎲 **Reroll Berjaya!** Pemenang baharu ialah: <@${randomWinner}>! 🎉` });
+      return;
+    }
+
     if (interaction.customId.startsWith("join_rumble_")) {
       await interaction.deferReply({ ephemeral: true });
       const parts = interaction.customId.split("_");
@@ -1741,7 +1765,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const newEmbed = EmbedBuilder.from(oldEmbed)
         .setDescription(oldEmbed.description.replace(/👥 \*\*Penyertaan:\*\* \d+/, `👥 **Penyertaan:** ${gw.participants.length}`));
 
-      await interaction.message.id.edit({ embeds: [newEmbed] }).catch(() => {});
+      await interaction.message.edit({ embeds: [newEmbed] }).catch(() => {});
       await interaction.editReply({ content: `✅ Berjaya menyertai giveaway! Semoga ada rezeki awak! 🎉` });
       return;
     }
