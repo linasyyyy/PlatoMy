@@ -68,7 +68,7 @@ const server = http.createServer(async (req, res) => {
         
         if (textChannel) {
           if (actionType === "giveaway") {
-            const prize = postData.gwPrize || "Hadiah Misteri";
+            const prize = postData.gwPrize || "Mystery Prize";
             const duration = parseInt(postData.gwDuration) || 5;
             const winnersCount = parseInt(postData.gwWinners) || 1;
 
@@ -78,29 +78,29 @@ const server = http.createServer(async (req, res) => {
             const gwEmbed = new EmbedBuilder()
               .setColor("#ffb6c1")
               .setTitle("˚.🎀༘⋆ GIVEAWAY ˚.🎀༘⋆")
-              .setDescription(`🎁 **Hadiah:** ${prize}\n👑 **Pemenang:** ${winnersCount}\n⏳ **Berakhir:** <t:${endTimeSeconds}:R>\n\n👥 **Penyertaan:** 0`)
+              .setDescription(`🎁 **Prize:** ${prize}\n👑 **Winners:** ${winnersCount}\n⏳ **Ends In:** <t:${endTimeSeconds}:R>\n\n👥 **Entries:** 0`)
               .setTimestamp();
 
-            const joinBtn = new ButtonBuilder().setCustomId("join_giveaway").setLabel("🎉 Sertai Giveaway").setStyle(ButtonStyle.Success);
+            const joinBtn = new ButtonBuilder().setCustomId("join_giveaway").setLabel("🎉 Join Giveaway").setStyle(ButtonStyle.Success);
             const msg = await textChannel.send({ embeds: [gwEmbed], components: [new ActionRowBuilder().addComponents(joinBtn)] });
 
             giveawaysMap.set(msg.id, { prize, winnersCount, participants: [], ended: false });
           } 
           else if (actionType === "event") {
-            const title = postData.evTitle || "Event Komuniti";
-            const timeStr = postData.evTime || "Sekarang";
-            const prize = postData.evPrize || "Tiada Hadiah";
+            const title = postData.evTitle || "Community Event";
+            const timeStr = postData.evTime || "Now";
+            const prize = postData.evPrize || "No Prize";
 
             const evEmbed = new EmbedBuilder()
               .setColor("#ffb6c1")
               .setTitle(`🎮 ${title}`)
-              .setDescription(`📅 **Masa:** ${timeStr}\n🎁 **Hadiah:** ${prize}\n👥 **Pemain:** 0`)
+              .setDescription(`📅 **Time:** ${timeStr}\n🎁 **Prize:** ${prize}\n👥 **Players:** 0`)
               .setTimestamp();
 
             const joinBtn = new ButtonBuilder().setCustomId("join_event_v2").setLabel("🎟 Join Event").setStyle(ButtonStyle.Success);
             const msg = await textChannel.send({ embeds: [evEmbed], components: [new ActionRowBuilder().addComponents(joinBtn)] });
 
-            eventsMap.set(msg.id, { title, dateStr: "Hari Ini", timeStr, endTimeMs: Date.now() + 86400000, participants: [], ended: false });
+            eventsMap.set(msg.id, { title, dateStr: "Today", timeStr, endTimeMs: Date.now() + 86400000, participants: [], ended: false });
           }
           else if (actionType === "setup_verify") {
             const embed = new EmbedBuilder().setColor("#ffb6c1").setTitle("PlatoMy • Sahkan Plato ID ✨").setDescription("Sila klik butang di bawah untuk sahkan Plato ID anda!");
@@ -213,9 +213,11 @@ const WELCOME_CHANNEL_NAME = "selamat-datang";
 const SERVER_LOGS_CHANNEL_NAME = "server-logs";
 const UPDATE_CHANNEL_NAME = "plato-update";
 const VERIFIED_ROLE_NAME = "Member";
+const ACTIVE_ROLE_NAME = "Murai Chatters 🥵"; // Nama role aktif anda
 const LOGO_URL = "https://cdn.discordapp.com/attachments/1549051773438787724/1549403998686281808/IMG_5614.png";
 
 let lastPostedUpdateId = null;
+const lastActiveMap = new Map(); // Menyimpan masa terakhir ahli aktif bersembang
 
 async function checkPlatoUpdates() {
   try {
@@ -263,6 +265,36 @@ async function checkPlatoUpdates() {
   }
 }
 
+// Fungsi semakan automatik untuk Role "Murai Chatters 🥵" (Semak setiap 6 jam)
+async function checkActiveRoles() {
+  const now = Date.now();
+  const threeDaysMs = 3 * 24 * 60 * 60 * 1000; // Had aktif: 3 hari
+
+  for (const [_, guild] of client.guilds.cache) {
+    const activeRole = guild.roles.cache.find(r => r.name.toLowerCase() === ACTIVE_ROLE_NAME.toLowerCase());
+    if (!activeRole) continue;
+
+    await guild.members.fetch().catch(() => {});
+
+    for (const [userId, lastTime] of lastActiveMap.entries()) {
+      const member = guild.members.cache.get(userId);
+      if (!member) continue;
+
+      if (now - lastTime > threeDaysMs) {
+        // Jika sudah lebih 3 hari tak aktif, buang role
+        if (member.roles.cache.has(activeRole.id)) {
+          await member.roles.remove(activeRole).catch(() => {});
+        }
+      } else {
+        // Jika aktif dalam masa 3 hari, beri role
+        if (!member.roles.cache.has(activeRole.id)) {
+          await member.roles.add(activeRole).catch(() => {});
+        }
+      }
+    }
+  }
+}
+
 const commands = [
   new SlashCommandBuilder().setName("wallet").setDescription("Semak baki akaun PlatoMy • Wallet anda! 🏦"),
   new SlashCommandBuilder().setName("leaderboard").setDescription("Papar papan pendahulu (Leaderboard EXP & Server Points) 📊"),
@@ -306,7 +338,7 @@ const commands = [
       .addStringOption(opt => opt.setName("prize").setDescription("Hadiah giveaway").setRequired(true))
       .addIntegerOption(opt => opt.setName("duration").setDescription("Tempoh masa dalam minit").setRequired(true))
       .addIntegerOption(opt => opt.setName("winners").setDescription("Bilangan pemenang").setRequired(true))
-      .addStringOption(opt => opt.setName("requirement").setDescription("Syarat penyertaan (Cth: Tag 2 kawan di general)").setRequired(false))
+      .addStringOption(opt => opt.setName("requirement").setDescription("Syarat penyertaan").setRequired(false))
       .addStringOption(opt => opt.setName("image").setDescription("Link URL imej besar banner giveaway").setRequired(false))
     ),
 ].map(c => c.toJSON());
@@ -328,6 +360,11 @@ client.once(Events.ClientReady, async (c) => {
   setInterval(() => {
     checkPlatoUpdates();
   }, 1000 * 60 * 5);
+
+  // Semak status aktif ahli setiap 6 jam
+  setInterval(() => {
+    checkActiveRoles();
+  }, 1000 * 60 * 60 * 6);
 });
 
 function getWallet(id) {
@@ -466,10 +503,35 @@ client.on(Events.GuildMemberRemove, async (member) => {
 client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot || !message.guild) return;
 
+  // --- KEMASKINI STATUS AKTIF & REKOD MASA UNTUK "Murai Chatters 🥵" ---
+  const userId = message.author.id;
+  lastActiveMap.set(userId, Date.now());
+
+  // Berikan role secara automatik jika belum ada
+  const activeRole = message.guild.roles.cache.find(r => r.name.toLowerCase() === ACTIVE_ROLE_NAME.toLowerCase());
+  if (activeRole && !message.member.roles.cache.has(activeRole.id)) {
+    await message.member.roles.add(activeRole).catch(() => {});
+  }
+  // -------------------------------------------------------------------
+
+  // --- SISTEM AUTO SERVER POINTS (EXP) SETIAP MESEJ ---
+  const w = getWallet(userId);
+  const oldPoints = w.serverPoints;
+  
+  // Setiap mesej menambah 15 mata Server Points
+  w.serverPoints += 15;
+
+  const oldLevel = Math.floor(oldPoints / 100) + 1;
+  const newLevel = Math.floor(w.serverPoints / 100) + 1;
+  
+  if (newLevel > oldLevel) {
+    await sendLevelUpLog(message.guild, userId, newLevel, w.serverPoints);
+  }
+  // ----------------------------------------------------
+
   const content = message.content.trim().toLowerCase();
 
   if (content === "!wallet" || content === "!bank") {
-    const w = getWallet(message.author.id);
     const embed = new EmbedBuilder()
       .setColor("#ffb6c1")
       .setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL({ size: 128, dynamic: true }) })
@@ -489,10 +551,10 @@ client.on(Events.MessageCreate, async (message) => {
       lbDescription += "• *Belum ada rekod leaderboard EXP lagi.*";
     } else {
       const medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
-      sortedWallets.forEach(([userId, data], index) => {
+      sortedWallets.forEach(([uid, data], index) => {
         const medalIcon = medals[index] || `#${index + 1}`;           
         const estimatedLevel = Math.floor(data.serverPoints / 100) + 1;           
-        lbDescription += `${medalIcon} **<@${userId}>**\nLevel${estimatedLevel} • XP: **${data.serverPoints.toLocaleString()}** pts\n\n`;
+        lbDescription += `${medalIcon} **<@${uid}>**\nLevel${estimatedLevel} • XP: **${data.serverPoints.toLocaleString()}** pts\n\n`;
       });
     }
 
@@ -509,13 +571,23 @@ client.on(Events.MessageCreate, async (message) => {
   }
 
   if (content === "!level" || content === "!rank") {
-    const w = getWallet(message.author.id);
     const currentLevel = Math.floor(w.serverPoints / 100) + 1;
+    const currentXpInLevel = w.serverPoints % 100;
+    
+    const progressBlocks = Math.floor(currentXpInLevel / 10);
+    const progressBar = "▓".repeat(progressBlocks) + "░".repeat(10 - progressBlocks);
+
     const rankEmbed = new EmbedBuilder()
       .setColor("#ffb6c1")
       .setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL({ size: 128, dynamic: true }) })
       .setTitle("✨ PlatoMy Level & Status")
-      .setDescription(`👤 **Member:** ${message.author}\n📊 **Current Level:** Level ${currentLevel}\n✨ **Total EXP:** ${w.serverPoints.toLocaleString()} pts`)
+      .setDescription(
+        `👤 **Member:** ${message.author}\n` +
+        `📊 **Current Level:** Level ${currentLevel}\n` +
+        `✨ **Total EXP:** ${w.serverPoints.toLocaleString()} pts\n\n` +
+        `📈 **Progress to Level ${currentLevel + 1}:**\n` +
+        `\`[${progressBar}]\` **${currentXpInLevel}/100 pts**`
+      )
       .setTimestamp();
     await message.reply({ embeds: [rankEmbed] });
     return;
@@ -578,6 +650,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         { name: "Pool", emoji: "🎱" }, { name: "Soccer", emoji: "⚽" }, { name: "Spades", emoji: "♠️" }, { name: "Other Game", emoji: "✨" }
       ];
 
+      // Susunan role: Plato Update diletakkan di atas Daily Quest
       const otherRolesList = [
         { name: "Plato Update", emoji: "🛠️" }, { name: "Daily Quest", emoji: "📅" }, { name: "Aura Swap", emoji: "💫" }, { name: "Plato Rumble", emoji: "⚔️" }
       ];
@@ -1023,13 +1096,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const subcommand = interaction.options.getSubcommand();
       if (subcommand === "start") {
         if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-          return interaction.reply({ content: "❌ Hanya Admin sahaja yang boleh memulakan giveaway!", ephemeral: true });
+          return interaction.reply({ content: "❌ Only Administrators can start a giveaway!", ephemeral: true });
         }
 
         const prize = interaction.options.getString("prize");
         const durationMins = interaction.options.getInteger("duration");
         const winnersCount = interaction.options.getInteger("winners");
-        const requirement = interaction.options.getString("requirement") || "Tiada syarat khusus";
+        const requirement = interaction.options.getString("requirement") || "No specific requirement";
         const imageUrl = interaction.options.getString("image");
 
         const endTime = Date.now() + durationMins * 60 * 1000;
@@ -1038,7 +1111,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const giveawayEmbed = new EmbedBuilder()
           .setColor("#ffb6c1")
           .setTitle("˚.🎀༘⋆ GIVEAWAY ˚.🎀༘⋆")
-          .setDescription(`🎁 **Hadiah:** ${prize}\n👑 **Bilangan Pemenang:** ${winnersCount}\n📌 **Syarat:** ${requirement}\n⏳ **Berakhir Pada:** <t:${endTimeSeconds}:R> (<t:${endTimeSeconds}:f>)\n\n✨ Klik butang **"🎉 Sertai Giveaway"** di bawah!\n👥 **Penyertaan:** 0`)
+          .setDescription(`🎁 **Prize:** ${prize}\n👑 **Winners:** ${winnersCount}\n📌 **Requirement:** ${requirement}\n⏳ **Ends In:** <t:${endTimeSeconds}:R> (<t:${endTimeSeconds}:f>)\n\n✨ Click the **"🎉 Join Giveaway"** button below!\n👥 **Entries:** 0`)
           .setTimestamp();
 
         if (imageUrl) {
@@ -1049,12 +1122,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         const joinBtn = new ButtonBuilder()
           .setCustomId("join_giveaway")
-          .setLabel("🎉 Sertai Giveaway")
+          .setLabel("🎉 Join Giveaway")
           .setStyle(ButtonStyle.Success);
 
         const row = new ActionRowBuilder().addComponents(joinBtn);
 
-        await interaction.reply({ content: "✅ Giveaway berjaya dimulakan!", ephemeral: true });
+        await interaction.reply({ content: "✅ Giveaway successfully started!", ephemeral: true });
         const giveawayMessage = await interaction.channel.send({ embeds: [giveawayEmbed], components: [row] });
 
         giveawaysMap.set(giveawayMessage.id, {
@@ -1071,7 +1144,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
           let winnersText = "";
           if (gw.participants.length === 0) {
-            winnersText = "• *Tiada sesiapa menyertai giveaway ini.*";
+            winnersText = "• *No one participated in this giveaway.*";
           } else {
             const shuffled = [...gw.participants].sort(() => 0.5 - Math.random());
             const winners = shuffled.slice(0, gw.winnersCount);
@@ -1080,8 +1153,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
           const endedEmbed = new EmbedBuilder()
             .setColor("#ffb6c1")
-            .setTitle("🎉 GIVEAWAY TELAH TAMAT! 🏆")
-            .setDescription(`🎁 **Hadiah:** ${gw.prize}\n👥 **Penyertaan:** ${gw.participants.length}\n\n🏆 **Pemenang Rasmi:**\n${winnersText}`)
+            .setTitle("🎉 GIVEAWAY ENDED! 🏆")
+            .setDescription(`🎁 **Prize:** ${gw.prize}\n👥 **Total Entries:** ${gw.participants.length}\n\n🏆 **Official Winner(s):**\n${winnersText}`)
             .setTimestamp();
 
           if (imageUrl) {
@@ -1090,7 +1163,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
             endedEmbed.setThumbnail(LOGO_URL);
           }
 
-          // Butang Reroll untuk Admin cabut semula pemenang jika perlu
           const rerollBtn = new ButtonBuilder()
             .setCustomId(`reroll_gw_${giveawayMessage.id}`)
             .setLabel("🎲 Reroll Winner")
@@ -1102,7 +1174,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           );
 
           await giveawayMessage.edit({ embeds: [endedEmbed], components: [disabledRow] }).catch(() => {});
-          await giveawayMessage.reply({ content: `🎉 Tahniah kepada pemenang giveaway: ${winnersText}!` }).catch(() => {});
+          await giveawayMessage.reply({ content: `🎉 Congratulations to the giveaway winner(s): ${winnersText}!` }).catch(() => {});
         }, durationMins * 60 * 1000);
 
         return;
@@ -1340,21 +1412,20 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 
   if (interaction.isButton()) {
-    // --- FUNGSI REROLL GIVEAWAY ---
     if (interaction.customId.startsWith("reroll_gw_")) {
       if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return interaction.reply({ content: "❌ Hanya Admin sahaja yang boleh melakukan reroll!", ephemeral: true });
+        return interaction.reply({ content: "❌ Only Administrators can reroll!", ephemeral: true });
       }
 
       const msgId = interaction.customId.replace("reroll_gw_", "");
       const gw = giveawaysMap.get(msgId);
 
       if (!gw || gw.participants.length === 0) {
-        return interaction.reply({ content: "❌ Tiada data peserta dijumpai untuk reroll ini.", ephemeral: true });
+        return interaction.reply({ content: "❌ No participant data found for this reroll.", ephemeral: true });
       }
 
       const randomWinner = gw.participants[Math.floor(Math.random() * gw.participants.length)];
-      await interaction.reply({ content: `🎲 **Reroll Berjaya!** Pemenang baharu ialah: <@${randomWinner}>! 🎉` });
+      await interaction.reply({ content: `🎲 **Reroll Successful!** New winner is: <@${randomWinner}>! 🎉` });
       return;
     }
 
@@ -1753,20 +1824,20 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.customId === "join_giveaway") {
       await interaction.deferReply({ ephemeral: true });
       const gw = giveawaysMap.get(interaction.message.id);
-      if (!gw || gw.ended) return interaction.editReply({ content: "❌ Giveaway ini telah tamat atau tidak wujud." });
+      if (!gw || gw.ended) return interaction.editReply({ content: "❌ This giveaway has ended or does not exist." });
 
       if (gw.participants.includes(interaction.user.id)) {
-        return interaction.editReply({ content: "⚠️ Awak sudah menyertai giveaway ini!" });
+        return interaction.editReply({ content: "⚠️ You have already joined this giveaway!" });
       }
 
       gw.participants.push(interaction.user.id);
 
       const oldEmbed = interaction.message.embeds[0];
       const newEmbed = EmbedBuilder.from(oldEmbed)
-        .setDescription(oldEmbed.description.replace(/👥 \*\*Penyertaan:\*\* \d+/, `👥 **Penyertaan:** ${gw.participants.length}`));
+        .setDescription(oldEmbed.description.replace(/👥 \*\*Entries:\*\* \d+/, `👥 **Entries:** ${gw.participants.length}`));
 
       await interaction.message.edit({ embeds: [newEmbed] }).catch(() => {});
-      await interaction.editReply({ content: `✅ Berjaya menyertai giveaway! Semoga ada rezeki awak! 🎉` });
+      await interaction.editReply({ content: `✅ Successfully joined the giveaway! Good luck! 🎉` });
       return;
     }
 
