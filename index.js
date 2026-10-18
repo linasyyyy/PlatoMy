@@ -121,9 +121,9 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  const sortedWallets = [...wallets.entries()].sort((a, b) => b[1].serverPoints - a[1].serverPoints).slice(0, 5);
+  const sortedWallets = [...wallets.entries()].sort((a, b) => b[1].exp - a[1].exp).slice(0, 5);
   let leaderboardRows = sortedWallets.length === 0 ? "<tr><td colspan='3'>Belum ada rekod EXP lagi.</td></tr>" : 
-    sortedWallets.map(([uid, data], i) => `<tr><td>#${i+1}</td><td>ID:${uid}</td><td>Lvl ${Math.floor(data.serverPoints/100)+1} (${data.serverPoints} pts)</td></tr>`).join("");
+    sortedWallets.map(([uid, data], i) => `<tr><td>#${i+1}</td><td>ID:${uid}</td><td>Lvl ${Math.floor(data.exp/1000)+1} (${data.exp} EXP)</td></tr>`).join("");
 
   res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
   res.end(`
@@ -192,7 +192,7 @@ const server = http.createServer(async (req, res) => {
             <div class="card">
                 <h3>👑 Live Leaderboard (Top 5)</h3>
                 <table>
-                    <tr><th>Rank</th><th>User</th><th>Level & Points</th></tr>
+                    <tr><th>Rank</th><th>User</th><th>Level & EXP</th></tr>
                     ${leaderboardRows}
                 </table>
             </div>
@@ -213,11 +213,11 @@ const WELCOME_CHANNEL_NAME = "selamat-datang";
 const SERVER_LOGS_CHANNEL_NAME = "server-logs";
 const UPDATE_CHANNEL_NAME = "plato-update";
 const VERIFIED_ROLE_NAME = "Member";
-const ACTIVE_ROLE_NAME = "Murai Chatters 🥵"; // Nama role aktif anda
+const ACTIVE_ROLE_NAME = "Murai Chatters 🥵"; 
 const LOGO_URL = "https://cdn.discordapp.com/attachments/1549051773438787724/1549403998686281808/IMG_5614.png";
 
 let lastPostedUpdateId = null;
-const lastActiveMap = new Map(); // Menyimpan masa terakhir ahli aktif bersembang
+const lastActiveMap = new Map(); 
 
 async function checkPlatoUpdates() {
   try {
@@ -265,10 +265,9 @@ async function checkPlatoUpdates() {
   }
 }
 
-// Fungsi semakan automatik untuk Role "Murai Chatters 🥵" (Semak setiap 6 jam)
 async function checkActiveRoles() {
   const now = Date.now();
-  const threeDaysMs = 3 * 24 * 60 * 60 * 1000; // Had aktif: 3 hari
+  const threeDaysMs = 3 * 24 * 60 * 60 * 1000; 
 
   for (const [_, guild] of client.guilds.cache) {
     const activeRole = guild.roles.cache.find(r => r.name.toLowerCase() === ACTIVE_ROLE_NAME.toLowerCase());
@@ -281,12 +280,10 @@ async function checkActiveRoles() {
       if (!member) continue;
 
       if (now - lastTime > threeDaysMs) {
-        // Jika sudah lebih 3 hari tak aktif, buang role
         if (member.roles.cache.has(activeRole.id)) {
           await member.roles.remove(activeRole).catch(() => {});
         }
       } else {
-        // Jika aktif dalam masa 3 hari, beri role
         if (!member.roles.cache.has(activeRole.id)) {
           await member.roles.add(activeRole).catch(() => {});
         }
@@ -297,7 +294,7 @@ async function checkActiveRoles() {
 
 const commands = [
   new SlashCommandBuilder().setName("wallet").setDescription("Semak baki akaun PlatoMy • Wallet anda! 🏦"),
-  new SlashCommandBuilder().setName("leaderboard").setDescription("Papar papan pendahulu (Leaderboard EXP & Server Points) 📊"),
+  new SlashCommandBuilder().setName("leaderboard").setDescription("Papar papan pendahulu (Leaderboard EXP) 📊"),
   new SlashCommandBuilder().setName("admin-wallet").setDescription("Urus baki akaun PlatoMy • Wallet ahli (Admin sahaja)")
     .addStringOption(opt => opt.setName("action").setDescription("Tindakan").setRequired(true).addChoices(
       { name: "Add Sponsor", value: "add_sponsor" },
@@ -361,18 +358,17 @@ client.once(Events.ClientReady, async (c) => {
     checkPlatoUpdates();
   }, 1000 * 60 * 5);
 
-  // Semak status aktif ahli setiap 6 jam
   setInterval(() => {
     checkActiveRoles();
   }, 1000 * 60 * 60 * 6);
 });
 
 function getWallet(id) {
-  if (!wallets.has(id)) wallets.set(id, { coins: 0, pips: 0, serverPoints: 0, sponsorTotal: 0 });
+  if (!wallets.has(id)) wallets.set(id, { coins: 0, pips: 0, exp: 0, sponsorTotal: 0 });
   return wallets.get(id);
 }
 
-async function sendLevelUpLog(guild, userId, newLevel, totalXp) {
+async function sendLevelUpLog(guild, userId, newLevel) {
   const channel = guild.channels.cache.find(
     (candidate) => candidate.name.toLowerCase().includes(LEVEL_LOG_CHANNEL_NAME.toLowerCase()) && candidate.isTextBased()
   );
@@ -381,7 +377,7 @@ async function sendLevelUpLog(guild, userId, newLevel, totalXp) {
   const levelUpEmbed = new EmbedBuilder()
     .setColor("#ffb6c1")
     .setTitle("LEVEL UP! 🎉")
-    .setDescription(`Tahniah <@${userId}>! Anda baru sahaja naik ke **Level ${newLevel}**! ✨\n\n📊 **Jumlah EXP Terkumpul:** \`${totalXp.toLocaleString()} pts\`\nTeruskan aktif dalam komuniti **PlatoMy**! 🚀`)
+    .setDescription(`Tahniah <@${userId}>! Anda baru sahaja naik ke **Level ${newLevel}**! ✨\n\nTeruskan aktif dalam komuniti **PlatoMy**! 🚀`)
     .setThumbnail(LOGO_URL)
     .setTimestamp();
 
@@ -503,29 +499,34 @@ client.on(Events.GuildMemberRemove, async (member) => {
 client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot || !message.guild) return;
 
-  // --- KEMASKINI STATUS AKTIF & REKOD MASA UNTUK "Murai Chatters 🥵" ---
   const userId = message.author.id;
   lastActiveMap.set(userId, Date.now());
 
-  // Berikan role secara automatik jika belum ada
   const activeRole = message.guild.roles.cache.find(r => r.name.toLowerCase() === ACTIVE_ROLE_NAME.toLowerCase());
   if (activeRole && !message.member.roles.cache.has(activeRole.id)) {
     await message.member.roles.add(activeRole).catch(() => {});
   }
-  // -------------------------------------------------------------------
 
-  // --- SISTEM AUTO SERVER POINTS (EXP) SETIAP MESEJ ---
+  // --- SISTEM EXP MENGIKUT KATEGORI / CHANNEL ---
   const w = getWallet(userId);
-  const oldPoints = w.serverPoints;
+  const oldExp = w.exp;
   
-  // Setiap mesej menambah 15 mata Server Points
-  w.serverPoints += 15;
+  // Semak sama ada mesej dihantar dalam kategori Play Zone atau channel berkaitan play/zone/game
+  const parentCategoryName = message.channel.parent?.name?.toLowerCase() || "";
+  const channelName = message.channel.name.toLowerCase();
+  
+  let earnedExp = 2; // Default 2 EXP untuk setiap mesej biasa
+  if (parentCategoryName.includes("play zone") || parentCategoryName.includes("play") || parentCategoryName.includes("zone") || channelName.includes("play") || channelName.includes("zone") || channelName.includes("game")) {
+    earnedExp = 0.5; // 0.5 EXP untuk kategori Play Zone
+  }
 
-  const oldLevel = Math.floor(oldPoints / 100) + 1;
-  const newLevel = Math.floor(w.serverPoints / 100) + 1;
+  w.exp += earnedExp;
+
+  const oldLevel = Math.floor(oldExp / 1000) + 1;
+  const newLevel = Math.floor(w.exp / 1000) + 1;
   
   if (newLevel > oldLevel) {
-    await sendLevelUpLog(message.guild, userId, newLevel, w.serverPoints);
+    await sendLevelUpLog(message.guild, userId, newLevel);
   }
   // ----------------------------------------------------
 
@@ -536,7 +537,7 @@ client.on(Events.MessageCreate, async (message) => {
       .setColor("#ffb6c1")
       .setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL({ size: 128, dynamic: true }) })
       .setTitle("💳 PlatoMy • Wallet")
-      .setDescription(`🪙 **Plato Coins:** ${w.coins.toLocaleString()}\n💠 **Pips:** ${w.pips.toLocaleString()}\n🎁 **Sponsor Total:** ${w.sponsorTotal.toLocaleString()}\n✨ **Server Points:** ${w.serverPoints.toLocaleString()} pts`)
+      .setDescription(`🪙 **Plato Coins:** ${w.coins.toLocaleString()}\n💠 **Pips:** ${w.pips.toLocaleString()}\n🎁 **Sponsor Total:** ${w.sponsorTotal.toLocaleString()}\n✨ **EXP:** ${w.exp.toLocaleString()}`)
       .setFooter({ text: "PlatoMy Wallet Official System ♡" })
       .setTimestamp();
     await message.reply({ embeds: [embed] });
@@ -544,7 +545,7 @@ client.on(Events.MessageCreate, async (message) => {
   }
 
   if (content === "!lb" || content === "!leaderboard") {
-    const sortedWallets = [...wallets.entries()].sort((a, b) => b[1].serverPoints - a[1].serverPoints).slice(0, 10);
+    const sortedWallets = [...wallets.entries()].sort((a, b) => b[1].exp - a[1].exp).slice(0, 10);
     let lbDescription = "Want to see more than the top 10?\n\n";
     
     if (sortedWallets.length === 0) {
@@ -553,8 +554,8 @@ client.on(Events.MessageCreate, async (message) => {
       const medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
       sortedWallets.forEach(([uid, data], index) => {
         const medalIcon = medals[index] || `#${index + 1}`;           
-        const estimatedLevel = Math.floor(data.serverPoints / 100) + 1;           
-        lbDescription += `${medalIcon} **<@${uid}>**\nLevel${estimatedLevel} • XP: **${data.serverPoints.toLocaleString()}** pts\n\n`;
+        const estimatedLevel = Math.floor(data.exp / 1000) + 1;           
+        lbDescription += `${medalIcon} **<@${uid}>**\nLevel${estimatedLevel} • EXP: **${data.exp.toLocaleString()}**\n\n`;
       });
     }
 
@@ -571,10 +572,11 @@ client.on(Events.MessageCreate, async (message) => {
   }
 
   if (content === "!level" || content === "!rank") {
-    const currentLevel = Math.floor(w.serverPoints / 100) + 1;
-    const currentXpInLevel = w.serverPoints % 100;
+    const currentLevel = Math.floor(w.exp / 1000) + 1;
+    const currentXpInLevel = Math.floor(w.exp % 1000);
     
-    const progressBlocks = Math.floor(currentXpInLevel / 10);
+    // Progress bar dikira berdasarkan skala 1000 EXP per level (10 blok = 100 EXP setiap blok)
+    const progressBlocks = Math.floor(currentXpInLevel / 100);
     const progressBar = "▓".repeat(progressBlocks) + "░".repeat(10 - progressBlocks);
 
     const rankEmbed = new EmbedBuilder()
@@ -584,9 +586,9 @@ client.on(Events.MessageCreate, async (message) => {
       .setDescription(
         `👤 **Member:** ${message.author}\n` +
         `📊 **Current Level:** Level ${currentLevel}\n` +
-        `✨ **Total EXP:** ${w.serverPoints.toLocaleString()} pts\n\n` +
+        `✨ **Total EXP:** ${w.exp.toLocaleString()}\n\n` +
         `📈 **Progress to Level ${currentLevel + 1}:**\n` +
-        `\`[${progressBar}]\` **${currentXpInLevel}/100 pts**`
+        `\`[${progressBar}]\` **${currentXpInLevel}/1000 EXP**`
       )
       .setTimestamp();
     await message.reply({ embeds: [rankEmbed] });
@@ -602,7 +604,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setColor("#ffb6c1")
         .setAuthor({ name: interaction.user.username, iconURL: interaction.user.displayAvatarURL({ size: 128, dynamic: true }) })
         .setTitle("💳 PlatoMy • Wallet")
-        .setDescription(`🪙 **Plato Coins:** ${w.coins.toLocaleString()}\n💠 **Pips:** ${w.pips.toLocaleString()}\n🎁 **Sponsor Total:** ${w.sponsorTotal.toLocaleString()}\n✨ **Server Points:** ${w.serverPoints.toLocaleString()} pts`)
+        .setDescription(`🪙 **Plato Coins:** ${w.coins.toLocaleString()}\n💠 **Pips:** ${w.pips.toLocaleString()}\n🎁 **Sponsor Total:** ${w.sponsorTotal.toLocaleString()}\n✨ **EXP:** ${w.exp.toLocaleString()}`)
         .setFooter({ text: "PlatoMy Wallet Official System ♡" })
         .setTimestamp();
       await interaction.reply({ embeds: [embed], ephemeral: true });
@@ -610,7 +612,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
 
     if (interaction.commandName === "leaderboard") {
-      const sortedWallets = [...wallets.entries()].sort((a, b) => b[1].serverPoints - a[1].serverPoints).slice(0, 10);
+      const sortedWallets = [...wallets.entries()].sort((a, b) => b[1].exp - a[1].exp).slice(0, 10);
       let lbDescription = "Want to see more than the top 10?\n\n";
       
       if (sortedWallets.length === 0) {
@@ -619,8 +621,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
         sortedWallets.forEach(([userId, data], index) => {
           const medalIcon = medals[index] || `#${index + 1}`;           
-          const estimatedLevel = Math.floor(data.serverPoints / 100) + 1;           
-          lbDescription += `${medalIcon} **<@${userId}>**\nLevel${estimatedLevel} • XP: **${data.serverPoints.toLocaleString()}** pts\n\n`;
+          const estimatedLevel = Math.floor(data.exp / 1000) + 1;           
+          lbDescription += `${medalIcon} **<@${userId}>**\nLevel${estimatedLevel} • EXP: **${data.exp.toLocaleString()}**\n\n`;
         });
       }
 
@@ -650,7 +652,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         { name: "Pool", emoji: "🎱" }, { name: "Soccer", emoji: "⚽" }, { name: "Spades", emoji: "♠️" }, { name: "Other Game", emoji: "✨" }
       ];
 
-      // Susunan role: Plato Update diletakkan di atas Daily Quest
       const otherRolesList = [
         { name: "Plato Update", emoji: "🛠️" }, { name: "Daily Quest", emoji: "📅" }, { name: "Aura Swap", emoji: "💫" }, { name: "Plato Rumble", emoji: "⚔️" }
       ];
@@ -900,11 +901,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const embed = new EmbedBuilder()
           .setColor("#ffb6c1")
           .setTitle("💳 PlatoMy • Wallet Account Check")
-          .setDescription(`• **Member:** ${target}\n🪙 Coins: ${w.coins.toLocaleString()}\n💠 Pips: ${w.pips.toLocaleString()}\n🎁 Sponsor Total: ${w.sponsorTotal.toLocaleString()}\n✨ Points: ${w.serverPoints.toLocaleString()} pts`);
+          .setDescription(`• **Member:** ${target}\n🪙 Coins: ${w.coins.toLocaleString()}\n💠 Pips: ${w.pips.toLocaleString()}\n🎁 Sponsor Total: ${w.sponsorTotal.toLocaleString()}\n✨ EXP: ${w.exp.toLocaleString()}`);
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
-      const oldPoints = w.serverPoints;
+      const oldExp = w.exp;
       
       if (action === "add_sponsor") { 
         w.coins += amount; 
@@ -915,15 +916,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
       else if (action === "deduct_coins") { w.coins = Math.max(0, w.coins - amount); cur = "🪙 Coins"; }
       else if (action === "add_pips") { 
         w.pips += amount; 
-        w.serverPoints += amount; 
+        w.exp += amount; 
         cur = "💠 Pips"; 
       }
       else if (action === "deduct_pips") { w.pips = Math.max(0, w.pips - amount); cur = "💠 Pips"; }
 
-      const oldLevel = Math.floor(oldPoints / 100) + 1;
-      const newLevel = Math.floor(w.serverPoints / 100) + 1;
+      const oldLevel = Math.floor(oldExp / 1000) + 1;
+      const newLevel = Math.floor(w.exp / 1000) + 1;
       if (newLevel > oldLevel) {
-        await sendLevelUpLog(interaction.guild, target.id, newLevel, w.serverPoints);
+        await sendLevelUpLog(interaction.guild, target.id, newLevel);
       }
 
       const successMsg = action === "add_sponsor" 
@@ -1863,5 +1864,5 @@ client.on(Events.InteractionCreate, async (interaction) => {
 });
 
 client.login(token).catch(err => {
-  console.error("GAGAL LOGIN KE DISCORD:", err);
+  console.error("GAGAL LOGIN KE Discord:", err);
 });
