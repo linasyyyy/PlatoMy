@@ -30,7 +30,8 @@ const client = new Client({
     GatewayIntentBits.Guilds, 
     GatewayIntentBits.GuildMessages, 
     GatewayIntentBits.MessageContent, 
-    GatewayIntentBits.GuildMembers
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildVoiceStates
   ] 
 });
 
@@ -39,6 +40,7 @@ const eventsMap = new Map();
 const birthdaysMap = new Map(); 
 const giveawaysMap = new Map(); 
 const rumbleMap = new Map(); 
+const tempVoiceOwners = new Map(); // Menyimpan pemilik voice channel sementara
 
 // --- LAMAN WEB DASHBOARD INTERAKTIF ---
 const server = http.createServer(async (req, res) => {
@@ -313,6 +315,8 @@ const commands = [
   new SlashCommandBuilder().setName("setup-report").setDescription("Hantar panel Report Ticket sahaja (Admin sahaja)"),
   new SlashCommandBuilder().setName("setup-role-plato").setDescription("Hantar menu dropdown game role Plato (Admin sahaja)"),
   new SlashCommandBuilder().setName("setup-update").setDescription("Hantar panel atau tetapan update rasmi (Admin sahaja)"),
+  new SlashCommandBuilder().setName("setup-voice-panel").setDescription("Hantar panel kawalan Voice Channel sementara (Admin sahaja)")
+    .addChannelOption(opt => opt.setName("channel").setDescription("Pilih text channel untuk hantar panel ini").setRequired(true)),
   new SlashCommandBuilder().setName("rumble").setDescription("Mula permainan PlatoMy Rumble dengan Total Prize (Admin sahaja)")
     .addStringOption(opt => opt.setName("currency").setDescription("Jenis mata wang hadiah").setRequired(true).addChoices(
       { name: "🪙 Plato Coins", value: "coins" },
@@ -361,6 +365,58 @@ client.once(Events.ClientReady, async (c) => {
   setInterval(() => {
     checkActiveRoles();
   }, 1000 * 60 * 60 * 6);
+});
+
+// --- SISTEM PEMANTAUAN VOICE CHANNEL (AUTO CREATE & DELETE) ---
+client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
+  const member = newState.member;
+  if (!member || member.user.bot) return;
+
+  const creatorChannelName = "➕ Create Voice";
+
+  if (newState.channel && newState.channel.name.toLowerCase() === creatorChannelName.toLowerCase()) {
+    const guild = newState.guild;
+    const parentCategory = newState.channel.parent;
+
+    try {
+      const userVc = await guild.channels.create({
+        name: `ʚ₊˚🔊・${member.user.username}'s Room`,
+        type: ChannelType.GuildVoice,
+        parent: parentCategory ? parentCategory.id : null,
+        permissionOverwrites: [
+          {
+            id: guild.id,
+            allow: [PermissionFlagsBits.Connect, PermissionFlagsBits.Speak],
+          },
+          {
+            id: member.id,
+            allow: [
+              PermissionFlagsBits.Connect, 
+              PermissionFlagsBits.Speak, 
+              PermissionFlagsBits.ManageChannels, 
+              PermissionFlagsBits.MuteMembers, 
+              PermissionFlagsBits.DeafenMembers
+            ],
+          }
+        ]
+      });
+
+      await member.voice.setChannel(userVc);
+      tempVoiceOwners.set(userVc.id, member.id);
+    } catch (err) {
+      console.error("Gagal mencipta voice channel:", err);
+    }
+  }
+
+  if (oldState.channel) {
+    const leftChannel = oldState.channel;
+    if (tempVoiceOwners.has(leftChannel.id)) {
+      if (leftChannel.members.size === 0) {
+        tempVoiceOwners.delete(leftChannel.id);
+        await leftChannel.delete().catch(() => {});
+      }
+    }
+  }
 });
 
 function getWallet(id) {
@@ -507,17 +563,15 @@ client.on(Events.MessageCreate, async (message) => {
     await message.member.roles.add(activeRole).catch(() => {});
   }
 
-  // --- SISTEM EXP MENGIKUT KATEGORI / CHANNEL ---
   const w = getWallet(userId);
   const oldExp = w.exp;
   
-  // Semak sama ada mesej dihantar dalam kategori Play Zone atau channel berkaitan play/zone/game
   const parentCategoryName = message.channel.parent?.name?.toLowerCase() || "";
   const channelName = message.channel.name.toLowerCase();
   
-  let earnedExp = 2; // Default 2 EXP untuk setiap mesej biasa
+  let earnedExp = 2; 
   if (parentCategoryName.includes("play zone") || parentCategoryName.includes("play") || parentCategoryName.includes("zone") || channelName.includes("play") || channelName.includes("zone") || channelName.includes("game")) {
-    earnedExp = 0.5; // 0.5 EXP untuk kategori Play Zone
+    earnedExp = 0.5; 
   }
 
   w.exp += earnedExp;
@@ -528,7 +582,6 @@ client.on(Events.MessageCreate, async (message) => {
   if (newLevel > oldLevel) {
     await sendLevelUpLog(message.guild, userId, newLevel);
   }
-  // ----------------------------------------------------
 
   const content = message.content.trim().toLowerCase();
 
@@ -575,7 +628,6 @@ client.on(Events.MessageCreate, async (message) => {
     const currentLevel = Math.floor(w.exp / 1000) + 1;
     const currentXpInLevel = Math.floor(w.exp % 1000);
     
-    // Progress bar dikira berdasarkan skala 1000 EXP per level (10 blok = 100 EXP setiap blok)
     const progressBlocks = Math.floor(currentXpInLevel / 100);
     const progressBar = "▓".repeat(progressBlocks) + "░".repeat(10 - progressBlocks);
 
@@ -635,6 +687,37 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setTimestamp();
 
       await interaction.reply({ embeds: [lbEmbed] });
+      return;
+    }
+
+    if (interaction.commandName === "setup-voice-panel") {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return interaction.reply({ content: "❌ Hanya Admin sahaja!", ephemeral: true });
+      }
+
+      const targetChannel = interaction.options.getChannel("channel");
+      
+      const vcEmbed = new EmbedBuilder()
+        .setColor("#ffb6c1")
+        .setTitle("ʚ・₊˚  VOICE CONTROL PANEL  ˚₊・ɞ")
+        .setDescription(
+          "✨ **Cara Membuka & Mengawal Bilik Suara Peribadi:**\n" +
+          " ꒰ 🎧 ꒱ Masuk ke channel **`➕ Create Voice`** di bawah untuk cipta bilik.\n" +
+          " ꒰ ⚡ ꒱ Gunakan butang di bawah untuk kawal bilik anda semasa berada di dalamnya!\n\n" +
+          " ୨ৎ *Enjoy your private session with friends!* ♡"
+        )
+        .setThumbnail(LOGO_URL)
+        .setTimestamp();
+
+      const row1 = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId("vc_lock").setLabel("Lock / Unlock").setStyle(ButtonStyle.Secondary).setEmoji("🔒"),
+        new ButtonBuilder().setCustomId("vc_hide").setLabel("Hide / Unhide").setStyle(ButtonStyle.Secondary).setEmoji("👁️"),
+        new ButtonBuilder().setCustomId("vc_limit").setLabel("Set Limit").setStyle(ButtonStyle.Primary).setEmoji("👥"),
+        new ButtonBuilder().setCustomId("vc_rename").setLabel("Rename").setStyle(ButtonStyle.Primary).setEmoji("✏️")
+      );
+
+      await targetChannel.send({ embeds: [vcEmbed], components: [row1] });
+      await interaction.reply({ content: `✅ Voice panel aesthetic berjaya dihantar ke channel <#${targetChannel.id}>!`, ephemeral: true });
       return;
     }
 
@@ -1184,6 +1267,42 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }    
 
   if (interaction.isModalSubmit()) {     
+    if (interaction.customId === "vc_limit_modal") {
+      await interaction.deferReply({ ephemeral: true });
+      const limitVal = parseInt(interaction.fields.getTextInputValue("vc_limit_val"));
+
+      if (isNaN(limitVal) || limitVal < 0 || limitVal > 99) {
+        return interaction.editReply({ content: "❌ Sila masukkan nombor yang sah antara 0 hingga 99 (0 bermaksud tiada had)." });
+      }
+
+      const userVc = interaction.member.voice.channel;
+      if (!userVc || tempVoiceOwners.get(userVc.id) !== interaction.user.id) {
+        return interaction.editReply({ content: "❌ Anda mesti berada di dalam voice channel anda sendiri untuk mengubah had!" });
+      }
+
+      await userVc.setUserLimit(limitVal);
+      await interaction.editReply({ content: `✅ Had bilik suara berjaya ditukar kepada **${limitVal === 0 ? "Tiada Had" : limitVal} orang**!` });
+      return;
+    }
+
+    if (interaction.customId === "vc_rename_modal") {
+      await interaction.deferReply({ ephemeral: true });
+      const newName = interaction.fields.getTextInputValue("vc_name_val").trim();
+
+      if (!newName) {
+        return interaction.editReply({ content: "❌ Sila masukkan nama channel yang sah!" });
+      }
+
+      const userVc = interaction.member.voice.channel;
+      if (!userVc || tempVoiceOwners.get(userVc.id) !== interaction.user.id) {
+        return interaction.editReply({ content: "❌ Anda mesti berada di dalam voice channel anda sendiri untuk menukar nama!" });
+      }
+
+      await userVc.setName(`ʚ₊˚🔊・${newName}`);
+      await interaction.editReply({ content: `✅ Nama bilik suara berjaya ditukar kepada **ʚ₊˚🔊・${newName}**!` });
+      return;
+    }
+
     if (interaction.customId.startsWith("eb_modal_basic_")) {
       await interaction.deferUpdate();
       const newTitle = interaction.fields.getTextInputValue("eb_title");
@@ -1413,6 +1532,84 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 
   if (interaction.isButton()) {
+    if (["vc_lock", "vc_hide", "vc_limit", "vc_rename"].includes(interaction.customId)) {
+      const userVc = interaction.member.voice.channel;
+      if (!userVc) {
+        return interaction.reply({ content: "❌ Anda mesti berada di dalam voice channel untuk menggunakan kawalan ini!", ephemeral: true });
+      }
+
+      const ownerId = tempVoiceOwners.get(userVc.id);
+      if (!ownerId || ownerId !== interaction.user.id) {
+        return interaction.reply({ content: "❌ Anda bukan pemilik (owner) bagi voice channel ini!", ephemeral: true });
+      }
+
+      if (interaction.customId === "vc_lock") {
+        await interaction.deferReply({ ephemeral: true });
+        const everyoneRole = interaction.guild.roles.everyone;
+        const currentPerms = userVc.permissionOverwrites.cache.get(everyoneRole.id);
+        const isLocked = currentPerms && currentPerms.deny.has(PermissionFlagsBits.Connect);
+
+        if (isLocked) {
+          await userVc.permissionOverwrites.edit(everyoneRole, { Connect: null });
+          await interaction.editReply({ content: "🔓 Voice channel anda telah **dibuka semula (Unlocked)**!" });
+        } else {
+          await userVc.permissionOverwrites.edit(everyoneRole, { Connect: false });
+          await interaction.editReply({ content: "🔒 Voice channel anda telah **dikunci (Locked)**!" });
+        }
+        return;
+      }
+
+      if (interaction.customId === "vc_hide") {
+        await interaction.deferReply({ ephemeral: true });
+        const everyoneRole = interaction.guild.roles.everyone;
+        const currentPerms = userVc.permissionOverwrites.cache.get(everyoneRole.id);
+        const isHidden = currentPerms && currentPerms.deny.has(PermissionFlagsBits.ViewChannel);
+
+        if (isHidden) {
+          await userVc.permissionOverwrites.edit(everyoneRole, { ViewChannel: null });
+          await interaction.editReply({ content: "👁️ Voice channel anda kini **kelihatan (Unhidden)**!" });
+        } else {
+          await userVc.permissionOverwrites.edit(everyoneRole, { ViewChannel: false });
+          await interaction.editReply({ content: "🕶️ Voice channel anda kini **disembunyikan (Hidden)** daripada orang lain!" });
+        }
+        return;
+      }
+
+      if (interaction.customId === "vc_limit") {
+        const modal = new ModalBuilder()
+          .setCustomId("vc_limit_modal")
+          .setTitle("Tetapkan Had Ahli Bilik");
+
+        const limitInput = new TextInputBuilder()
+          .setCustomId("vc_limit_val")
+          .setLabel("Had Bilangan Ahli (0 - 99)")
+          .setStyle(TextInputStyle.Short)
+          .setPlaceholder("Cth: 5")
+          .setRequired(true);
+
+        modal.addComponents(new ActionRowBuilder().addComponents(limitInput));
+        await interaction.showModal(modal);
+        return;
+      }
+
+      if (interaction.customId === "vc_rename") {
+        const modal = new ModalBuilder()
+          .setCustomId("vc_rename_modal")
+          .setTitle("Tukar Nama Bilik Suara");
+
+        const nameInput = new TextInputBuilder()
+          .setCustomId("vc_name_val")
+          .setLabel("Nama Baharu Bilik")
+          .setStyle(TextInputStyle.Short)
+          .setPlaceholder("Cth: Chill & Chat")
+          .setRequired(true);
+
+        modal.addComponents(new ActionRowBuilder().addComponents(nameInput));
+        await interaction.showModal(modal);
+        return;
+      }
+    }
+
     if (interaction.customId.startsWith("reroll_gw_")) {
       if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
         return interaction.reply({ content: "❌ Only Administrators can reroll!", ephemeral: true });
@@ -1864,5 +2061,5 @@ client.on(Events.InteractionCreate, async (interaction) => {
 });
 
 client.login(token).catch(err => {
-  console.error("GAGAL LOGIN KE Discord:", err);
+  console.error("GAGAL LOGIN KE DISCORD:", err);
 });
