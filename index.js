@@ -701,9 +701,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setColor("#ffb6c1")
         .setTitle("ʚ・₊˚  VOICE CONTROL PANEL  ˚₊・ɞ")
         .setDescription(
-          "✨ **Cara Membuka & Mengawal Bilik Suara Peribadi:**\n" +
-          " ꒰ 🎧 ꒱ Masuk ke channel **`➕ Create Voice`** di bawah untuk cipta bilik.\n" +
-          " ꒰ ⚡ ꒱ Gunakan butang di bawah untuk kawal bilik anda semasa berada di dalamnya!\n\n" +
+          "✨ **Cara Membuka & Mengawal Bilik Suara Peribadi / How to Create & Control Your Private Voice Room:**\n\n" +
+          "-# ଓ ꒰ 🎧 ꒱ Masuk ke channel **`➕ Create Voice`** di bawah untuk cipta bilik. *(Join the channel below to create your room.)*\n" +
+          "-# ଓ ꒰ ⚡ ꒱ Gunakan butang di bawah untuk kawal bilik anda semasa berada di dalamnya! *(Use the buttons below to manage your room while inside!)*\n\n" +
           " ୨ৎ *Enjoy your private session with friends!* ♡"
         )
         .setThumbnail(LOGO_URL)
