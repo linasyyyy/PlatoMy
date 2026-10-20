@@ -86,7 +86,7 @@ const server = http.createServer(async (req, res) => {
             const joinBtn = new ButtonBuilder().setCustomId("join_giveaway").setLabel("🎉 Join Giveaway").setStyle(ButtonStyle.Success);
             const msg = await textChannel.send({ embeds: [gwEmbed], components: [new ActionRowBuilder().addComponents(joinBtn)] });
 
-            giveawaysMap.set(msg.id, { prize, winnersCount, participants: [], ended: false });
+            giveawaysMap.set(msg.id, { prize, winnersCount, requirement: "Tiada syarat khusus", participants: [], ended: false });
           } 
           else if (actionType === "event") {
             const title = postData.evTitle || "Community Event";
@@ -221,10 +221,8 @@ const LOGO_URL = "https://cdn.discordapp.com/attachments/1549051773438787724/154
 let lastPostedUpdateId = null;
 const lastActiveMap = new Map(); 
 
-// Helper to get current time in Malaysia Timezone (UTC+8)
 function getMalaysiaCurrentTime() {
   const now = new Date();
-  // Using Intl to correctly offset or evaluate local Malaysia time components
   return new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kuala_Lumpur" }));
 }
 
@@ -346,7 +344,7 @@ const commands = [
       .addStringOption(opt => opt.setName("prize").setDescription("Hadiah giveaway").setRequired(true))
       .addIntegerOption(opt => opt.setName("duration").setDescription("Tempoh masa dalam minit").setRequired(true))
       .addIntegerOption(opt => opt.setName("winners").setDescription("Bilangan pemenang").setRequired(true))
-      .addStringOption(opt => opt.setName("requirement").setDescription("Syarat penyertaan (Cth: Min Level 2 atau Member Role)").setRequired(false))
+      .addStringOption(opt => opt.setName("requirement").setDescription("Syarat penyertaan (Cth: @RoleName atau nama role)").setRequired(false))
       .addStringOption(opt => opt.setName("image").setDescription("Link URL imej besar banner giveaway").setRequired(false))
     ),
 ].map(c => c.toJSON());
@@ -483,7 +481,6 @@ function parseBirthdayToTimestamp(inputStr) {
 
   if (isNaN(day) || month === undefined) return null;
 
-  // Use Malaysia local date context for recurring annual tracking
   const nowMY = getMalaysiaCurrentTime();
   let year = nowMY.getFullYear();
   let targetDate = new Date(year, month, day);
@@ -515,7 +512,6 @@ async function checkBirthdays() {
           await targetChannel.send({ content: `🎂 Selamat Hari Lahir <@${userId}>!`, embeds: [bdayEmbed] }).catch(() => {});         
         }       
       }
-      // Make birthdays recurring annually by pushing the target timestamp forward by 1 year (31536000 seconds)
       data.timestamp += 31536000;     
     }   
   } 
@@ -1849,7 +1845,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await interaction.deferReply({ ephemeral: true });
       const guild = interaction.guild;
 
-      // Prevent duplicate active trading channels for the same user
       const existingChannel = guild.channels.cache.find(c => c.name === `trade-${interaction.user.username.toLowerCase()}`);
       if (existingChannel) {
         return interaction.editReply({ content: `⚠️ Anda sudah mempunyai tiket trading yang aktif: <#${existingChannel.id}>` });
@@ -2048,16 +2043,29 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return interaction.editReply({ content: "⚠️ You have already joined this giveaway!" });
       }
 
-      // Giveaway Requirement Check Simulation & Validation
-      if (gw.requirement && gw.requirement !== "Tiada syarat khusus") {
-        const reqLower = gw.requirement.toLowerCase();
-        // If requirement specifies a role name check
-        if (reqLower.includes("role")) {
-          const requiredRoleName = gw.requirement.split(" ").pop();
-          const hasRole = interaction.member.roles.cache.some(r => r.name.toLowerCase().includes(requiredRoleName));
-          if (!hasRole && !interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-            return interaction.editReply({ content: `❌ Syarat Giveaway tidak dipenuhi! Anda memerlukan role yang sepadan: **${gw.requirement}**` });
+      // Strict Giveaway Requirement Validation
+      if (gw.requirement && gw.requirement !== "Tiada syarat khusus" && gw.requirement !== "No specific requirement") {
+        let meetsRequirement = false;
+        const reqClean = gw.requirement.trim();
+
+        const targetRole = interaction.guild.roles.cache.find(r => 
+          r.name.toLowerCase() === reqClean.replace(/<@&|>/g, "").toLowerCase() || 
+          r.id === reqClean.replace(/<@&|>/g, "")
+        );
+
+        if (targetRole) {
+          if (interaction.member.roles.cache.has(targetRole.id)) {
+            meetsRequirement = true;
           }
+        } else {
+          const hasMatchedRole = interaction.member.roles.cache.some(r => r.name.toLowerCase().includes(reqClean.toLowerCase()));
+          if (hasMatchedRole) {
+            meetsRequirement = true;
+          }
+        }
+
+        if (!meetsRequirement) {
+          return interaction.editReply({ content: `❌ Syarat Giveaway tidak dipenuhi! Anda memerlukan syarat/role berikut: **${gw.requirement}**` });
         }
       }
 
