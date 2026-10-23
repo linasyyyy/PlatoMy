@@ -16,9 +16,15 @@ import {
   ChannelType,
   StringSelectMenuBuilder,
 } from "discord.js";
-import http from "http";
-import url from "url";
-import querystring from "querystring";
+import express from "express";
+import session from "express-session";
+import passport from "passport";
+import { Strategy as DiscordStrategy } from "passport-discord";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
@@ -40,171 +46,119 @@ const eventsMap = new Map();
 const birthdaysMap = new Map(); 
 const giveawaysMap = new Map(); 
 const rumbleMap = new Map(); 
-const tempVoiceOwners = new Map(); 
+const tempVoiceOwners = new Map();
 
-// --- LAMAN WEB DASHBOARD INTERAKTIF ---
-const server = http.createServer(async (req, res) => {
-  const parsedUrl = url.parse(req.url, true);
-  const pathname = parsedUrl.pathname;
+function getWallet(id) {
+  if (!wallets.has(id)) wallets.set(id, { coins: 0, pips: 0, exp: 0, sponsorTotal: 0 });
+  return wallets.get(id);
+}
 
-  if (req.method === "POST" && pathname === "/action") {
-    let body = "";
-    req.on("data", chunk => { body += chunk; });
-    req.on("end", async () => {
-      const postData = querystring.parse(body);
-      const actionType = postData.actionType;
-      
-      const guild = client.guilds.cache.first();
-      if (guild) {
-        let targetChannelName = "";
-        if (actionType === "giveaway") targetChannelName = "giveaway";
-        else if (actionType === "event") targetChannelName = "event-promote";
-        else if (actionType === "setup_verify") targetChannelName = "verify-here";
-        else if (actionType === "setup_birthday") targetChannelName = "birthday-corner";
+// --- INTEGRASI WEB DASHBOARD (EXPRESS + DISCORD OAUTH2 + Y2K THEME) ---
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-        let textChannel = guild.channels.cache.find(c => c.name.toLowerCase().includes(targetChannelName.toLowerCase()) && c.isTextBased());
-        
-        if (!textChannel) {
-          textChannel = guild.channels.cache.find(c => c.isTextBased() && c.permissionsFor(guild.members.me).has(PermissionFlagsBits.SendMessages));
-        }
-        
-        if (textChannel) {
-          if (actionType === "giveaway") {
-            const prize = postData.gwPrize || "Mystery Prize";
-            const duration = parseInt(postData.gwDuration) || 5;
-            const winnersCount = parseInt(postData.gwWinners) || 1;
+app.set("view engine", "ejs");
+app.set("views", path.join(__dirname, "views"));
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 
-            const endTime = Date.now() + duration * 60 * 1000;
-            const endTimeSeconds = Math.floor(endTime / 1000);
+app.use(
+  session({
+    secret: "platomy_y2k_secret_key_123",
+    resave: false,
+    saveUninitialized: false,
+  })
+);
 
-            const gwEmbed = new EmbedBuilder()
-              .setColor("#ffb6c1")
-              .setTitle("˚.🎀༘⋆ GIVEAWAY ˚.🎀༘⋆")
-              .setDescription(`🎁 **Prize:** ${prize}\n👑 **Winners:** ${winnersCount}\n⏳ **Ends In:** <t:${endTimeSeconds}:R>\n\n👥 **Entries:** 0`)
-              .setTimestamp();
+app.use(passport.initialize());
+app.use(passport.session());
 
-            const joinBtn = new ButtonBuilder().setCustomId("join_giveaway").setLabel("🎉 Join Giveaway").setStyle(ButtonStyle.Success);
-            const msg = await textChannel.send({ embeds: [gwEmbed], components: [new ActionRowBuilder().addComponents(joinBtn)] });
+const CLIENT_ID = "1556578779437072546";
+const CLIENT_SECRET = "XIfRq23FWQttp-5E9JSgRLfizc03Io_9";
+const DOMAIN_URL = process.env.RAILWAY_STATIC_URL 
+  ? `https://${process.env.RAILWAY_STATIC_URL}` 
+  : `http://localhost:${PORT}`;
 
-            giveawaysMap.set(msg.id, { prize, winnersCount, requirement: "Tiada syarat khusus", participants: [], ended: false });
-          } 
-          else if (actionType === "event") {
-            const title = postData.evTitle || "Community Event";
-            const timeStr = postData.evTime || "Now";
-            const prize = postData.evPrize || "No Prize";
+passport.serializeUser((user, done) => done(null, user));
+passport.deserializeUser((obj, done) => done(null, obj));
 
-            const evEmbed = new EmbedBuilder()
-              .setColor("#ffb6c1")
-              .setTitle(`🎮 ${title}`)
-              .setDescription(`📅 **Time (MYT):** ${timeStr}\n🎁 **Prize:** ${prize}\n👥 **Players:** 0`)
-              .setTimestamp();
+passport.use(
+  new DiscordStrategy(
+    {
+      clientID: CLIENT_ID,
+      clientSecret: CLIENT_SECRET,
+      callbackURL: `${DOMAIN_URL}/discord/callback`,
+      scope: ["identify", "guilds"],
+    },
+    (accessToken, refreshToken, profile, done) => {
+      process.nextTick(() => done(null, profile));
+    }
+  )
+);
 
-            const joinBtn = new ButtonBuilder().setCustomId("join_event_v2").setLabel("🎟 Join Event").setStyle(ButtonStyle.Success);
-            const msg = await textChannel.send({ embeds: [evEmbed], components: [new ActionRowBuilder().addComponents(joinBtn)] });
+function checkAuth(req, res, next) {
+  if (req.isAuthenticated()) return next();
+  res.redirect("/login");
+}
 
-            eventsMap.set(msg.id, { title, dateStr: "Today", timeStr, endTimeMs: Date.now() + 86400000, participants: [], ended: false });
-          }
-          else if (actionType === "setup_verify") {
-            const embed = new EmbedBuilder().setColor("#ffb6c1").setTitle("PlatoMy • Sahkan Plato ID ✨").setDescription("Sila klik butang di bawah untuk sahkan Plato ID anda!");
-            const btn = new ButtonBuilder().setCustomId("open_verify_modal").setLabel("✨ Tekan Disini").setStyle(ButtonStyle.Primary);
-            await textChannel.send({ embeds: [embed], components: [new ActionRowBuilder().addComponents(btn)] });
-          }
-          else if (actionType === "setup_birthday") {
-            const embed = new EmbedBuilder().setColor("#ffb6c1").setTitle("🎂 Birthday Corner 🎂").setDescription("Klik butang di bawah untuk tetapkan tarikh lahir anda! ♡");
-            const btn = new ButtonBuilder().setCustomId("open_birthday_modal").setLabel("🎀 Set/Update Birthday").setStyle(ButtonStyle.Primary);
-            await textChannel.send({ embeds: [embed], components: [new ActionRowBuilder().addComponents(btn)] });
-          }
-        }
-      }
+app.get("/login", passport.authenticate("discord"));
 
-      res.writeHead(302, { Location: "/" });
-      res.end();
-    });
-    return;
+app.get(
+  "/discord/callback",
+  passport.authenticate("discord", { failureRedirect: "/" }),
+  (req, res) => {
+    res.redirect("/");
+  }
+);
+
+app.get("/logout", (req, res) => {
+  req.logout(() => {
+    res.redirect("/");
+  });
+});
+
+app.get("/", checkAuth, (req, res) => {
+  // Ambil data akaun & leaderboard dari bot
+  const userWallet = getWallet(req.user.id);
+  
+  const allWallets = [...wallets.entries()].map(([id, data]) => ({
+    id,
+    ...data
+  }));
+
+  res.render("dashboard", {
+    user: req.user,
+    wallet: userWallet,
+    allWallets: allWallets,
+    totalCoins: Array.from(wallets.values()).reduce((a, b) => a + b.coins, 0),
+    totalPips: Array.from(wallets.values()).reduce((a, b) => a + b.pips, 0),
+    botClient: client
+  });
+});
+
+// API untuk Admin Inject Coins / Pips terus dari Web Dashboard
+app.post("/api/inject-assets", checkAuth, (req, res) => {
+  const { targetId, assetType, amount } = req.body;
+  if (!targetId || !amount) return res.status(400).json({ error: "Sila isi semua maklumat!" });
+
+  const cleanTargetId = targetId.replace(/[<@!>]/g, "").trim();
+  const targetWallet = getWallet(cleanTargetId);
+  const qty = parseInt(amount) || 0;
+
+  if (assetType.includes("Coins")) {
+    targetWallet.coins += qty;
+  } else {
+    targetWallet.pips += qty;
   }
 
-  const sortedWallets = [...wallets.entries()].sort((a, b) => b[1].exp - a[1].exp).slice(0, 5);
-  let leaderboardRows = sortedWallets.length === 0 ? "<tr><td colspan='3'>Belum ada rekod EXP lagi.</td></tr>" : 
-    sortedWallets.map(([uid, data], i) => `<tr><td>#${i+1}</td><td>ID:${uid}</td><td>Lvl ${Math.floor(data.exp/1000)+1} (${data.exp} EXP)</td></tr>`).join("");
-
-  res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-  res.end(`
-    <!DOCTYPE html>
-    <html lang="ms">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>👑 PlatoMy • Control Panel</title>
-        <style>
-            body { background-color: #fff0f3; color: #59484b; font-family: 'Segoe UI', Tahoma, sans-serif; text-align: center; padding: 20px; }
-            .container { max-width: 750px; margin: 0 auto; }
-            .card { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(255,182,193,0.4); border: 2px solid #ffb6c1; margin-bottom: 20px; }
-            h1, h3 { color: #ff69b4; }
-            input, button { width: 100%; padding: 10px; margin: 8px 0; border-radius: 10px; border: 1px solid #ffb6c1; box-sizing: border-box; }
-            button { background-color: #ff69b4; color: white; font-weight: bold; cursor: pointer; }
-            button:hover { background-color: #ff479b; }
-            table { width: 100%; border-collapse: collapse; background: #fff8f9; border-radius: 10px; overflow: hidden; margin-top: 10px; }
-            th, td { padding: 8px; border-bottom: 1px solid #ffe4e6; font-size: 13px; text-align: center; }
-            th { background-color: #ffb6c1; color: white; }
-            .badge { display: inline-block; background: #ffb6c1; color: white; padding: 5px 12px; border-radius: 50px; font-weight: bold; font-size: 13px; }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <div class="card">
-                <h1>🌸 PlatoMy Bot Control Panel 🌸</h1>
-                <div class="badge">✨ Status: Online & Connected (MYT Timezone Active)</div>
-                <p>Urus bot Discord anda secara terus dari website ini! ♡</p>
-            </div>
-
-            <div class="card">
-                <h3>🎉 Cipta Giveaway (Hantar ke giveaway)</h3>
-                <form action="/action" method="POST">
-                    <input type="hidden" name="actionType" value="giveaway">
-                    <input type="text" name="gwPrize" placeholder="Hadiah (Cth: 1,000 Coins)" required>
-                    <input type="number" name="gwDuration" placeholder="Masa (Minit)" required>
-                    <input type="number" name="gwWinners" placeholder="Bilangan Pemenang" required>
-                    <button type="submit">Hantar Giveaway 🚀</button>
-                </form>
-            </div>
-
-            <div class="card">
-                <h3>🗣️ Cipta Event (Hantar ke event-promote)</h3>
-                <form action="/action" method="POST">
-                    <input type="hidden" name="actionType" value="event">
-                    <input type="text" name="evTitle" placeholder="Tajuk Event" required>
-                    <input type="text" name="evTime" placeholder="Masa (Cth: 8:00 PM MYT)" required>
-                    <input type="text" name="evPrize" placeholder="Hadiah Event" required>
-                    <button type="submit">Hantar Event 🎮</button>
-                </form>
-            </div>
-
-            <div class="card">
-                <h3>📌 Hantar Panel Setup Utama</h3>
-                <form action="/action" method="POST">
-                    <input type="hidden" name="actionType" value="setup_verify">
-                    <button type="submit">Hantar Panel Verify (ke verify-here)</button>
-                </form>
-                <form action="/action" method="POST" style="margin-top: 10px;">
-                    <input type="hidden" name="actionType" value="setup_birthday">
-                    <button type="submit">Hantar Panel Birthday (ke birthday-corner)</button>
-                </form>
-            </div>
-
-            <div class="card">
-                <h3>👑 Live Leaderboard (Top 5)</h3>
-                <table>
-                    <tr><th>Rank</th><th>User</th><th>Level & EXP</th></tr>
-                    ${leaderboardRows}
-                </table>
-            </div>
-        </div>
-    </body>
-    </html>
-  `);
+  res.json({ success: true, message: `Berjaya menambah ${qty} ${assetType} kepada ${cleanTargetId}!` });
 });
-server.listen(process.env.PORT || 3000);
 
+app.listen(PORT, () => {
+  console.log(`Web Dashboard PlatoMy (Y2K Theme) berjalan di port ${PORT}!`);
+});
+
+// --- DISCORD BOT LOGIC ---
 const VERIFY_CHANNEL_ID = ""; 
 const WALLET_LOG_ID = "";     
 const BIRTHDAY_CHANNEL_ID = ""; 
@@ -220,11 +174,6 @@ const LOGO_URL = "https://cdn.discordapp.com/attachments/1549051773438787724/154
 
 let lastPostedUpdateId = null;
 const lastActiveMap = new Map(); 
-
-function getMalaysiaCurrentTime() {
-  const now = new Date();
-  return new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kuala_Lumpur" }));
-}
 
 async function checkPlatoUpdates() {
   try {
@@ -337,20 +286,21 @@ const commands = [
     .addStringOption(opt => opt.setName("title").setDescription("Tajuk ringkas (pilihan)").setRequired(false)),
   new SlashCommandBuilder().setName("birthday").setDescription("Urus tarikh lahir anda")
     .addSubcommand(sub => sub.setName("set").setDescription("Tetapkan tarikh lahir anda")),
-  new SlashCommandBuilder().setName("event").setDescription("Urus event komuniti (Malaysia Timezone)")
+  new SlashCommandBuilder().setName("event").setDescription("Urus event komuniti")
     .addSubcommand(sub => sub.setName("create").setDescription("Cipta event baharu menggunakan modal (Admin sahaja)")),
   new SlashCommandBuilder().setName("giveaway").setDescription("Urus sistem giveaway komuniti (Admin sahaja)")
     .addSubcommand(sub => sub.setName("start").setDescription("Mula giveaway baharu")
       .addStringOption(opt => opt.setName("prize").setDescription("Hadiah giveaway").setRequired(true))
       .addIntegerOption(opt => opt.setName("duration").setDescription("Tempoh masa dalam minit").setRequired(true))
       .addIntegerOption(opt => opt.setName("winners").setDescription("Bilangan pemenang").setRequired(true))
-      .addStringOption(opt => opt.setName("requirement").setDescription("Syarat penyertaan (Cth: @RoleName atau nama role)").setRequired(false))
+      .addStringOption(opt => opt.setName("requirement").setDescription("Syarat penyertaan").setRequired(false))
       .addStringOption(opt => opt.setName("image").setDescription("Link URL imej besar banner giveaway").setRequired(false))
     ),
 ].map(c => c.toJSON());
 
 client.once(Events.ClientReady, async (c) => {
   console.log(`Bot telah berjaya log masuk sebagai ${c.user.tag}!`);
+
   const rest = new REST({ version: "10" }).setToken(token);
   try {
     await rest.put(Routes.applicationCommands(c.user.id), { body: commands });
@@ -424,11 +374,6 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
   }
 });
 
-function getWallet(id) {
-  if (!wallets.has(id)) wallets.set(id, { coins: 0, pips: 0, exp: 0, sponsorTotal: 0 });
-  return wallets.get(id);
-}
-
 async function sendLevelUpLog(guild, userId, newLevel) {
   const channel = guild.channels.cache.find(
     (candidate) => candidate.name.toLowerCase().includes(LEVEL_LOG_CHANNEL_NAME.toLowerCase()) && candidate.isTextBased()
@@ -481,11 +426,11 @@ function parseBirthdayToTimestamp(inputStr) {
 
   if (isNaN(day) || month === undefined) return null;
 
-  const nowMY = getMalaysiaCurrentTime();
-  let year = nowMY.getFullYear();
+  const now = new Date();
+  let year = now.getFullYear();
   let targetDate = new Date(year, month, day);
 
-  if (targetDate < nowMY) {
+  if (targetDate < now) {
     targetDate.setFullYear(year + 1);
   }
 
@@ -493,8 +438,8 @@ function parseBirthdayToTimestamp(inputStr) {
 }
 
 async function checkBirthdays() {
-  const nowMY = getMalaysiaCurrentTime();
-  const todaySec = Math.floor(new Date(nowMY.getFullYear(), nowMY.getMonth(), nowMY.getDate()).getTime() / 1000);
+  const now = new Date();
+  const todaySec = Math.floor(now.setHours(0,0,0,0) / 1000);
 
   for (const [userId, data] of birthdaysMap.entries()) {
     if (data.timestamp <= todaySec + 86400 && data.timestamp >= todaySec) {
@@ -511,8 +456,8 @@ async function checkBirthdays() {
 
           await targetChannel.send({ content: `🎂 Selamat Hari Lahir <@${userId}>!`, embeds: [bdayEmbed] }).catch(() => {});         
         }       
-      }
-      data.timestamp += 31536000;     
+      }       
+      birthdaysMap.delete(userId);     
     }   
   } 
 }  
@@ -613,7 +558,7 @@ client.on(Events.MessageCreate, async (message) => {
       sortedWallets.forEach(([uid, data], index) => {
         const medalIcon = medals[index] || `#${index + 1}`;           
         const estimatedLevel = Math.floor(data.exp / 1000) + 1;           
-        lbDescription += `${medalIcon} **<@${uid}>**\nLevel${estimatedLevel} • EXP: **${data.exp.toLocaleString()}**\n\n`;
+        lbDescription += `${medalIcon} **<@${uid}>**\nLevel ${estimatedLevel} • EXP: **${data.exp.toLocaleString()}**\n\n`;
       });
     }
 
@@ -679,7 +624,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         sortedWallets.forEach(([userId, data], index) => {
           const medalIcon = medals[index] || `#${index + 1}`;           
           const estimatedLevel = Math.floor(data.exp / 1000) + 1;           
-          lbDescription += `${medalIcon} **<@${userId}>**\nLevel${estimatedLevel} • EXP: **${data.exp.toLocaleString()}**\n\n`;
+          lbDescription += `${medalIcon} **<@${userId}>**\nLevel ${estimatedLevel} • EXP: **${data.exp.toLocaleString()}**\n\n`;
         });
       }
 
@@ -819,8 +764,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setColor("#ffb6c1")
         .setTitle("🌸・PlatoMy Rumble Arena")
         .setDescription(
-          `🎁 **Total Prize:** ${totalPrize.toLocaleString()}${currencyName}\n` +
-          `⏳ **Berakhir Pada (MYT):** <t:${endTimeSeconds}:R> (<t:${endTimeSeconds}:f>)\n\n` +
+          `🎁 **Total Prize:** ${totalPrize.toLocaleString()} ${currencyName}\n` +
+          `⏳ **Berakhir Pada:** <t:${endTimeSeconds}:R> (<t:${endTimeSeconds}:f>)\n\n` +
           `👥 **Penyertaan:** 0 pemain`
         )
         .setTimestamp();
@@ -870,7 +815,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           const soloEmbed = new EmbedBuilder()
             .setColor("#ffb6c1")
             .setTitle("🌸・PlatoMy Rumble Tamat")
-            .setDescription(`⚠️ Hanya seorang sahaja (<@${soloId}>) yang menyertai. Beliau terus memenangi **${game.totalPrize.toLocaleString()}${currencyName}**!`);
+            .setDescription(`⚠️ Hanya seorang sahaja (<@${soloId}>) yang menyertai. Beliau terus memenangi **${game.totalPrize.toLocaleString()} ${currencyName}**!`);
           const disabledRow = new ActionRowBuilder().addComponents(
             ButtonBuilder.from(joinBtn).setDisabled(true).setStyle(ButtonStyle.Secondary).setLabel("🔒 Rumble Closed")
           );
@@ -1019,7 +964,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
 
       const successMsg = action === "add_sponsor" 
-        ? `💖 Berjaya masukkan rekod sponsor sebanyak ${amount.toLocaleString()} untuk${target.tag}!` 
+        ? `💖 Berjaya masukkan rekod sponsor sebanyak ${amount.toLocaleString()} untuk ${target.tag}!` 
         : `✅ Berjaya kemaskini baki akaun PlatoMy • Wallet ${target.tag}!`;
 
       await interaction.reply({ content: successMsg, ephemeral: true });
@@ -1134,7 +1079,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         const modal = new ModalBuilder()           
           .setCustomId("event_create_modal")           
-          .setTitle("🌸 PlatoMy • Event (MYT)");          
+          .setTitle("🌸 PlatoMy • Event ");          
 
         const titleInput = new TextInputBuilder()           
           .setCustomId("event_title")           
@@ -1152,7 +1097,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         const timeInput = new TextInputBuilder()           
           .setCustomId("event_time")           
-          .setLabel("Masa Malaysia (Cth: 21:00 MYT / 9 PM)")           
+          .setLabel("Masa Tamat / Mula (Cth: 21:00 atau 9 PM)")           
           .setStyle(TextInputStyle.Short)           
           .setPlaceholder("21:00")           
           .setRequired(true);          
@@ -1194,7 +1139,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const prize = interaction.options.getString("prize");
         const durationMins = interaction.options.getInteger("duration");
         const winnersCount = interaction.options.getInteger("winners");
-        const requirement = interaction.options.getString("requirement") || "Tiada syarat khusus";
+        const requirement = interaction.options.getString("requirement") || "No specific requirement";
         const imageUrl = interaction.options.getString("image");
 
         const endTime = Date.now() + durationMins * 60 * 1000;
@@ -1203,7 +1148,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const giveawayEmbed = new EmbedBuilder()
           .setColor("#ffb6c1")
           .setTitle("˚.🎀༘⋆ GIVEAWAY ˚.🎀༘⋆")
-          .setDescription(`🎁 **Prize:** ${prize}\n👑 **Winners:** ${winnersCount}\n📌 **Requirement:** ${requirement}\n⏳ **Ends In (MYT):** <t:${endTimeSeconds}:R> (<t:${endTimeSeconds}:f>)\n\n✨ Click the **"🎉 Join Giveaway"** button below!\n👥 **Entries:** 0`)
+          .setDescription(`🎁 **Prize:** ${prize}\n👑 **Winners:** ${winnersCount}\n📌 **Requirement:** ${requirement}\n⏳ **Ends In:** <t:${endTimeSeconds}:R> (<t:${endTimeSeconds}:f>)\n\n✨ Click the **"🎉 Join Giveaway"** button below!\n👥 **Entries:** 0`)
           .setTimestamp();
 
         if (imageUrl) {
@@ -1225,7 +1170,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         giveawaysMap.set(giveawayMessage.id, {
           prize,
           winnersCount,
-          requirement,
           participants: [],
           ended: false,
         });
@@ -1430,7 +1374,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const eventEmbed = new EmbedBuilder()
         .setColor("#ffb6c1")
         .setTitle(`🎮 ${title}`)
-        .setDescription(`${desc}\n\n📅 **Tarikh:** ${dateStr}\n⏰ **Masa Tamat (MYT):** ${timeStr}\n🎁 **Prize Pool:** ${prize}\n👥 **Pemain:** 0`)
+        .setDescription(`${desc}\n\n📅 **Tarikh:** ${dateStr}\n⏰ **Masa Tamat:** ${timeStr}\n🎁 **Prize Pool:** ${prize}\n👥 **Pemain:** 0`)
         .setTimestamp();
 
       const joinBtn = new ButtonBuilder()
@@ -1451,7 +1395,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         ended: false,
       });
 
-      await interaction.editReply({ content: "✨ Event v2.0 berjaya dicipta dengan zon masa Malaysia!" });
+      await interaction.editReply({ content: "✨ Event v2.0 berjaya dicipta!" });
       return;
     }
 
@@ -1844,17 +1788,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.customId === "open_trading_ticket") {
       await interaction.deferReply({ ephemeral: true });
       const guild = interaction.guild;
-
-      const existingChannel = guild.channels.cache.find(c => c.name === `trade-${interaction.user.username.toLowerCase()}`);
-      if (existingChannel) {
-        return interaction.editReply({ content: `⚠️ Anda sudah mempunyai tiket trading yang aktif: <#${existingChannel.id}>` });
-      }
-
       const traderRole = guild.roles.cache.find(r => r.name.toLowerCase() === "trader");
       const traderPing = traderRole ? `<@&${traderRole.id}>` : "@trader";
 
       const ticketChannel = await guild.channels.create({
-        name: `trade-${interaction.user.username.toLowerCase()}`,
+        name: `trade-${interaction.user.username}`,
         type: ChannelType.GuildText,
         parent: interaction.channel.parentKey, 
         permissionOverwrites: [
@@ -1901,7 +1839,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const traderRole = guild.roles.cache.find(r => r.name.toLowerCase() === "trader");
 
       const exclusiveChannel = await guild.channels.create({
-        name: `deal-${interaction.user.username.toLowerCase()}`,
+        name: `deal-${interaction.user.username}`,
         type: ChannelType.GuildText,
         parent: interaction.channel.parentKey,
         permissionOverwrites: [
@@ -2041,32 +1979,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       if (gw.participants.includes(interaction.user.id)) {
         return interaction.editReply({ content: "⚠️ You have already joined this giveaway!" });
-      }
-
-      // Strict Giveaway Requirement Validation
-      if (gw.requirement && gw.requirement !== "Tiada syarat khusus" && gw.requirement !== "No specific requirement") {
-        let meetsRequirement = false;
-        const reqClean = gw.requirement.trim();
-
-        const targetRole = interaction.guild.roles.cache.find(r => 
-          r.name.toLowerCase() === reqClean.replace(/<@&|>/g, "").toLowerCase() || 
-          r.id === reqClean.replace(/<@&|>/g, "")
-        );
-
-        if (targetRole) {
-          if (interaction.member.roles.cache.has(targetRole.id)) {
-            meetsRequirement = true;
-          }
-        } else {
-          const hasMatchedRole = interaction.member.roles.cache.some(r => r.name.toLowerCase().includes(reqClean.toLowerCase()));
-          if (hasMatchedRole) {
-            meetsRequirement = true;
-          }
-        }
-
-        if (!meetsRequirement) {
-          return interaction.editReply({ content: `❌ Syarat Giveaway tidak dipenuhi! Anda memerlukan syarat/role berikut: **${gw.requirement}**` });
-        }
       }
 
       gw.participants.push(interaction.user.id);
