@@ -30,7 +30,6 @@ const client = new Client({
 });
 
 const wallets = new Map();
-const birthdaysMap = new Map(); 
 const tempVoiceOwners = new Map();
 
 function getWallet(id) {
@@ -58,12 +57,13 @@ app.use(passport.session());
 
 const CLIENT_ID = "1556578779437072546";
 const CLIENT_SECRET = "XIfRq23FWQttp-5E9JSgRLfizc03Io_9";
+
 const DOMAIN_URL = process.env.RAILWAY_STATIC_URL 
   ? `https://${process.env.RAILWAY_STATIC_URL}` 
   : `http://localhost:${PORT}`;
 
 passport.serializeUser((user, done) => done(null, user));
-passport.deserializeUser((obj, done) => done(null, obj));
+passport.deserializeUser((obj, done) => done(obj, done));
 
 passport.use(
   new DiscordStrategy(
@@ -150,32 +150,7 @@ app.listen(PORT, () => {
 });
 
 // --- DISCORD BOT LOGIC ---
-const BIRTHDAY_CHANNEL_ID = ""; 
-const LEVEL_LOG_CHANNEL_NAME = "level-up";       
 const WELCOME_CHANNEL_NAME = "selamat-datang";
-const LOGO_URL = "https://cdn.discordapp.com/attachments/1549051773438787724/1549403998686281808/IMG_5614.png";
-
-const lastActiveMap = new Map(); 
-
-async function checkPlatoUpdates() {
-  try {
-    const rssUrl = "https://nitter.poast.org/platochat/rss";
-    const response = await fetch(rssUrl);
-    if (!response.ok) return;
-    const text = await response.text();
-
-    const matchLink = text.match(/<link>(.*?)<\/link>/);
-    const matchTitle = text.match(/<title>(.*?)<\/title>/);
-
-    if (matchLink && matchTitle) {
-      const updateUrl = matchLink[1];
-      const updateContent = matchTitle[1];
-      console.log("Update check:", updateContent);
-    }
-  } catch (error) {
-    console.error("Gagal mengambil update Plato:", error);
-  }
-}
 
 const commands = [
   new SlashCommandBuilder().setName("wallet").setDescription("Semak baki akaun PlatoMy • Wallet anda! 🏦"),
@@ -184,17 +159,15 @@ const commands = [
 ].map(c => c.toJSON());
 
 client.once(Events.ClientReady, async (c) => {
-  console.log(`Bot telah berjaya log masuk sebagai ${c.user.tag}!`);[span_0](start_span)[span_0](end_span)
+  console.log(`Bot telah berjaya log masuk sebagai ${c.user.tag}!`);
 
   const rest = new REST({ version: "10" }).setToken(token);
   try {
     await rest.put(Routes.applicationCommands(c.user.id), { body: commands });
-    console.log("Slash commands berjaya di-register!");[span_1](start_span)[span_1](end_span)
+    console.log("Slash commands berjaya di-register!");
   } catch (error) {
     console.error("Gagal mendaftarkan slash commands:", error);
   }
-
-  setInterval(() => { checkPlatoUpdates(); }, 1000 * 60 * 5);
 });
 
 client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
@@ -240,40 +213,10 @@ client.on(Events.GuildMemberAdd, async (member) => {
   const welcomeEmbed = new EmbedBuilder()     
     .setColor("#ffb6c1")     
     .setTitle("🌸SELAMAT DATANG!")     
-    .setDescription(`Hai ${member}! 🖐️💕 Selamat datang ke Plato MY!`)
+    .setDescription(`Hai ${member}! 👤💕 Selamat datang ke Plato MY!`)
     .setTimestamp();    
   await channel.send({ embeds: [welcomeEmbed] }); 
 });  
-
-client.on(Events.MessageCreate, async (message) => {
-  if (message.author.bot || !message.guild) return;
-  const userId = message.author.id;
-  lastActiveMap.set(userId, Date.now());
-  const w = getWallet(userId);
-  w.exp += 2;
-
-  const content = message.content.trim().toLowerCase();
-  if (content === "!wallet" || content === "!bank") {
-    const embed = new EmbedBuilder()
-      .setColor("#ffb6c1")
-      .setTitle("💳 PlatoMy • Wallet")
-      .setDescription(`🪙 **Plato Coins:** ${w.coins.toLocaleString()}\n💠 **Pips:** ${w.pips.toLocaleString()}`);
-    await message.reply({ embeds: [embed] });
-  }
-});
-
-client.on(Events.InteractionCreate, async (interaction) => {
-  if (interaction.isChatInputCommand()) {
-    if (interaction.commandName === "wallet") {
-      const w = getWallet(interaction.user.id);
-      const embed = new EmbedBuilder()
-        .setColor("#ffb6c1")
-        .setTitle("💳 PlatoMy • Wallet")
-        .setDescription(`🪙 **Plato Coins:** ${w.coins.toLocaleString()}\n💠 **Pips:** ${w.pips.toLocaleString()}`);
-      await interaction.reply({ embeds: [embed], ephemeral: true });
-    }
-  }
-});
 
 client.login(token).catch(err => {
   console.error("GAGAL LOGIN KE DISCORD:", err);
