@@ -20,11 +20,6 @@ import express from "express";
 import session from "express-session";
 import passport from "passport";
 import { Strategy as DiscordStrategy } from "passport-discord";
-import path from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
@@ -53,12 +48,10 @@ function getWallet(id) {
   return wallets.get(id);
 }
 
-// --- INTEGRASI WEB DASHBOARD (EXPRESS + DISCORD OAUTH2 + Y2K THEME) ---
+// --- EXPRESS SERVER & HTML TEMPLATE ---
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
-app.set("view engine", "ejs");
-app.set("views", path.join(__dirname, "views"));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
@@ -117,41 +110,68 @@ app.get("/logout", (req, res) => {
   });
 });
 
+// HTML Dashboard Y2K Crystal Terus Dalam Kod
 app.get("/", checkAuth, (req, res) => {
-  // Ambil data akaun & leaderboard dari bot
-  const userWallet = getWallet(req.user.id);
-  
-  const allWallets = [...wallets.entries()].map(([id, data]) => ({
-    id,
-    ...data
-  }));
-
-  res.render("dashboard", {
-    user: req.user,
-    wallet: userWallet,
-    allWallets: allWallets,
-    totalCoins: Array.from(wallets.values()).reduce((a, b) => a + b.coins, 0),
-    totalPips: Array.from(wallets.values()).reduce((a, b) => a + b.pips, 0),
-    botClient: client
-  });
-});
-
-// API untuk Admin Inject Coins / Pips terus dari Web Dashboard
-app.post("/api/inject-assets", checkAuth, (req, res) => {
-  const { targetId, assetType, amount } = req.body;
-  if (!targetId || !amount) return res.status(400).json({ error: "Sila isi semua maklumat!" });
-
-  const cleanTargetId = targetId.replace(/[<@!>]/g, "").trim();
-  const targetWallet = getWallet(cleanTargetId);
-  const qty = parseInt(amount) || 0;
-
-  if (assetType.includes("Coins")) {
-    targetWallet.coins += qty;
-  } else {
-    targetWallet.pips += qty;
-  }
-
-  res.json({ success: true, message: `Berjaya menambah ${qty} ${assetType} kepada ${cleanTargetId}!` });
+  res.send(`<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PlatoMy Dashboard — Black & Pink Y2K Crystal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        pureBlack: '#050505',
+                        darkCard: '#111111',
+                        darkHover: '#1a1a1a',
+                        neonPink: '#F996B1',
+                        pinkMuted: 'rgba(249, 150, 177, 0.15)',
+                        textSoft: '#FCE4EC',
+                    },
+                    fontFamily: {
+                        sans: ['Outfit', 'Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    boxShadow: {
+                        'neon': '0 0 15px rgba(249, 150, 177, 0.4)',
+                        'neon-strong': '0 0 25px rgba(249, 150, 177, 0.7)',
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background-color: #050505; color: #FCE4EC; font-family: 'Outfit', sans-serif; }
+        .crystal-dark-card { background-color: #111111; border: 1px solid rgba(249, 150, 177, 0.25); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5); border-radius: 1.5rem; }
+        .gel-neon-btn { background: linear-gradient(180deg, #1a1a1a 0%, #050505 100%); border: 1px solid #F996B1; color: #F996B1; box-shadow: 0 0 15px rgba(249, 150, 177, 0.3); }
+        .gel-filled-btn { background: #F996B1; color: #050505; border: 1px solid #F996B1; }
+        .text-glow { text-shadow: 0 0 10px rgba(249, 150, 177, 0.6); }
+    </style>
+</head>
+<body class="h-screen w-full flex items-center justify-center p-6">
+    <div class="crystal-dark-card p-10 max-w-lg w-full text-center border-2 border-neonPink shadow-neon-strong">
+        <div class="w-16 h-16 rounded-full bg-neonPink/20 text-neonPink flex items-center justify-center text-3xl mx-auto mb-6 border border-neonPink shadow-neon">
+            🔮
+        </div>
+        <h1 class="text-3xl font-black text-textSoft mb-2">Plato<span class="text-neonPink text-glow">My</span> Dashboard</h1>
+        <p class="text-sm text-neonPink/80 font-mono mb-6 uppercase tracking-wider">Authenticated as: ${req.user.username}</p>
+        <div class="bg-[#0a0a0a] p-4 rounded-xl border border-neonPink/30 mb-6 text-left space-y-2 text-sm">
+            <p>✅ **Discord Connection:** Active</p>
+            <p>🚀 **Node Status:** Online (Port ${PORT})</p>
+        </div>
+        <a href="/logout" class="inline-block px-8 py-3 rounded-full gel-filled-btn text-sm font-bold uppercase tracking-wide">
+            Logout Terminal
+        </a>
+    </div>
+</body>
+</html>`);
 });
 
 app.listen(PORT, () => {
@@ -309,20 +329,11 @@ client.once(Events.ClientReady, async (c) => {
     console.error("Gagal mendaftarkan slash commands:", error);
   }
 
-  setInterval(() => {
-    checkBirthdays();
-  }, 1000 * 60 * 60);
-
-  setInterval(() => {
-    checkPlatoUpdates();
-  }, 1000 * 60 * 5);
-
-  setInterval(() => {
-    checkActiveRoles();
-  }, 1000 * 60 * 60 * 6);
+  setInterval(() => { checkBirthdays(); }, 1000 * 60 * 60);
+  setInterval(() => { checkPlatoUpdates(); }, 1000 * 60 * 5);
+  setInterval(() => { checkActiveRoles(); }, 1000 * 60 * 60 * 6);
 });
 
-// --- SISTEM PEMANTAUAN VOICE CHANNEL (AUTO CREATE & DELETE) ---
 client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
   const member = newState.member;
   if (!member || member.user.bot) return;
@@ -339,20 +350,8 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
         type: ChannelType.GuildVoice,
         parent: parentCategory ? parentCategory.id : null,
         permissionOverwrites: [
-          {
-            id: guild.id,
-            allow: [PermissionFlagsBits.Connect, PermissionFlagsBits.Speak],
-          },
-          {
-            id: member.id,
-            allow: [
-              PermissionFlagsBits.Connect, 
-              PermissionFlagsBits.Speak, 
-              PermissionFlagsBits.ManageChannels, 
-              PermissionFlagsBits.MuteMembers, 
-              PermissionFlagsBits.DeafenMembers
-            ],
-          }
+          { id: guild.id, allow: [PermissionFlagsBits.Connect, PermissionFlagsBits.Speak] },
+          { id: member.id, allow: [PermissionFlagsBits.Connect, PermissionFlagsBits.Speak, PermissionFlagsBits.ManageChannels, PermissionFlagsBits.MuteMembers, PermissionFlagsBits.DeafenMembers] }
         ]
       });
 
@@ -365,25 +364,21 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
 
   if (oldState.channel) {
     const leftChannel = oldState.channel;
-    if (tempVoiceOwners.has(leftChannel.id)) {
-      if (leftChannel.members.size === 0) {
-        tempVoiceOwners.delete(leftChannel.id);
-        await leftChannel.delete().catch(() => {});
-      }
+    if (tempVoiceOwners.has(leftChannel.id) && leftChannel.members.size === 0) {
+      tempVoiceOwners.delete(leftChannel.id);
+      await leftChannel.delete().catch(() => {});
     }
   }
 });
 
 async function sendLevelUpLog(guild, userId, newLevel) {
-  const channel = guild.channels.cache.find(
-    (candidate) => candidate.name.toLowerCase().includes(LEVEL_LOG_CHANNEL_NAME.toLowerCase()) && candidate.isTextBased()
-  );
+  const channel = guild.channels.cache.find(c => c.name.toLowerCase().includes(LEVEL_LOG_CHANNEL_NAME.toLowerCase()) && c.isTextBased());
   if (!channel || !("send" in channel)) return;
 
   const levelUpEmbed = new EmbedBuilder()
     .setColor("#ffb6c1")
     .setTitle("LEVEL UP! 🎉")
-    .setDescription(`Tahniah <@${userId}>! Anda baru sahaja naik ke **Level ${newLevel}**! ✨\n\nTeruskan aktif dalam komuniti **PlatoMy**! 🚀`)
+    .setDescription(`Tahniah <@${userId}>! Anda baru sahaja naik ke **Level ${newLevel}**! ✨`)
     .setThumbnail(LOGO_URL)
     .setTimestamp();
 
@@ -403,198 +398,68 @@ async function sendLog(guild, channelNameOrId, payload) {
 
 function parseBirthdayToTimestamp(inputStr) {
   const months = {
-    jan: 0, january: 0,
-    feb: 1, february: 1,
-    mar: 2, march: 2,
-    apr: 3, april: 3,
-    may: 4,
-    jun: 5, june: 5,
-    jul: 6, july: 6,
-    aug: 7, august: 7,
-    sep: 8, september: 8,
-    oct: 9, october: 9, okt: 9,
-    nov: 10, november: 10,
-    dec: 11, december: 11, dis: 11
+    jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2,
+    apr: 3, april: 3, may: 4, jun: 5, june: 5, jul: 6, july: 6,
+    aug: 7, august: 7, sep: 8, september: 8, oct: 9, october: 9, okt: 9,
+    nov: 10, november: 10, dec: 11, december: 11, dis: 11
   };
-
   const parts = inputStr.trim().toLowerCase().split(/\s+/);
   if (parts.length < 2) return null;
-
   const day = parseInt(parts[0]);
-  const monthKey = parts[1];
-  const month = months[monthKey];
-
+  const month = months[parts[1]];
   if (isNaN(day) || month === undefined) return null;
-
   const now = new Date();
-  let year = now.getFullYear();
-  let targetDate = new Date(year, month, day);
-
-  if (targetDate < now) {
-    targetDate.setFullYear(year + 1);
-  }
-
+  let targetDate = new Date(now.getFullYear(), month, day);
+  if (targetDate < now) targetDate.setFullYear(now.getFullYear() + 1);
   return Math.floor(targetDate.getTime() / 1000);
 }
 
 async function checkBirthdays() {
   const now = new Date();
   const todaySec = Math.floor(now.setHours(0,0,0,0) / 1000);
-
   for (const [userId, data] of birthdaysMap.entries()) {
     if (data.timestamp <= todaySec + 86400 && data.timestamp >= todaySec) {
       for (const [_, guild] of client.guilds.cache) {
-        const targetChannel = guild.channels.cache.get(BIRTHDAY_CHANNEL_ID) || 
-                              guild.channels.cache.find(c => c.name.includes("birthday") && c.isTextBased());
+        const targetChannel = guild.channels.cache.get(BIRTHDAY_CHANNEL_ID) || guild.channels.cache.find(c => c.name.includes("birthday") && c.isTextBased());
         if (targetChannel) {
           const bdayEmbed = new EmbedBuilder()
             .setColor("#ffb6c1")
             .setTitle("🎉 HAPPY BIRTHDAY! 🎂✨")
-            .setDescription(`Selamat Hari Lahir <@${userId}>! 🥳💕\n\nSemoga hari lahir anda pada hari ini diwarnai dengan seribu kebahagiaan, dimurahkan rezeki, sentiasa sihat, dan terus sukses dalam apa jua bidang yang diceburi! Terima kasih kerana menjadi sebahagian daripada komuniti **PlatoMy** ini. 🌸✨`)
-            .setImage("https://cdn.discordapp.com/attachments/1549051773438787724/1551515791910903918/Video.gif")
+            .setDescription(`Selamat Hari Lahir <@${userId}>! 🥳💕`)
             .setTimestamp();
-
           await targetChannel.send({ content: `🎂 Selamat Hari Lahir <@${userId}>!`, embeds: [bdayEmbed] }).catch(() => {});         
         }       
       }       
       birthdaysMap.delete(userId);     
     }   
   } 
-}  
+}
 
 client.on(Events.GuildMemberAdd, async (member) => {   
-  const channel = member.guild.channels.cache.find(     
-    (candidate) => candidate.name.includes(WELCOME_CHANNEL_NAME) && candidate.isTextBased(),   
-  );   
+  const channel = member.guild.channels.cache.find(c => c.name.includes(WELCOME_CHANNEL_NAME) && c.isTextBased());   
   if (!channel || !("send" in channel)) return;    
-
-  const userName = member.user.tag;   
-  const userAvatar = member.user.displayAvatarURL({ size: 128, dynamic: true });    
-
   const welcomeEmbed = new EmbedBuilder()     
     .setColor("#ffb6c1")     
-    .setAuthor({ name: userName, iconURL: userAvatar })     
     .setTitle("🌸SELAMAT DATANG!")     
-    .setDescription(`Hai ${member}! 🖐️💕\nSelamat datang ke Plato MY!\n\n🎀 Jom enjoy dan have fun bersama kami! ♡`)
-    .setImage("https://cdn.discordapp.com/attachments/1549051773438787724/1551515791910903918/Video.gif")
-    .setThumbnail(LOGO_URL)
-    .setFooter({ text: `Awak adalah member ke ${member.guild.memberCount}!` })     
+    .setDescription(`Hai ${member}! 🖐️💕 Selamat datang ke Plato MY!`)
     .setTimestamp();    
-
   await channel.send({ embeds: [welcomeEmbed] }); 
 });  
 
-client.on(Events.GuildMemberRemove, async (member) => {   
-  const channel = member.guild.channels.cache.find(     
-    (candidate) => candidate.name.includes(SERVER_LOGS_CHANNEL_NAME) && candidate.isTextBased(),   
-  );   
-  if (!channel || !("send" in channel)) return;    
-
-  const userAvatar = member.user.displayAvatarURL({ size: 128, dynamic: true });   
-  const goodbyeEmbed = new EmbedBuilder()     
-    .setColor("#ffb6c1")     
-    .setTitle(`${member.user.tag} left the server`)
-    .setDescription(`**User**\n<@${member.id}>`)     
-    .setThumbnail(userAvatar)     
-    .setFooter({ text: `${member.guild.name}` })
-    .setTimestamp();
-
-  await channel.send({ embeds: [goodbyeEmbed] });
-});
-
 client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot || !message.guild) return;
-
   const userId = message.author.id;
   lastActiveMap.set(userId, Date.now());
-
-  const activeRole = message.guild.roles.cache.find(r => r.name.toLowerCase() === ACTIVE_ROLE_NAME.toLowerCase());
-  if (activeRole && !message.member.roles.cache.has(activeRole.id)) {
-    await message.member.roles.add(activeRole).catch(() => {});
-  }
-
   const w = getWallet(userId);
-  const oldExp = w.exp;
-  
-  const parentCategoryName = message.channel.parent?.name?.toLowerCase() || "";
-  const channelName = message.channel.name.toLowerCase();
-  
-  let earnedExp = 2; 
-  if (parentCategoryName.includes("play zone") || parentCategoryName.includes("play") || parentCategoryName.includes("zone") || channelName.includes("play") || channelName.includes("zone") || channelName.includes("game")) {
-    earnedExp = 0.5; 
-  }
-
-  w.exp += earnedExp;
-
-  const oldLevel = Math.floor(oldExp / 1000) + 1;
-  const newLevel = Math.floor(w.exp / 1000) + 1;
-  
-  if (newLevel > oldLevel) {
-    await sendLevelUpLog(message.guild, userId, newLevel);
-  }
+  w.exp += 2;
 
   const content = message.content.trim().toLowerCase();
-
   if (content === "!wallet" || content === "!bank") {
     const embed = new EmbedBuilder()
       .setColor("#ffb6c1")
-      .setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL({ size: 128, dynamic: true }) })
       .setTitle("💳 PlatoMy • Wallet")
-      .setDescription(`🪙 **Plato Coins:** ${w.coins.toLocaleString()}\n💠 **Pips:** ${w.pips.toLocaleString()}\n🎁 **Sponsor Total:** ${w.sponsorTotal.toLocaleString()}\n✨ **EXP:** ${w.exp.toLocaleString()}`)
-      .setFooter({ text: "PlatoMy Wallet Official System ♡" })
-      .setTimestamp();
+      .setDescription(`🪙 **Plato Coins:** ${w.coins.toLocaleString()}\n💠 **Pips:** ${w.pips.toLocaleString()}`);
     await message.reply({ embeds: [embed] });
-    return;
-  }
-
-  if (content === "!lb" || content === "!leaderboard") {
-    const sortedWallets = [...wallets.entries()].sort((a, b) => b[1].exp - a[1].exp).slice(0, 10);
-    let lbDescription = "Want to see more than the top 10?\n\n";
-    
-    if (sortedWallets.length === 0) {
-      lbDescription += "• *Belum ada rekod leaderboard EXP lagi.*";
-    } else {
-      const medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
-      sortedWallets.forEach(([uid, data], index) => {
-        const medalIcon = medals[index] || `#${index + 1}`;           
-        const estimatedLevel = Math.floor(data.exp / 1000) + 1;           
-        lbDescription += `${medalIcon} **<@${uid}>**\nLevel ${estimatedLevel} • EXP: **${data.exp.toLocaleString()}**\n\n`;
-      });
-    }
-
-    const lbEmbed = new EmbedBuilder()
-      .setColor("#ffb6c1")
-      .setTitle("💃🏻 Leaderboard PlatoMy")
-      .setDescription(lbDescription)
-      .setThumbnail(LOGO_URL)
-      .setFooter({ text: "Last update: Just now" })
-      .setTimestamp();
-
-    await message.reply({ embeds: [lbEmbed] });
-    return;
-  }
-
-  if (content === "!level" || content === "!rank") {
-    const currentLevel = Math.floor(w.exp / 1000) + 1;
-    const currentXpInLevel = Math.floor(w.exp % 1000);
-    
-    const progressBlocks = Math.floor(currentXpInLevel / 100);
-    const progressBar = "▓".repeat(progressBlocks) + "░".repeat(10 - progressBlocks);
-
-    const rankEmbed = new EmbedBuilder()
-      .setColor("#ffb6c1")
-      .setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL({ size: 128, dynamic: true }) })
-      .setTitle("✨ PlatoMy Level & Status")
-      .setDescription(
-        `👤 **Member:** ${message.author}\n` +
-        `📊 **Current Level:** Level ${currentLevel}\n` +
-        `✨ **Total EXP:** ${w.exp.toLocaleString()}\n\n` +
-        `📈 **Progress to Level ${currentLevel + 1}:**\n` +
-        `\`[${progressBar}]\` **${currentXpInLevel}/1000 EXP**`
-      )
-      .setTimestamp();
-    await message.reply({ embeds: [rankEmbed] });
-    return;
   }
 });
 
@@ -604,1411 +469,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const w = getWallet(interaction.user.id);
       const embed = new EmbedBuilder()
         .setColor("#ffb6c1")
-        .setAuthor({ name: interaction.user.username, iconURL: interaction.user.displayAvatarURL({ size: 128, dynamic: true }) })
         .setTitle("💳 PlatoMy • Wallet")
-        .setDescription(`🪙 **Plato Coins:** ${w.coins.toLocaleString()}\n💠 **Pips:** ${w.pips.toLocaleString()}\n🎁 **Sponsor Total:** ${w.sponsorTotal.toLocaleString()}\n✨ **EXP:** ${w.exp.toLocaleString()}`)
-        .setFooter({ text: "PlatoMy Wallet Official System ♡" })
-        .setTimestamp();
+        .setDescription(`🪙 **Plato Coins:** ${w.coins.toLocaleString()}\n💠 **Pips:** ${w.pips.toLocaleString()}`);
       await interaction.reply({ embeds: [embed], ephemeral: true });
-      return;
-    }
-
-    if (interaction.commandName === "leaderboard") {
-      const sortedWallets = [...wallets.entries()].sort((a, b) => b[1].exp - a[1].exp).slice(0, 10);
-      let lbDescription = "Want to see more than the top 10?\n\n";
-      
-      if (sortedWallets.length === 0) {
-        lbDescription += "• *Belum ada rekod leaderboard EXP lagi.*";
-      } else {
-        const medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
-        sortedWallets.forEach(([userId, data], index) => {
-          const medalIcon = medals[index] || `#${index + 1}`;           
-          const estimatedLevel = Math.floor(data.exp / 1000) + 1;           
-          lbDescription += `${medalIcon} **<@${userId}>**\nLevel ${estimatedLevel} • EXP: **${data.exp.toLocaleString()}**\n\n`;
-        });
-      }
-
-      const lbEmbed = new EmbedBuilder()
-        .setColor("#ffb6c1")
-        .setTitle("💃🏻 Leaderboard PlatoMy")
-        .setDescription(lbDescription)
-        .setThumbnail(LOGO_URL)
-        .setFooter({ text: "Last update: Just now" })
-        .setTimestamp();
-
-      await interaction.reply({ embeds: [lbEmbed] });
-      return;
-    }
-
-    if (interaction.commandName === "setup-voice-panel") {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return interaction.reply({ content: "❌ Hanya Admin sahaja!", ephemeral: true });
-      }
-
-      const targetChannel = interaction.options.getChannel("channel");
-      
-      const vcEmbed = new EmbedBuilder()
-        .setColor("#ffb6c1")
-        .setTitle("ʚ・₊˚  VOICE CONTROL PANEL  ˚₊・ɞ")
-        .setDescription(
-          "✨ **Cara Membuka & Mengawal Bilik Suara Peribadi**\n" +
-          "꒰ 🎧 ꒱ Masuk ke channel ⁠`➕ Create Voice`⁠ di bawah untuk cipta bilik.\n" +
-          "꒰ ⚡ ꒱ Gunakan butang di bawah untuk kawal bilik anda semasa berada di dalamnya!\n\n" +
-          "---\n\n" +
-          "✨ **How to Create & Control Your Private Voice Room**\n" +
-          "꒰ 🎧 ꒱ Join the `➕ Create Voice` below to create your room.\n" +
-          "꒰ ⚡ ꒱ Use the buttons below to manage your room while inside!"
-        )
-        .setThumbnail(LOGO_URL)
-        .setTimestamp();
-
-      const row1 = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId("vc_lock").setLabel("Lock / Unlock").setStyle(ButtonStyle.Secondary).setEmoji("🔒"),
-        new ButtonBuilder().setCustomId("vc_hide").setLabel("Hide / Unhide").setStyle(ButtonStyle.Secondary).setEmoji("👁️"),
-        new ButtonBuilder().setCustomId("vc_limit").setLabel("Set Limit").setStyle(ButtonStyle.Primary).setEmoji("👥"),
-        new ButtonBuilder().setCustomId("vc_rename").setLabel("Rename").setStyle(ButtonStyle.Primary).setEmoji("✏️")
-      );
-
-      await targetChannel.send({ embeds: [vcEmbed], components: [row1] });
-      await interaction.reply({ content: `✅ Voice panel aesthetic berjaya dihantar ke channel <#${targetChannel.id}>!`, ephemeral: true });
-      return;
-    }
-
-    if (interaction.commandName === "setup-role-plato") {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return interaction.reply({ content: "❌ Hanya Admin sahaja!", ephemeral: true });
-      }
-
-      const gameList = [
-        { name: "Archery", emoji: "🏹" }, { name: "Bingo", emoji: "🎯" }, { name: "Bounce", emoji: "🏀" }, { name: "Bowling", emoji: "🎳" },
-        { name: "Brawlbots", emoji: "🤖" }, { name: "Carrom", emoji: "🥏" }, { name: "Darts", emoji: "🎯" }, { name: "Dice Party", emoji: "🎲" },
-        { name: "Dominoes", emoji: "🀄" }, { name: "Dungeon Tales", emoji: "⚔️" }, { name: "Gin Rummy", emoji: "🎴" }, { name: "Go Fish", emoji: "🎣" },
-        { name: "Ludo", emoji: "🎲" }, { name: "Match It", emoji: "🧩" }, { name: "Match Monsters", emoji: "👾" }, { name: "Mini Golf", emoji: "⛳" },
-        { name: "Minesweeper", emoji: "💣" }, { name: "Ocho", emoji: "🎴" }, { name: "Old Zombie", emoji: "🧟" }, { name: "Plox", emoji: "🔮" },
-        { name: "Pool", emoji: "🎱" }, { name: "Soccer", emoji: "⚽" }, { name: "Spades", emoji: "♠️" }, { name: "Other Game", emoji: "✨" }
-      ];
-
-      const otherRolesList = [
-        { name: "Plato Update", emoji: "🛠️" }, { name: "Daily Quest", emoji: "📅" }, { name: "Aura Swap", emoji: "💫" }, { name: "Plato Rumble", emoji: "⚔️" }
-      ];
-
-      const options1 = gameList.map(g => ({
-        label: g.name,
-        value: `role_${g.name.toLowerCase().replace(/\s+/g, '_')}`,
-        emoji: g.emoji
-      }));
-
-      const options2 = otherRolesList.map(r => ({
-        label: r.name,
-        value: `role_${r.name.toLowerCase().replace(/\s+/g, '_')}`,
-        emoji: r.emoji
-      }));
-
-      const roleEmbed = new EmbedBuilder()
-        .setColor("#ffb6c1")
-        .setTitle("ʚ・₊˚  PLATO ROLES  ˚₊・ɞ")
-        .setDescription(
-          "✨ Pilih role game dan role lain untuk main bersama!\n" +
-          "-# Tekan reaction emoji yang disediakan di bawah.\n" +
-          "-# Korang bebas pilih lebih dari satu game.\n\n" +
-          "🎮 Happy gaming & have fun! 🤍"
-        )
-        .setTimestamp();
-
-      const selectMenu1 = new StringSelectMenuBuilder()
-        .setCustomId("role_select_menu_1")
-        .setPlaceholder("✨ Sila pilih game role anda di sini...")
-        .addOptions(options1);
-
-      const selectMenu2 = new StringSelectMenuBuilder()
-        .setCustomId("role_select_menu_2")
-        .setPlaceholder("✨ Sila pilih roles lain di sini…")
-        .addOptions(options2);
-
-      const row1 = new ActionRowBuilder().addComponents(selectMenu1);
-      const row2 = new ActionRowBuilder().addComponents(selectMenu2);
-
-      await interaction.reply({ content: "✅ Panel game role plato berjaya dihantar!", ephemeral: true });
-      await interaction.channel.send({ embeds: [roleEmbed], components: [row1, row2] });
-      return;
-    }
-
-    if (interaction.commandName === "setup-update") {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return interaction.reply({ content: "❌ Hanya Admin sahaja!", ephemeral: true });
-      }
-
-      const embed = new EmbedBuilder()
-        .setColor("#ffb6c1")
-        .setTitle("🛠️・Plato Updates Integration")
-        .setDescription("Sistem sedang aktif! Setiap hantaran baharu daripada akaun rasmi **@platochat** akan dikemas kini secara automatik ke channel **`🛠️・plato-update`** lengkap dengan ping `@Plato Update` ♡");
-
-      await interaction.reply({ content: "✅ Tetapan update berjaya diaktifkan!", ephemeral: true });
-      await interaction.channel.send({ embeds: [embed] });
-      return;
-    }
-
-    if (interaction.commandName === "rumble") {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return interaction.reply({ content: "❌ Hanya Admin sahaja yang boleh memulakan PlatoMy Rumble!", ephemeral: true });
-      }
-
-      const currencyType = interaction.options.getString("currency");
-      const totalPrize = interaction.options.getInteger("prize");
-      const durationMins = interaction.options.getInteger("duration");
-
-      const currencyName = currencyType === "coins" ? "🪙 Plato Coins" : "💠 Pips";
-      const endTimeSeconds = Math.floor((Date.now() + durationMins * 60 * 1000) / 1000);
-
-      const rumbleEmbed = new EmbedBuilder()
-        .setColor("#ffb6c1")
-        .setTitle("🌸・PlatoMy Rumble Arena")
-        .setDescription(
-          `🎁 **Total Prize:** ${totalPrize.toLocaleString()} ${currencyName}\n` +
-          `⏳ **Berakhir Pada:** <t:${endTimeSeconds}:R> (<t:${endTimeSeconds}:f>)\n\n` +
-          `👥 **Penyertaan:** 0 pemain`
-        )
-        .setTimestamp();
-
-      const joinBtn = new ButtonBuilder()
-        .setCustomId(`join_rumble_${currencyType}_${totalPrize}`)
-        .setLabel("🎟️ Enter Free Rumble")
-        .setStyle(ButtonStyle.Success);
-
-      const row = new ActionRowBuilder().addComponents(joinBtn);
-
-      await interaction.reply({ content: "✅ PlatoMy Rumble berjaya dimulakan!", ephemeral: true });
-      const rumbleMsg = await interaction.channel.send({ embeds: [rumbleEmbed], components: [row] });
-
-      rumbleMap.set(rumbleMsg.id, {
-        currencyType,
-        totalPrize,
-        participants: [],
-        ended: false
-      });
-
-      setTimeout(async () => {
-        const game = rumbleMap.get(rumbleMsg.id);
-        if (!game || game.ended) return;
-        game.ended = true;
-
-        const players = [...game.participants];
-        if (players.length === 0) {
-          const emptyEmbed = new EmbedBuilder()
-            .setColor("#ffb6c1")
-            .setTitle("🌸・PlatoMy Rumble Tamat")
-            .setDescription("• *Tiada sesiapa menyertai PlatoMy Rumble kali ini.*");
-          const disabledRow = new ActionRowBuilder().addComponents(
-            ButtonBuilder.from(joinBtn).setDisabled(true).setStyle(ButtonStyle.Secondary).setLabel("🔒 Rumble Closed")
-          );
-          await rumbleMsg.edit({ embeds: [emptyEmbed], components: [disabledRow] }).catch(() => {});
-          rumbleMap.delete(rumbleMsg.id);
-          return;
-        }
-
-        if (players.length === 1) {
-          const soloId = players[0];
-          const soloWallet = getWallet(soloId);
-          if (game.currencyType === "coins") soloWallet.coins += game.totalPrize;
-          else soloWallet.pips += game.totalPrize;
-
-          const soloEmbed = new EmbedBuilder()
-            .setColor("#ffb6c1")
-            .setTitle("🌸・PlatoMy Rumble Tamat")
-            .setDescription(`⚠️ Hanya seorang sahaja (<@${soloId}>) yang menyertai. Beliau terus memenangi **${game.totalPrize.toLocaleString()} ${currencyName}**!`);
-          const disabledRow = new ActionRowBuilder().addComponents(
-            ButtonBuilder.from(joinBtn).setDisabled(true).setStyle(ButtonStyle.Secondary).setLabel("🔒 Rumble Closed")
-          );
-          await rumbleMsg.edit({ embeds: [soloEmbed], components: [disabledRow] }).catch(() => {});
-          rumbleMap.delete(rumbleMsg.id);
-          return;
-        }
-
-        const deathEvents = [
-          (p) => `💥 <@${p}> tergelincir kulit pisang lalu tersingkir daripada gelanggang.`,
-          (p) => `💀 <@${p}> asyik main telefon pintar sampai tidak perasan zon bahaya sedang mengecil.`,
-          (p) => `🗡️ <@${p}> kena serang secara senyap oleh bayang-bayang sendiri lalu rebah.`,
-          (p) => `💨 <@${p}> lari terlalu laju merempuh dinding dan pengsan.`,
-          (p) => `💣 <@${p}> salah pijak perangkap bom dan terpelanting jauh keluar arena!`,
-          (p) => `💤 <@${p}> ketiduran di penjuru dinding dan disingkirkan tanpa sempat melawan.`
-        ];
-
-        let activePlayers = [...players];
-        let storyLogs = [];
-
-        while (activePlayers.length > 1) {
-          const dropCount = activePlayers.length > 4 ? 2 : 1;
-          for (let i = 0; i < dropCount && activePlayers.length > 1; i++) {
-            const randomIndex = Math.floor(Math.random() * activePlayers.length);
-            const eliminated = activePlayers.splice(randomIndex, 1)[0];
-            const randomEvent = deathEvents[Math.floor(Math.random() * deathEvents.length)];
-            storyLogs.push(randomEvent(eliminated));
-          }
-        }
-
-        const winnerId = activePlayers[0];
-        const winnerWallet = getWallet(winnerId);
-
-        if (game.currencyType === "coins") {
-          winnerWallet.coins += game.totalPrize;
-        } else {
-          winnerWallet.pips += game.totalPrize;
-        }
-
-        let finalDesc = `🎁 **Total Prize:** \`${game.totalPrize.toLocaleString()} ${currencyName}\`\n\n📜 **Kronologi Pertarungan:**\n` + storyLogs.join("\n") + `\n\n🏆 **Pemenang Terakhir (Champion):**\n👑 <@${winnerId}> berjaya bertahan dan membawa pulang hadiah utama! 🎉`;
-
-        const endedEmbed = new EmbedBuilder()
-          .setColor("#ffb6c1")
-          .setTitle("🌸・PlatoMy Rumble Selesai!")
-          .setDescription(finalDesc)
-          .setTimestamp();
-
-        const disabledRow = new ActionRowBuilder().addComponents(
-          ButtonBuilder.from(joinBtn).setDisabled(true).setStyle(ButtonStyle.Secondary).setLabel("🔒 Rumble Ended")
-        );
-
-        await rumbleMsg.edit({ embeds: [endedEmbed], components: [disabledRow] }).catch(() => {});
-        rumbleMap.delete(rumbleMsg.id);
-      }, durationMins * 60 * 1000);
-
-      return;
-    }
-
-    if (interaction.commandName === "embed-builder") {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return interaction.reply({ content: "❌ Hanya Admin sahaja!", ephemeral: true });
-      }
-
-      const targetChannel = interaction.options.getChannel("channel");
-      
-      const defaultEmbed = new EmbedBuilder()
-        .setColor("#ffb6c1")
-        .setTitle("Plato MY")
-        .setDescription("Test");
-
-      const row1 = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(`eb_edit_basic_${targetChannel.id}`).setLabel("edit basic info").setStyle(ButtonStyle.Primary),
-        new ButtonBuilder().setCustomId(`eb_edit_author_${targetChannel.id}`).setLabel("edit author").setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId(`eb_edit_footer_${targetChannel.id}`).setLabel("edit footer").setStyle(ButtonStyle.Secondary)
-      );
-
-      const row2 = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(`eb_edit_images_${targetChannel.id}`).setLabel("edit images").setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId(`eb_send_${targetChannel.id}`).setLabel("🚀 Send to Channel").setStyle(ButtonStyle.Success)
-      );
-
-      await interaction.reply({ content: `✨ Embed Builder diaktifkan untuk channel **${targetChannel.name}**:`, embeds: [defaultEmbed], components: [row1, row2], ephemeral: true });
-      return;
-    }
-
-    if (interaction.commandName === "embed-image") {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return interaction.reply({ content: "❌ Hanya Admin sahaja!", ephemeral: true });
-      }
-
-      const targetChannel = interaction.options.getChannel("channel");
-      const imageUrl = interaction.options.getString("image_url");
-      const titleText = interaction.options.getString("title");
-
-      const imageEmbed = new EmbedBuilder()
-        .setColor("#ffb6c1")
-        .setImage(imageUrl);
-
-      if (titleText) {
-        imageEmbed.setTitle(titleText);
-      }
-
-      await targetChannel.send({ embeds: [imageEmbed] });
-      await interaction.reply({ content: `✅ Embed gambar berjaya dihantar ke channel <#${targetChannel.id}>!`, ephemeral: true });
-      return;
-    }
-
-    if (interaction.commandName === "admin-wallet") {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) return interaction.reply({ content: "❌ Admin sahaja!", ephemeral: true });
-      
-      const action = interaction.options.getString("action");
-      const target = interaction.options.getUser("target");
-      const amount = interaction.options.getInteger("amount") || 0;
-      const reason = interaction.options.getString("reason") || "Tiada sebab diberikan";
-      const w = getWallet(target.id);
-      let cur = "";
-
-      if (action === "check") {
-        const embed = new EmbedBuilder()
-          .setColor("#ffb6c1")
-          .setTitle("💳 PlatoMy • Wallet Account Check")
-          .setDescription(`• **Member:** ${target}\n🪙 Coins: ${w.coins.toLocaleString()}\n💠 Pips: ${w.pips.toLocaleString()}\n🎁 Sponsor Total: ${w.sponsorTotal.toLocaleString()}\n✨ EXP: ${w.exp.toLocaleString()}`);
-        return interaction.reply({ embeds: [embed], ephemeral: true });
-      }
-
-      const oldExp = w.exp;
-      
-      if (action === "add_sponsor") { 
-        w.coins += amount; 
-        w.sponsorTotal += amount;
-        cur = "🪙 Plato Coins (Sponsor)"; 
-      }
-      else if (action === "add_coins") { w.coins += amount; cur = "🪙 Coins"; }
-      else if (action === "deduct_coins") { w.coins = Math.max(0, w.coins - amount); cur = "🪙 Coins"; }
-      else if (action === "add_pips") { 
-        w.pips += amount; 
-        w.exp += amount; 
-        cur = "💠 Pips"; 
-      }
-      else if (action === "deduct_pips") { w.pips = Math.max(0, w.pips - amount); cur = "💠 Pips"; }
-
-      const oldLevel = Math.floor(oldExp / 1000) + 1;
-      const newLevel = Math.floor(w.exp / 1000) + 1;
-      if (newLevel > oldLevel) {
-        await sendLevelUpLog(interaction.guild, target.id, newLevel);
-      }
-
-      const successMsg = action === "add_sponsor" 
-        ? `💖 Berjaya masukkan rekod sponsor sebanyak ${amount.toLocaleString()} untuk ${target.tag}!` 
-        : `✅ Berjaya kemaskini baki akaun PlatoMy • Wallet ${target.tag}!`;
-
-      await interaction.reply({ content: successMsg, ephemeral: true });
-      
-      const logEmbed = new EmbedBuilder()
-        .setColor("#ffb6c1")
-        .setTitle(action === "add_sponsor" ? "💖 PlatoMy • Sponsor Log" : "💳 PlatoMy • Transaction Log")
-        .setDescription(`• **Member / Sponsor:** ${target}\n• **Action:** ${action} ${amount.toLocaleString()}${cur}\n• **Note / Details:** ${reason}\n• **Admin:** ${interaction.user}`)
-        .setTimestamp();
-      
-      await sendLog(interaction.guild, WALLET_LOG_ID || "wallet-log", { embeds: [logEmbed] });
-      return;
-    }
-
-    if (interaction.commandName === "setup-verify") {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) return;
-      const embed = new EmbedBuilder()
-        .setColor("#ffb6c1")
-        .setTitle("PlatoMy • Sahkan Plato ID ✨")
-        .setDescription("Sila klik butang di bawah untuk sahkan Plato ID anda!");
-      const btn = new ButtonBuilder().setCustomId("open_verify_modal").setLabel("✨ Tekan Disini").setStyle(ButtonStyle.Primary);
-      await interaction.reply({ content: "✅ Panel dihantar!", ephemeral: true });
-      await interaction.channel.send({ embeds: [embed], components: [new ActionRowBuilder().addComponents(btn)] });
-      return;
-    }
-
-    if (interaction.commandName === "setup-birthday") {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return interaction.reply({ content: "❌ Hanya Admin sahaja!", ephemeral: true });
-      }
-
-      let sortedBdays = [...birthdaysMap.entries()].sort((a,b) => a[1].timestamp - b[1].timestamp);
-      let bdayListText = "";
-      sortedBdays.forEach(([userId, data]) => {
-        bdayListText += `• <t:${data.timestamp}:D> <@${userId}>\n`;
-      });
-
-      const bdayEmbed = new EmbedBuilder()
-        .setColor("#ffb6c1")
-        .setTitle("🎂Birthday Corner 🎂")
-        .setDescription(`💌 Ingin tarikh lahir anda disenaraikan di sini supaya kami boleh meraikannya bersama? Klik butang di bawah untuk menetapkan tarikh lahir anda! ♡\n\n✨ **Upcoming Birthdays**\n${bdayListText || "• *Tiada tarikh direkodkan lagi. Jom daftar sekarang!* "}`);        
-      
-      const bdayBtn = new ButtonBuilder()         
-        .setCustomId("open_birthday_modal")         
-        .setLabel("🎀 Set/Update Birthday")         
-        .setStyle(ButtonStyle.Primary);        
-      
-      const row = new ActionRowBuilder().addComponents(bdayBtn);        
-      await interaction.reply({ content: "✅ Birthday Corner berjaya dihantar!", ephemeral: true });       
-      await interaction.channel.send({ embeds: [bdayEmbed], components: [row] });       
-      return;     
-    }      
-
-    if (interaction.commandName === "setup-trading") {       
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) return;       
-      const embed = new EmbedBuilder()         
-        .setColor("#ffb6c1")         
-        .setTitle("🛍 PlatoMy • Trading Center 🤝")         
-        .setDescription("Ingin membuat pertukaran item? Sila klik butang di bawah untuk membuka Trading Ticket!");        
-      
-      const row = new ActionRowBuilder().addComponents(         
-        new ButtonBuilder().setCustomId("open_trading_ticket").setLabel("🛍 Open Trading Ticket").setStyle(ButtonStyle.Success)
-      );        
-      
-      await interaction.reply({ content: "✅ Panel Trading Ticket berjaya dihantar!", ephemeral: true });       
-      await interaction.channel.send({ embeds: [embed], components: [row] });       
-      return;     
-    }
-
-    if (interaction.commandName === "setup-report") {       
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) return;       
-      const embed = new EmbedBuilder()         
-        .setColor("#ffb6c1")         
-        .setTitle("🚨 PlatoMy • Report  🎫")         
-        .setDescription("Menghadapi sebarang isu atau masalah? Sila klik butang di bawah untuk membuat laporan kepada Leader!");        
-      
-      const row = new ActionRowBuilder().addComponents(         
-        new ButtonBuilder().setCustomId("open_report_ticket").setLabel("🚨 Submit Report").setStyle(ButtonStyle.Danger)
-      );        
-      
-      await interaction.reply({ content: "✅ Panel Report Ticket berjaya dihantar!", ephemeral: true });       
-      await interaction.channel.send({ embeds: [embed], components: [row] });       
-      return;     
-    }      
-
-    if (interaction.commandName === "birthday") {       
-      const sub = interaction.options.getSubcommand();       
-      if (sub === "set") {         
-        const modal = new ModalBuilder()           
-          .setCustomId("birthday_modal")           
-          .setTitle("🎀 Set Your Birthday");          
-        
-        const dateInput = new TextInputBuilder()           
-          .setCustomId("bday_date")           
-          .setLabel("Tarikh Lahir (Cth: 1 Oktober atau 7 Oct)")           
-          .setStyle(TextInputStyle.Short)           
-          .setPlaceholder("1 Oktober")           
-          .setRequired(true);          
-        
-        modal.addComponents(new ActionRowBuilder().addComponents(dateInput));         
-        await interaction.showModal(modal);         
-        return;       
-      }     
-    }      
-
-    if (interaction.commandName === "event") {       
-      const subcommand = interaction.options.getSubcommand();       
-      if (subcommand === "create") {         
-        if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {           
-          return interaction.reply({ content: "❌ Hanya Admin sahaja yang boleh mencipta event!", ephemeral: true });         
-        }          
-
-        const modal = new ModalBuilder()           
-          .setCustomId("event_create_modal")           
-          .setTitle("🌸 PlatoMy • Event ");          
-
-        const titleInput = new TextInputBuilder()           
-          .setCustomId("event_title")           
-          .setLabel("Event Title")           
-          .setStyle(TextInputStyle.Short)           
-          .setPlaceholder("🌸 PlatoMy Evening Bingo")           
-          .setRequired(true);          
-
-        const dateInput = new TextInputBuilder()           
-          .setCustomId("event_date")           
-          .setLabel("Tarikh Event (Cth: 15 October 2026)")           
-          .setStyle(TextInputStyle.Short)           
-          .setPlaceholder("15 October 2026")           
-          .setRequired(true);          
-
-        const timeInput = new TextInputBuilder()           
-          .setCustomId("event_time")           
-          .setLabel("Masa Tamat / Mula (Cth: 21:00 atau 9 PM)")           
-          .setStyle(TextInputStyle.Short)           
-          .setPlaceholder("21:00")           
-          .setRequired(true);          
-
-        const prizeInput = new TextInputBuilder()           
-          .setCustomId("event_prize")           
-          .setLabel("Prize Pool")           
-          .setStyle(TextInputStyle.Short)           
-          .setPlaceholder("1,500 Plato Coins")           
-          .setRequired(true);          
-
-        const descInput = new TextInputBuilder()           
-          .setCustomId("event_desc")           
-          .setLabel("Description / Notes")           
-          .setStyle(TextInputStyle.Paragraph)           
-          .setPlaceholder("Sila bersedia 5 minit lebih awal!")           
-          .setRequired(true);          
-
-        modal.addComponents(           
-          new ActionRowBuilder().addComponents(titleInput),           
-          new ActionRowBuilder().addComponents(dateInput),           
-          new ActionRowBuilder().addComponents(timeInput),           
-          new ActionRowBuilder().addComponents(prizeInput),           
-          new ActionRowBuilder().addComponents(descInput)         
-        );          
-
-        await interaction.showModal(modal);         
-        return;       
-      }     
-    }
-
-    if (interaction.commandName === "giveaway") {
-      const subcommand = interaction.options.getSubcommand();
-      if (subcommand === "start") {
-        if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-          return interaction.reply({ content: "❌ Only Administrators can start a giveaway!", ephemeral: true });
-        }
-
-        const prize = interaction.options.getString("prize");
-        const durationMins = interaction.options.getInteger("duration");
-        const winnersCount = interaction.options.getInteger("winners");
-        const requirement = interaction.options.getString("requirement") || "No specific requirement";
-        const imageUrl = interaction.options.getString("image");
-
-        const endTime = Date.now() + durationMins * 60 * 1000;
-        const endTimeSeconds = Math.floor(endTime / 1000);
-
-        const giveawayEmbed = new EmbedBuilder()
-          .setColor("#ffb6c1")
-          .setTitle("˚.🎀༘⋆ GIVEAWAY ˚.🎀༘⋆")
-          .setDescription(`🎁 **Prize:** ${prize}\n👑 **Winners:** ${winnersCount}\n📌 **Requirement:** ${requirement}\n⏳ **Ends In:** <t:${endTimeSeconds}:R> (<t:${endTimeSeconds}:f>)\n\n✨ Click the **"🎉 Join Giveaway"** button below!\n👥 **Entries:** 0`)
-          .setTimestamp();
-
-        if (imageUrl) {
-          giveawayEmbed.setImage(imageUrl);
-        } else {
-          giveawayEmbed.setThumbnail(LOGO_URL);
-        }
-
-        const joinBtn = new ButtonBuilder()
-          .setCustomId("join_giveaway")
-          .setLabel("🎉 Join Giveaway")
-          .setStyle(ButtonStyle.Success);
-
-        const row = new ActionRowBuilder().addComponents(joinBtn);
-
-        await interaction.reply({ content: "✅ Giveaway successfully started!", ephemeral: true });
-        const giveawayMessage = await interaction.channel.send({ embeds: [giveawayEmbed], components: [row] });
-
-        giveawaysMap.set(giveawayMessage.id, {
-          prize,
-          winnersCount,
-          participants: [],
-          ended: false,
-        });
-
-        setTimeout(async () => {
-          const gw = giveawaysMap.get(giveawayMessage.id);
-          if (!gw || gw.ended) return;
-          gw.ended = true;
-
-          let winnersText = "";
-          if (gw.participants.length === 0) {
-            winnersText = "• *No one participated in this giveaway.*";
-          } else {
-            const shuffled = [...gw.participants].sort(() => 0.5 - Math.random());
-            const winners = shuffled.slice(0, gw.winnersCount);
-            winnersText = winners.map(id => `<@${id}>`).join(", ");
-          }
-
-          const endedEmbed = new EmbedBuilder()
-            .setColor("#ffb6c1")
-            .setTitle("🎉 GIVEAWAY ENDED! 🏆")
-            .setDescription(`🎁 **Prize:** ${gw.prize}\n👥 **Total Entries:** ${gw.participants.length}\n\n🏆 **Official Winner(s):**\n${winnersText}`)
-            .setTimestamp();
-
-          if (imageUrl) {
-            endedEmbed.setImage(imageUrl);
-          } else {
-            endedEmbed.setThumbnail(LOGO_URL);
-          }
-
-          const rerollBtn = new ButtonBuilder()
-            .setCustomId(`reroll_gw_${giveawayMessage.id}`)
-            .setLabel("🎲 Reroll Winner")
-            .setStyle(ButtonStyle.Primary);
-
-          const disabledRow = new ActionRowBuilder().addComponents(
-            ButtonBuilder.from(joinBtn).setDisabled(true).setStyle(ButtonStyle.Secondary),
-            rerollBtn
-          );
-
-          await giveawayMessage.edit({ embeds: [endedEmbed], components: [disabledRow] }).catch(() => {});
-          await giveawayMessage.reply({ content: `🎉 Congratulations to the giveaway winner(s): ${winnersText}!` }).catch(() => {});
-        }, durationMins * 60 * 1000);
-
-        return;
-      }
-    }
-  }    
-
-  if (interaction.isModalSubmit()) {     
-    if (interaction.customId === "vc_limit_modal") {
-      await interaction.deferReply({ ephemeral: true });
-      const limitVal = parseInt(interaction.fields.getTextInputValue("vc_limit_val"));
-
-      if (isNaN(limitVal) || limitVal < 0 || limitVal > 99) {
-        return interaction.editReply({ content: "❌ Sila masukkan nombor yang sah antara 0 hingga 99 (0 bermaksud tiada had)." });
-      }
-
-      const userVc = interaction.member.voice.channel;
-      if (!userVc || tempVoiceOwners.get(userVc.id) !== interaction.user.id) {
-        return interaction.editReply({ content: "❌ Anda mesti berada di dalam voice channel anda sendiri untuk mengubah had!" });
-      }
-
-      await userVc.setUserLimit(limitVal);
-      await interaction.editReply({ content: `✅ Had bilik suara berjaya ditukar kepada **${limitVal === 0 ? "Tiada Had" : limitVal} orang**!` });
-      return;
-    }
-
-    if (interaction.customId === "vc_rename_modal") {
-      await interaction.deferReply({ ephemeral: true });
-      const newName = interaction.fields.getTextInputValue("vc_name_val").trim();
-
-      if (!newName) {
-        return interaction.editReply({ content: "❌ Sila masukkan nama channel yang sah!" });
-      }
-
-      const userVc = interaction.member.voice.channel;
-      if (!userVc || tempVoiceOwners.get(userVc.id) !== interaction.user.id) {
-        return interaction.editReply({ content: "❌ Anda mesti berada di dalam voice channel anda sendiri untuk menukar nama!" });
-      }
-
-      await userVc.setName(`ʚ₊˚🔊・${newName}`);
-      await interaction.editReply({ content: `✅ Nama bilik suara berjaya ditukar kepada **ʚ₊˚🔊・${newName}**!` });
-      return;
-    }
-
-    if (interaction.customId.startsWith("eb_modal_basic_")) {
-      await interaction.deferUpdate();
-      const newTitle = interaction.fields.getTextInputValue("eb_title");
-      const newDesc = interaction.fields.getTextInputValue("eb_desc");
-      const newColor = interaction.fields.getTextInputValue("eb_color") || "#ffb6c1";
-
-      const oldEmbed = interaction.message.embeds[0];
-      const updatedEmbed = EmbedBuilder.from(oldEmbed)
-        .setTitle(newTitle)
-        .setDescription(newDesc)
-        .setColor(newColor);
-
-      await interaction.editReply({ embeds: [updatedEmbed] });
-      return;
-    }
-
-    if (interaction.customId.startsWith("eb_modal_author_")) {
-      await interaction.deferUpdate();
-      const authorName = interaction.fields.getTextInputValue("eb_author_name");
-      const authorIcon = interaction.fields.getTextInputValue("eb_author_icon") || null;
-
-      const oldEmbed = interaction.message.embeds[0];
-      const updatedEmbed = EmbedBuilder.from(oldEmbed)
-        .setAuthor({ name: authorName, iconURL: authorIcon });
-
-      await interaction.editReply({ embeds: [updatedEmbed] });
-      return;
-    }
-
-    if (interaction.customId.startsWith("eb_modal_footer_")) {
-      await interaction.deferUpdate();
-      const footerText = interaction.fields.getTextInputValue("eb_footer_text");
-      const footerIcon = interaction.fields.getTextInputValue("eb_footer_icon") || null;
-
-      const oldEmbed = interaction.message.embeds[0];
-      const updatedEmbed = EmbedBuilder.from(oldEmbed)
-        .setFooter({ text: footerText, iconURL: footerIcon });
-
-      await interaction.editReply({ embeds: [updatedEmbed] });
-      return;
-    }
-
-    if (interaction.customId.startsWith("eb_modal_images_")) {
-      await interaction.deferUpdate();
-      const imageUrl = interaction.fields.getTextInputValue("eb_image") || null;
-      const thumbUrl = interaction.fields.getTextInputValue("eb_thumbnail") || null;
-
-      const oldEmbed = interaction.message.embeds[0];
-      const updatedEmbed = EmbedBuilder.from(oldEmbed)
-        .setImage(imageUrl)
-        .setThumbnail(thumbUrl);
-
-      await interaction.editReply({ embeds: [updatedEmbed] });
-      return;
-    }
-
-    if (interaction.customId === "ign_verify_modal") {       
-      await interaction.deferReply({ ephemeral: true });       
-      const id = interaction.fields.getTextInputValue("plato_id");       
-      const embed = new EmbedBuilder()         
-        .setColor("#ffb6c1")         
-        .setTitle("🔍 Permohonan Sahkan Plato ID")         
-        .setDescription(`• **Member:** ${interaction.user}\n• **Plato ID:** \`${id}\``);
-      
-      const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(`verify_approve_${interaction.user.id}`).setLabel("Approve").setStyle(ButtonStyle.Success),
-        new ButtonBuilder().setCustomId(`verify_reject_${interaction.user.id}`).setLabel("Reject").setStyle(ButtonStyle.Danger)
-      );
-
-      await sendLog(interaction.guild, VERIFY_CHANNEL_ID || "verification-log", { embeds: [embed], components: [row] });
-      await interaction.editReply({ content: "✨ Permohonan anda akan dihantar kepada admin untuk semakan!" });
-      return;
-    }
-
-    if (interaction.customId === "birthday_modal") {
-      await interaction.deferReply({ ephemeral: true });
-      const bdayInput = interaction.fields.getTextInputValue("bday_date");
-      const timestampSec = parseBirthdayToTimestamp(bdayInput);
-
-      if (!timestampSec) {
-        return interaction.editReply({ content: "❌ Format tarikh tidak sah! Sila guna contoh seperti: `1 Oktober` atau `7 Oct`." });
-      }
-      
-      birthdaysMap.set(interaction.user.id, { dateStr: bdayInput, timestamp: timestampSec });
-
-      let sortedBdays = [...birthdaysMap.entries()].sort((a,b) => a[1].timestamp - b[1].timestamp);
-      let bdayListText = "";
-      sortedBdays.forEach(([userId, data]) => {
-        bdayListText += `• <t:${data.timestamp}:D> <@${userId}>\n`;
-      });
-
-      const updatedEmbed = new EmbedBuilder()
-        .setColor("#ffb6c1")
-        .setTitle("🎂Birthday Corner 🎂")
-        .setDescription(`💌 Ingin tarikh lahir anda disenaraikan di sini supaya kami boleh meraikannya bersama? Klik butang di bawah untuk menetapkan tarikh lahir anda! ♡\n\n✨ **Upcoming Birthdays**\n${bdayListText || "• *Tiada tarikh direkodkan lagi.*"}`);
-
-      try {
-        await interaction.message?.edit({ embeds: [updatedEmbed] }).catch(() => {});
-      } catch (e) {}
-
-      await interaction.editReply({ content: `✨ Tarikh lahir anda berjaya disimpan dalam Birthday Corner! ♡` });
-      return;
-    }
-
-    if (interaction.customId === "event_create_modal") {
-      await interaction.deferReply({ ephemeral: true });
-      const title = interaction.fields.getTextInputValue("event_title");
-      const dateStr = interaction.fields.getTextInputValue("event_date");
-      const timeStr = interaction.fields.getTextInputValue("event_time");
-      const prize = interaction.fields.getTextInputValue("event_prize");
-      const desc = interaction.fields.getTextInputValue("event_desc");
-
-      const parsedTargetDate = new Date(`${dateStr} ${timeStr}`);
-      const endTimeMs = isNaN(parsedTargetDate.getTime()) ? Date.now() + 86400000 : parsedTargetDate.getTime();
-
-      const eventEmbed = new EmbedBuilder()
-        .setColor("#ffb6c1")
-        .setTitle(`🎮 ${title}`)
-        .setDescription(`${desc}\n\n📅 **Tarikh:** ${dateStr}\n⏰ **Masa Tamat:** ${timeStr}\n🎁 **Prize Pool:** ${prize}\n👥 **Pemain:** 0`)
-        .setTimestamp();
-
-      const joinBtn = new ButtonBuilder()
-        .setCustomId("join_event_v2")
-        .setLabel("🎟 Join Event")
-        .setStyle(ButtonStyle.Success);
-
-      const row = new ActionRowBuilder().addComponents(joinBtn);
-
-      const eventMessage = await interaction.channel.send({ embeds: [eventEmbed], components: [row] });
-      
-      eventsMap.set(eventMessage.id, {
-        title,
-        dateStr,
-        timeStr,
-        endTimeMs,
-        participants: [],
-        ended: false,
-      });
-
-      await interaction.editReply({ content: "✨ Event v2.0 berjaya dicipta!" });
-      return;
-    }
-
-    if (interaction.customId.startsWith("report_modal_")) {
-      await interaction.deferReply({ ephemeral: true });
-      const category = interaction.customId.replace("report_modal_", "");
-      const details = interaction.fields.getTextInputValue("report_details");
-      const evidence = interaction.fields.getTextInputValue("report_evidence") || "Tiada bukti diberikan";
-
-      const reportChannel = interaction.guild.channels.cache.find(c => c.name.includes("report-log") && c.isTextBased());
-
-      if (!reportChannel) {
-        return interaction.editReply({ content: "❌ Channel 'report-log' tidak dijumpai di server! Sila pastikan channel tersebut wujud." });
-      }
-
-      const reportEmbed = new EmbedBuilder()
-        .setColor("#ffb6c1")
-        .setTitle(`🚨 Laporan Baharu: [${category}]`)
-        .setDescription(`• **Pelapor:** ${interaction.user} (${interaction.user.tag})\n• **Status:** 🟡 Open\n• **Handler:** Belum di-claim\n\n📝 **Butiran:**\n${details}\n\n🔗 **Bukti / Screenshot:**\n${evidence}`)
-        .setTimestamp();
-
-      const actionRow = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId("report_claim").setLabel("🙋‍♂️ Claim Report").setStyle(ButtonStyle.Primary),
-        new ButtonBuilder().setCustomId("report_resolve").setLabel("✅ Resolve").setStyle(ButtonStyle.Success),
-        new ButtonBuilder().setCustomId("report_reject").setLabel("❌ Reject").setStyle(ButtonStyle.Danger),
-        new ButtonBuilder().setCustomId("report_close").setLabel("🔒 Close & Log").setStyle(ButtonStyle.Secondary)
-      );
-
-      await reportChannel.send({ embeds: [reportEmbed], components: [actionRow] });
-      await interaction.editReply({ content: "✅ Laporan anda telah berjaya dihantar ke channel **report-log**! Terima kasih." });
-      return;
-    }
-  }
-
-  if (interaction.isStringSelectMenu()) {
-    if (interaction.customId === "role_select_menu_1" || interaction.customId === "role_select_menu_2") {
-      await interaction.deferReply({ ephemeral: true });
-      const selectedVal = interaction.values[0];
-      
-      const rawName = selectedVal.replace("role_", "").replace(/_/g, " ");
-      const roleName = rawName === "other game" ? "Other Game" : rawName.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-
-      const role = interaction.guild.roles.cache.find(r => r.name.toLowerCase() === roleName.toLowerCase());
-      if (!role) {
-        return interaction.editReply({ content: `❌ Ralat: Role **${roleName}** di dalam server tidak dijumpai! Sila pastikan role dengan nama tersebut telah dicipta di tetapan server.` });
-      }
-
-      const member = interaction.member;
-      if (member.roles.cache.has(role.id)) {
-        await member.roles.remove(role);
-        await interaction.editReply({ content: `✅ Role **${roleName}** telah dibuang daripada akaun awak!` });
-      } else {
-        await member.roles.add(role);
-        await interaction.editReply({ content: `🎉 Berjaya! Role **${roleName}** telah diberikan kepada awak!` });
-      }
-      return;
-    }
-
-    if (interaction.customId === "report_category_select") {
-      const selectedCategory = interaction.values[0];
-      const modal = new ModalBuilder()
-        .setCustomId(`report_modal_${selectedCategory}`)
-        .setTitle(`Report: ${selectedCategory}`);
-
-      const detailsInput = new TextInputBuilder()
-        .setCustomId("report_details")
-        .setLabel("Butiran / Isu Laporan")
-        .setStyle(TextInputStyle.Paragraph)
-        .setPlaceholder("Terangkan masalah atau pengguna yang ingin dilapor...")
-        .setRequired(true);
-
-      const evidenceInput = new TextInputBuilder()
-        .setCustomId("report_evidence")
-        .setLabel("Link Bukti / Screenshot")
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder("https://imgur.com/... atau lampiran pautan")
-        .setRequired(false);
-
-      modal.addComponents(
-        new ActionRowBuilder().addComponents(detailsInput),
-        new ActionRowBuilder().addComponents(evidenceInput)
-      );
-
-      await interaction.showModal(modal);
-      return;
-    }
-  }
-
-  if (interaction.isButton()) {
-    if (["vc_lock", "vc_hide", "vc_limit", "vc_rename"].includes(interaction.customId)) {
-      const userVc = interaction.member.voice.channel;
-      if (!userVc) {
-        return interaction.reply({ content: "❌ Anda mesti berada di dalam voice channel untuk menggunakan kawalan ini!", ephemeral: true });
-      }
-
-      const ownerId = tempVoiceOwners.get(userVc.id);
-      if (!ownerId || ownerId !== interaction.user.id) {
-        return interaction.reply({ content: "❌ Anda bukan pemilik (owner) bagi voice channel ini!", ephemeral: true });
-      }
-
-      if (interaction.customId === "vc_lock") {
-        await interaction.deferReply({ ephemeral: true });
-        const everyoneRole = interaction.guild.roles.everyone;
-        const currentPerms = userVc.permissionOverwrites.cache.get(everyoneRole.id);
-        const isLocked = currentPerms && currentPerms.deny.has(PermissionFlagsBits.Connect);
-
-        if (isLocked) {
-          await userVc.permissionOverwrites.edit(everyoneRole, { Connect: null });
-          await interaction.editReply({ content: "🔓 Voice channel anda telah **dibuka semula (Unlocked)**!" });
-        } else {
-          await userVc.permissionOverwrites.edit(everyoneRole, { Connect: false });
-          await interaction.editReply({ content: "🔒 Voice channel anda telah **dikunci (Locked)**!" });
-        }
-        return;
-      }
-
-      if (interaction.customId === "vc_hide") {
-        await interaction.deferReply({ ephemeral: true });
-        const everyoneRole = interaction.guild.roles.everyone;
-        const currentPerms = userVc.permissionOverwrites.cache.get(everyoneRole.id);
-        const isHidden = currentPerms && currentPerms.deny.has(PermissionFlagsBits.ViewChannel);
-
-        if (isHidden) {
-          await userVc.permissionOverwrites.edit(everyoneRole, { ViewChannel: null });
-          await interaction.editReply({ content: "👁️ Voice channel anda kini **kelihatan (Unhidden)**!" });
-        } else {
-          await userVc.permissionOverwrites.edit(everyoneRole, { ViewChannel: false });
-          await interaction.editReply({ content: "🕶️ Voice channel anda kini **disembunyikan (Hidden)** daripada orang lain!" });
-        }
-        return;
-      }
-
-      if (interaction.customId === "vc_limit") {
-        const modal = new ModalBuilder()
-          .setCustomId("vc_limit_modal")
-          .setTitle("Tetapkan Had Ahli Bilik");
-
-        const limitInput = new TextInputBuilder()
-          .setCustomId("vc_limit_val")
-          .setLabel("Had Bilangan Ahli (0 - 99)")
-          .setStyle(TextInputStyle.Short)
-          .setPlaceholder("Cth: 5")
-          .setRequired(true);
-
-        modal.addComponents(new ActionRowBuilder().addComponents(limitInput));
-        await interaction.showModal(modal);
-        return;
-      }
-
-      if (interaction.customId === "vc_rename") {
-        const modal = new ModalBuilder()
-          .setCustomId("vc_rename_modal")
-          .setTitle("Tukar Nama Bilik Suara");
-
-        const nameInput = new TextInputBuilder()
-          .setCustomId("vc_name_val")
-          .setLabel("Nama Baharu Bilik")
-          .setStyle(TextInputStyle.Short)
-          .setPlaceholder("Cth: Chill & Chat")
-          .setRequired(true);
-
-        modal.addComponents(new ActionRowBuilder().addComponents(nameInput));
-        await interaction.showModal(modal);
-        return;
-      }
-    }
-
-    if (interaction.customId.startsWith("reroll_gw_")) {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return interaction.reply({ content: "❌ Only Administrators can reroll!", ephemeral: true });
-      }
-
-      const msgId = interaction.customId.replace("reroll_gw_", "");
-      const gw = giveawaysMap.get(msgId);
-
-      if (!gw || gw.participants.length === 0) {
-        return interaction.reply({ content: "❌ No participant data found for this reroll.", ephemeral: true });
-      }
-
-      const randomWinner = gw.participants[Math.floor(Math.random() * gw.participants.length)];
-      await interaction.reply({ content: `🎲 **Reroll Successful!** New winner is: <@${randomWinner}>! 🎉` });
-      return;
-    }
-
-    if (interaction.customId.startsWith("join_rumble_")) {
-      await interaction.deferReply({ ephemeral: true });
-      const parts = interaction.customId.split("_");
-      const currencyType = parts[2]; 
-      const totalPrize = parseInt(parts[3]);
-
-      const game = rumbleMap.get(interaction.message.id);
-      if (!game || game.ended) {
-        return interaction.editReply({ content: "❌ Permainan PlatoMy Rumble ini telah tamat atau tidak wujud." });
-      }
-
-      if (game.participants.includes(interaction.user.id)) {
-        return interaction.editReply({ content: "⚠️ Awak sudah menyertai PlatoMy Rumble ini!" });
-      }
-
-      game.participants.push(interaction.user.id);
-
-      const oldEmb = interaction.message.embeds[0];
-      const newEmb = EmbedBuilder.from(oldEmb)
-        .setDescription(oldEmb.description.replace(/👥 \*\*Penyertaan:\*\* \d+ pemain/, `👥 **Penyertaan:** ${game.participants.length} pemain`));
-
-      await interaction.message.edit({ embeds: [newEmb] }).catch(() => {});
-      await interaction.editReply({ content: `✅ Berjaya menyertai PlatoMy Rumble! Good luck! ⚔️` });
-      return;
-    }
-
-    if (interaction.customId.startsWith("eb_edit_basic_")) {
-      const channelId = interaction.customId.replace("eb_edit_basic_", "");
-      const currentEmbed = interaction.message.embeds[0];
-
-      const modal = new ModalBuilder()
-        .setCustomId(`eb_modal_basic_${channelId}`)
-        .setTitle("Edit Basic Information");
-
-      const titleInput = new TextInputBuilder()
-        .setCustomId("eb_title")
-        .setLabel("Embed Title")
-        .setStyle(TextInputStyle.Short)
-        .setValue(currentEmbed.title || "")
-        .setRequired(true);
-
-      const descInput = new TextInputBuilder()
-        .setCustomId("eb_desc")
-        .setLabel("Embed Description")
-        .setStyle(TextInputStyle.Paragraph)
-        .setValue(currentEmbed.description || "")
-        .setRequired(true);
-
-      const colorInput = new TextInputBuilder()
-        .setCustomId("eb_color")
-        .setLabel("Embed Color (Cth: #ffb6c1)")
-        .setStyle(TextInputStyle.Short)
-        .setValue("#ffb6c1")
-        .setRequired(false);
-
-      modal.addComponents(
-        new ActionRowBuilder().addComponents(titleInput),
-        new ActionRowBuilder().addComponents(descInput),
-        new ActionRowBuilder().addComponents(colorInput)
-      );
-
-      await interaction.showModal(modal);
-      return;
-    }
-
-    if (interaction.customId.startsWith("eb_edit_author_")) {
-      const channelId = interaction.customId.replace("eb_edit_author_", "");
-      const currentEmbed = interaction.message.embeds[0];
-
-      const modal = new ModalBuilder()
-        .setCustomId(`eb_modal_author_${channelId}`)
-        .setTitle("Edit Author");
-
-      const authorNameInput = new TextInputBuilder()
-        .setCustomId("eb_author_name")
-        .setLabel("Author Name")
-        .setStyle(TextInputStyle.Short)
-        .setValue(currentEmbed.author?.name || "")
-        .setRequired(false);
-
-      const authorIconInput = new TextInputBuilder()
-        .setCustomId("eb_author_icon")
-        .setLabel("Author Icon URL")
-        .setStyle(TextInputStyle.Short)
-        .setValue(currentEmbed.author?.iconURL || "")
-        .setRequired(false);
-
-      modal.addComponents(
-        new ActionRowBuilder().addComponents(authorNameInput),
-        new ActionRowBuilder().addComponents(authorIconInput)
-      );
-
-      await interaction.showModal(modal);
-      return;
-    }
-
-    if (interaction.customId.startsWith("eb_edit_footer_")) {
-      const channelId = interaction.customId.replace("eb_edit_footer_", "");
-      const currentEmbed = interaction.message.embeds[0];
-
-      const modal = new ModalBuilder()
-        .setCustomId(`eb_modal_footer_${channelId}`)
-        .setTitle("Edit Footer");
-
-      const footerTextInput = new TextInputBuilder()
-        .setCustomId("eb_footer_text")
-        .setLabel("Footer Text")
-        .setStyle(TextInputStyle.Short)
-        .setValue(currentEmbed.footer?.text || "")
-        .setRequired(false);
-
-      const footerIconInput = new TextInputBuilder()
-        .setCustomId("eb_footer_icon")
-        .setLabel("Footer Icon URL")
-        .setStyle(TextInputStyle.Short)
-        .setValue(currentEmbed.footer?.iconURL || "")
-        .setRequired(false);
-
-      modal.addComponents(
-        new ActionRowBuilder().addComponents(footerTextInput),
-        new ActionRowBuilder().addComponents(footerIconInput)
-      );
-
-      await interaction.showModal(modal);
-      return;
-    }
-
-    if (interaction.customId.startsWith("eb_edit_images_")) {
-      const channelId = interaction.customId.replace("eb_edit_images_", "");
-      const currentEmbed = interaction.message.embeds[0];
-
-      const modal = new ModalBuilder()
-        .setCustomId(`eb_modal_images_${channelId}`)
-        .setTitle("Edit Images");
-
-      const imageInput = new TextInputBuilder()
-        .setCustomId("eb_image")
-        .setLabel("Main Image URL")
-        .setStyle(TextInputStyle.Short)
-        .setValue(currentEmbed.image?.url || "")
-        .setRequired(false);
-
-      const thumbInput = new TextInputBuilder()
-        .setCustomId("eb_thumbnail")
-        .setLabel("Thumbnail URL")
-        .setStyle(TextInputStyle.Short)
-        .setValue(currentEmbed.thumbnail?.url || "")
-        .setRequired(false);
-
-      modal.addComponents(
-        new ActionRowBuilder().addComponents(imageInput),
-        new ActionRowBuilder().addComponents(thumbInput)
-      );
-
-      await interaction.showModal(modal);
-      return;
-    }
-
-    if (interaction.customId.startsWith("eb_send_")) {
-      const channelId = interaction.customId.replace("eb_send_", "");
-      const targetChannel = interaction.guild.channels.cache.get(channelId);
-
-      if (!targetChannel) {
-        return interaction.reply({ content: "❌ Channel tidak dijumpai!", ephemeral: true });
-      }
-
-      const embedToSend = interaction.message.embeds[0];
-      await targetChannel.send({ embeds: [embedToSend] });
-      await interaction.update({ content: "✅ Embed berjaya dihantar ke channel pilihan!", embeds: [], components: [] });
-      return;
-    }
-
-    if (interaction.customId === "open_verify_modal") {
-      const modal = new ModalBuilder()
-        .setCustomId("ign_verify_modal")
-        .setTitle("Sahkan Plato ID");
-      
-      const platoInput = new TextInputBuilder()
-        .setCustomId("plato_id")
-        .setLabel("Plato ID")
-        .setStyle(TextInputStyle.Short)
-        .setRequired(true);
-
-      modal.addComponents(new ActionRowBuilder().addComponents(platoInput));
-      await interaction.showModal(modal);
-      return;
-    }
-
-    if (interaction.customId === "open_birthday_modal") {
-      const modal = new ModalBuilder()
-        .setCustomId("birthday_modal")
-        .setTitle("🎀 Set Your Birthday");
-
-      const dateInput = new TextInputBuilder()
-        .setCustomId("bday_date")
-        .setLabel("Tarikh Lahir (Cth: 1 Oktober atau 7 Oct)")
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder("1 Oktober")
-        .setRequired(true);
-
-      modal.addComponents(new ActionRowBuilder().addComponents(dateInput));
-      await interaction.showModal(modal);
-      return;
-    }
-
-    if (interaction.customId === "open_trading_ticket") {
-      await interaction.deferReply({ ephemeral: true });
-      const guild = interaction.guild;
-      const traderRole = guild.roles.cache.find(r => r.name.toLowerCase() === "trader");
-      const traderPing = traderRole ? `<@&${traderRole.id}>` : "@trader";
-
-      const ticketChannel = await guild.channels.create({
-        name: `trade-${interaction.user.username}`,
-        type: ChannelType.GuildText,
-        parent: interaction.channel.parentKey, 
-        permissionOverwrites: [
-          { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
-          { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
-          ...(traderRole ? [{ id: traderRole.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] }] : []),
-        ],
-      });
-
-      const embed = new EmbedBuilder()
-        .setColor("#ffb6c1")
-        .setTitle("🛍 Trading Ticket Lounge")
-        .setDescription(`Hai ${interaction.user}! Selamat datang ke Trading Lounge.\n\nSila nyatakan item yang anda inginkan / Hi please list item that you want to trade here.`);
-
-      const acceptBtn = new ButtonBuilder()
-        .setCustomId(`accept_trade_${interaction.user.id}`)
-        .setLabel("🤝 Accept Trade")
-        .setStyle(ButtonStyle.Success);
-
-      const closeBtn = new ButtonBuilder()
-        .setCustomId("close_ticket")
-        .setLabel("🔒 Trading Selesai / Trading Done")
-        .setStyle(ButtonStyle.Danger);
-
-      await ticketChannel.send({ 
-        content: `${interaction.user} ${traderPing}`, 
-        embeds: [embed], 
-        components: [new ActionRowBuilder().addComponents(acceptBtn, closeBtn)] 
-      });
-
-      await interaction.editReply({ content: `✅ Tiket peribadi anda telah dibuka di bawah kategori trading: <#${ticketChannel.id}>` });
-      return;
-    }
-
-    if (interaction.customId.startsWith("accept_trade_")) {
-      await interaction.deferReply({ ephemeral: true });
-      const ownerId = interaction.customId.replace("accept_trade_", "");
-
-      if (interaction.user.id === ownerId) {
-        return interaction.editReply({ content: "❌ Anda adalah pemilik tiket ini!" });
-      }
-
-      const guild = interaction.guild;
-      const traderRole = guild.roles.cache.find(r => r.name.toLowerCase() === "trader");
-
-      const exclusiveChannel = await guild.channels.create({
-        name: `deal-${interaction.user.username}`,
-        type: ChannelType.GuildText,
-        parent: interaction.channel.parentKey,
-        permissionOverwrites: [
-          { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
-          { id: ownerId, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
-          { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
-          ...(traderRole ? [{ id: traderRole.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] }] : []),
-        ],
-      });
-
-      const privateEmbed = new EmbedBuilder()
-        .setColor("#ffb6c1")
-        .setTitle("🤝 Exclusive Trade Room")
-        .setDescription(`Trade diterima oleh <@${interaction.user.id}>!\n\nChannel ini hanya boleh dilihat oleh Pemilik (<@${ownerId}>) dan Pembeli (<@${interaction.user.id}>) sahaja. Selamat berdagang! ♡`);
-
-      const closeBtn = new ButtonBuilder()
-        .setCustomId("close_ticket")
-        .setLabel("🔒 Trading Selesai / Trading Done")
-        .setStyle(ButtonStyle.Danger);
-
-      await exclusiveChannel.send({ 
-        content: `<@${ownerId}> <@${interaction.user.id}>`, 
-        embeds: [privateEmbed], 
-        components: [new ActionRowBuilder().addComponents(closeBtn)] 
-      });
-
-      await interaction.editReply({ content: `✨ Deal berjaya! Channel eksklusif anda telah dibuka: <#${exclusiveChannel.id}>` });
-      return;
-    }
-
-    if (interaction.customId === "open_report_ticket") {
-      const selectMenu = new StringSelectMenuBuilder()
-        .setCustomId("report_category_select")
-        .setPlaceholder("Sila pilih kategori laporan...")
-        .addOptions([
-          { label: "Player / User Report", value: "Player Report" },
-          { label: "Bug / Technical Issue", value: "Technical Bug" },
-          { label: "Other", value: "Other" },
-        ]);
-
-      const row = new ActionRowBuilder().addComponents(selectMenu);
-      await interaction.reply({ content: "📌 Sila pilih kategori laporan anda di bawah:", components: [row], ephemeral: true });
-      return;
-    }
-
-    if (interaction.customId === "close_ticket") {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return interaction.reply({ content: "❌ Hanya staf atau admin sahaja yang boleh menutup tiket ini!", ephemeral: true });
-      }
-
-      await interaction.reply({ content: "🔒 Tiket ini akan ditutup dalam masa 5 saat..." });
-      
-      setTimeout(async () => {
-        const logChannel = interaction.guild.channels.cache.find(c => c.name.includes(TRADING_LOG_CHANNEL_NAME) && c.isTextBased());
-        if (logChannel) {
-          const logEmb = new EmbedBuilder()
-            .setColor("#ffb6c1")
-            .setTitle("🔒 Trading Ticket Closed Log")
-            .setDescription(`• **Channel:** \`${interaction.channel.name}\`\n• **Closed by:** ${interaction.user}`)
-            .setTimestamp();
-          await logChannel.send({ embeds: [logEmb] }).catch(() => {});
-        }
-        await interaction.channel.delete().catch(() => {});
-      }, 5000);
-      return;
-    }
-
-    if (["report_claim", "report_resolve", "report_reject", "report_close"].includes(interaction.customId)) {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return interaction.reply({ content: "❌ Hanya staf sahaja yang boleh menguruskan laporan ini!", ephemeral: true });
-      }
-
-      const oldEmb = interaction.message.embeds[0];
-      const oldDesc = oldEmb.description;
-      let newStatus = "🟡 Open";
-
-      if (interaction.customId === "report_claim") {
-        newStatus = `🔵 Under Review (Claimed by ${interaction.user.tag})`;
-      } else if (interaction.customId === "report_resolve") {
-        newStatus = `🟢 Resolved (Handled by ${interaction.user.tag})`;
-      } else if (interaction.customId === "report_reject") {
-        newStatus = `🔴 Rejected (Handled by ${interaction.user.tag})`;
-      } else if (interaction.customId === "report_close") {
-        newStatus = `🔒 Closed & Archived (Handled by ${interaction.user.tag})`;
-      }
-
-      const updatedDesc = oldDesc.replace(/• \*\*Status:\*\* .*/, `• **Status:** ${newStatus}`);
-      const newEmb = EmbedBuilder.from(oldEmb).setColor("#ffb6c1").setDescription(updatedDesc);
-
-      await interaction.update({ embeds: [newEmb], components: interaction.customId === "report_close" ? [] : interaction.message.components });
-
-      if (interaction.customId === "report_close") {
-        const logChannel = interaction.guild.channels.cache.find(c => c.name.includes(REPORT_LOG_CHANNEL_NAME) && c.isTextBased());
-        if (logChannel) {
-          await logChannel.send({ embeds: [newEmb] }).catch(() => {});
-        }
-      }
-      return;
-    }
-
-    if (interaction.customId === "join_event_v2") {
-      await interaction.deferReply({ ephemeral: true });
-      const ev = eventsMap.get(interaction.message.id);
-      
-      if (!ev || ev.ended) {
-        return interaction.editReply({ content: "❌ Event ini tidak wujud atau telah tamat." });
-      }
-
-      if (Date.now() > ev.endTimeMs) {
-        ev.ended = true;
-        const disabledRow = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId("join_event_v2").setLabel("🎟 Event Telah Tamat").setStyle(ButtonStyle.Secondary).setDisabled(true)
-        );
-        await interaction.message.edit({ components: [disabledRow] }).catch(() => {});
-        return interaction.editReply({ content: "❌ Maaf, masa untuk menyertai event ini sudah tamat!" });
-      }
-
-      if (ev.participants.includes(interaction.user.id)) {
-        return interaction.editReply({ content: "⚠️ Awak sudah menyertai event ini!" });
-      }
-
-      ev.participants.push(interaction.user.id);
-
-      const oldEmb = interaction.message.embeds[0];
-      const newEmb = EmbedBuilder.from(oldEmb)
-        .setDescription(oldEmb.description.replace(/👥 \*\*Pemain:\*\* \d+/, `👥 **Pemain:** ${ev.participants.length}`));
-
-      await interaction.message.edit({ embeds: [newEmb] }).catch(() => {});
-      await interaction.editReply({ content: `✅ Berjaya menyertai event! Jumlah pemain: ${ev.participants.length}` });
-      return;
-    }
-
-    if (interaction.customId === "join_giveaway") {
-      await interaction.deferReply({ ephemeral: true });
-      const gw = giveawaysMap.get(interaction.message.id);
-      if (!gw || gw.ended) return interaction.editReply({ content: "❌ This giveaway has ended or does not exist." });
-
-      if (gw.participants.includes(interaction.user.id)) {
-        return interaction.editReply({ content: "⚠️ You have already joined this giveaway!" });
-      }
-
-      gw.participants.push(interaction.user.id);
-
-      const oldEmbed = interaction.message.embeds[0];
-      const newEmbed = EmbedBuilder.from(oldEmbed)
-        .setDescription(oldEmbed.description.replace(/👥 \*\*Entries:\*\* \d+/, `👥 **Entries:** ${gw.participants.length}`));
-
-      await interaction.message.edit({ embeds: [newEmbed] }).catch(() => {});
-      await interaction.editReply({ content: `✅ Successfully joined the giveaway! Good luck! 🎉` });
-      return;
-    }
-
-    if (interaction.customId.startsWith("verify_approve_")) {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) return;
-      await interaction.deferUpdate();
-      const member = await interaction.guild.members.fetch(interaction.customId.replace("verify_approve_", "")).catch(() => null);
-      if (member) {
-        const role = interaction.guild.roles.cache.find(r => r.name === VERIFIED_ROLE_NAME);
-        if (role) await member.roles.add(role).catch(() => {});
-      }
-      await interaction.edit({ embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor("#ffb6c1").setTitle("✅ Diluluskan")], components: [] });
-      return;
-    }
-
-    if (interaction.customId.startsWith("variable_reject_") || interaction.customId.startsWith("verify_reject_")) {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) return;
-      await interaction.deferUpdate();
-      await interaction.edit({ embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor("#ffb6c1").setTitle("❌ Ditolak")], components: [] }).catch(() => {});
-      return;
     }
   }
 });
