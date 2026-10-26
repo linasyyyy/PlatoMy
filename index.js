@@ -305,6 +305,21 @@ async function sendLevelUpLog(guild, userId, newLevel) {
   await channel.send({ content: `🎉 Tahniah <@${userId}> atas kenaikan level anda!`, embeds: [levelUpEmbed] }).catch(() => {});
 }
 
+// Logik Pengiraan Level & EXP Bertingkat (200, 400, 600, dst)
+function calculateLevelData(totalExp) {
+  let level = 1;
+  let expRequired = 200;
+  let currentExp = totalExp;
+
+  while (currentExp >= expRequired) {
+    currentExp -= expRequired;
+    level++;
+    expRequired = level * 200;
+  }
+
+  return { level, currentExp, expRequired };
+}
+
 client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot || !message.guild) return;
   const userId = message.author.id;
@@ -313,10 +328,11 @@ client.on(Events.MessageCreate, async (message) => {
   const oldExp = w.exp;
   w.exp += 2;
 
-  const oldLevel = Math.floor(oldExp / 1000) + 1;
-  const newLevel = Math.floor(w.exp / 1000) + 1;
-  if (newLevel > oldLevel) {
-    await sendLevelUpLog(message.guild, userId, newLevel);
+  const oldData = calculateLevelData(oldExp);
+  const newData = calculateLevelData(w.exp);
+
+  if (newData.level > oldData.level) {
+    await sendLevelUpLog(message.guild, userId, newData.level);
   }
 
   const content = message.content.trim().toLowerCase();
@@ -340,8 +356,8 @@ client.on(Events.MessageCreate, async (message) => {
       const medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
       sortedWallets.forEach(([uid, data], index) => {
         const medalIcon = medals[index] || `#${index + 1}`;           
-        const estimatedLevel = Math.floor(data.exp / 1000) + 1;           
-        lbDescription += `${medalIcon} **<@${uid}>**\nLevel ${estimatedLevel} • EXP: **${data.exp.toLocaleString()}**\n\n`;
+        const userLevelData = calculateLevelData(data.exp);           
+        lbDescription += `${medalIcon} **<@${uid}>**\nLevel ${userLevelData.level} • EXP: **${data.exp.toLocaleString()}**\n\n`;
       });
     }
 
@@ -361,9 +377,8 @@ client.on(Events.MessageCreate, async (message) => {
     const serverRank = sortedArr.findIndex(([id]) => id === userId) + 1;
     const rankDisplay = serverRank > 0 ? `#${serverRank}` : "#-";
 
-    const currentLevel = Math.floor(w.exp / 1000) + 1;
-    const currentXpInLevel = Math.floor(w.exp % 1000);
-    const progressBlocks = Math.floor(currentXpInLevel / 100);
+    const data = calculateLevelData(w.exp);
+    const progressBlocks = Math.floor((data.currentExp / data.expRequired) * 10);
     const progressBar = "🖤".repeat(progressBlocks) + "🤍".repeat(10 - progressBlocks);
 
     const timeString = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
@@ -371,14 +386,14 @@ client.on(Events.MessageCreate, async (message) => {
     const rankEmbed = new EmbedBuilder()
       .setColor("#ff69b4")
       .setAuthor({ name: `${message.author.username}'s Rank Card`, iconURL: message.author.displayAvatarURL({ size: 128, dynamic: true }) })
-      .setTitle("ʚ₊˚ 🌸 𝖫𝖤𝖵𝖤𝖫 & 𝖲𝖳𝖠𝖳𝖴𝖲 ˚₊・ɞ")
+      .setTitle("✿ LEVEL & STATUS ✿")
       .setDescription(
         `🖤 **Member:** ${message.author}\n\n` +
         `🏆 **Server Rank:** \`${rankDisplay}\`\n` +
-        `📊 **Current Level:** \`${currentLevel}\`\n` +
+        `📊 **Current Level:** \`${data.level}\`\n` +
         `✨ **Total EXP:** \`${w.exp.toLocaleString()} EXP\`\n\n` +
-        `📈 **Progress to Level ${currentLevel + 1}:**\n` +
-        `\`[${progressBar}]\` **${currentXpInLevel}/1000 EXP**`
+        `📈 **Progress to Level ${data.level + 1}:**\n` +
+        `\`[${progressBar}]\` **${data.currentExp}/${data.expRequired} EXP**`
       )
       .setThumbnail(message.author.displayAvatarURL({ size: 256, dynamic: true }))
       .setFooter({ text: `PlatoMy • Today at ${timeString}` });
@@ -411,8 +426,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
         sortedWallets.forEach(([userId, data], index) => {
           const medalIcon = medals[index] || `#${index + 1}`;           
-          const estimatedLevel = Math.floor(data.exp / 1000) + 1;           
-          lbDescription += `${medalIcon} **<@${userId}>**\nLevel ${estimatedLevel} • EXP: **${data.exp.toLocaleString()}**\n\n`;
+          const userLevelData = calculateLevelData(data.exp);           
+          lbDescription += `${medalIcon} **<@${userId}>**\nLevel ${userLevelData.level} • EXP: **${data.exp.toLocaleString()}**\n\n`;
         });
       }
 
