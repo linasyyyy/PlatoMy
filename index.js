@@ -244,10 +244,11 @@ async function sendLevelUpLog(guild, userId, newLevel) {
   const channel = guild.channels.cache.find(c => c.name.toLowerCase().includes(LEVEL_LOG_CHANNEL_NAME.toLowerCase()) && c.isTextBased());
   if (!channel || !("send" in channel)) return;
 
+  // Menggunakan warna tema Pink & Hitam Y2K Crystal
   const levelUpEmbed = new EmbedBuilder()
-    .setColor("#ffb6c1")
-    .setTitle("LEVEL UP! 🎉")
-    .setDescription(`Tahniah <@${userId}>! Anda baru sahaja naik ke **Level ${newLevel}**! ✨\n\nTeruskan aktif dalam komuniti **PlatoMy**! 🚀`)
+    .setColor("#ff69b4")
+    .setTitle("✨ 𝖫𝖤𝖵𝖤𝖫 𝖴𝖯! 🌸")
+    .setDescription(`🖤 Tahniah <@${userId}>! Anda baru sahaja naik ke **Level ${newLevel}**! ✨\n\n🎀 Teruskan aktif dalam komuniti **PlatoMy**! 🚀`)
     .setThumbnail(LOGO_URL)
     .setTimestamp();
 
@@ -272,7 +273,7 @@ client.on(Events.MessageCreate, async (message) => {
 
   if (content === "!wallet" || content === "!bank") {
     const embed = new EmbedBuilder()
-      .setColor("#ffb6c1")
+      .setColor("#ff69b4")
       .setTitle("💳 PlatoMy • Wallet")
       .setDescription(`🪙 **Plato Coins:** ${w.coins.toLocaleString()}\n💠 **Pips:** ${w.pips.toLocaleString()}\n✨ **EXP:** ${w.exp.toLocaleString()}`);
     await message.reply({ embeds: [embed] });
@@ -281,10 +282,10 @@ client.on(Events.MessageCreate, async (message) => {
 
   if (content === "!lb" || content === "!leaderboard") {
     const sortedWallets = [...wallets.entries()].sort((a, b) => b[1].exp - a[1].exp).slice(0, 10);
-    let lbDescription = "Papan pendahulu EXP tertinggi:\n\n";
+    let lbDescription = "";
     
     if (sortedWallets.length === 0) {
-      lbDescription += "• *Belum ada rekod leaderboard EXP lagi.*";
+      lbDescription = "• *Belum ada rekod leaderboard EXP lagi.*";
     } else {
       const medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
       sortedWallets.forEach(([uid, data], index) => {
@@ -295,7 +296,7 @@ client.on(Events.MessageCreate, async (message) => {
     }
 
     const lbEmbed = new EmbedBuilder()
-      .setColor("#ffb6c1")
+      .setColor("#ff69b4")
       .setTitle("💃🏻 Leaderboard PlatoMy")
       .setDescription(lbDescription)
       .setThumbnail(LOGO_URL)
@@ -306,23 +307,30 @@ client.on(Events.MessageCreate, async (message) => {
   }
 
   if (content === "!level" || content === "!rank") {
+    const sortedArr = [...wallets.entries()].sort((a, b) => b[1].exp - a[1].exp);
+    const serverRank = sortedArr.findIndex(([id]) => id === userId) + 1;
+    const rankDisplay = serverRank > 0 ? `#${serverRank}` : "#-";
+
     const currentLevel = Math.floor(w.exp / 1000) + 1;
     const currentXpInLevel = Math.floor(w.exp % 1000);
     const progressBlocks = Math.floor(currentXpInLevel / 100);
-    const progressBar = "▓".repeat(progressBlocks) + "░".repeat(10 - progressBlocks);
+    const progressBar = "🖤".repeat(progressBlocks) + "🤍".repeat(10 - progressBlocks);
 
+    // Reka bentuk kad rank bertema Pink & Hitam Y2K
     const rankEmbed = new EmbedBuilder()
-      .setColor("#ffb6c1")
-      .setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL({ size: 128, dynamic: true }) })
-      .setTitle("✨ PlatoMy Level & Status Card")
+      .setColor("#ff69b4")
+      .setAuthor({ name: `${message.author.username}'s Rank Card`, iconURL: message.author.displayAvatarURL({ size: 128, dynamic: true }) })
+      .setTitle("ʚ₊˚ 🌸 𝖫𝖤𝖵𝖤𝖫 & 𝖲𝖳𝖠𝖳𝖴𝖲 ˚₊・ɞ")
       .setDescription(
-        `👤 **Member:** ${message.author}\n` +
-        `📊 **Current Level:** Level ${currentLevel}\n` +
-        `✨ **Total EXP:** ${w.exp.toLocaleString()} EXP\n\n` +
+        `🖤 **Member:** ${message.author}\n\n` +
+        `🏆 **Server Rank:** \`${rankDisplay}\`\n` +
+        `📊 **Current Level:** \`${currentLevel}\`\n` +
+        `✨ **Total EXP:** \`${w.exp.toLocaleString()} EXP\`\n\n` +
         `📈 **Progress to Level ${currentLevel + 1}:**\n` +
         `\`[${progressBar}]\` **${currentXpInLevel}/1000 EXP**`
       )
-      .setThumbnail(LOGO_URL)
+      .setThumbnail(message.author.displayAvatarURL({ size: 256, dynamic: true }))
+      .setFooter({ text: "PlatoMy • Y2K Crystal Pink & Black Edition ♡" })
       .setTimestamp();
 
     await message.reply({ embeds: [rankEmbed] });
@@ -335,7 +343,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.commandName === "wallet") {
       const w = getWallet(interaction.user.id);
       const embed = new EmbedBuilder()
-        .setColor("#ffb6c1")
+        .setColor("#ff69b4")
         .setTitle("💳 PlatoMy • Wallet")
         .setDescription(`🪙 **Plato Coins:** ${w.coins.toLocaleString()}\n💠 **Pips:** ${w.pips.toLocaleString()}\n✨ **EXP:** ${w.exp.toLocaleString()}`);
       await interaction.reply({ embeds: [embed], ephemeral: true });
@@ -343,12 +351,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
 
     if (interaction.commandName === "leaderboard") {
-      const colorInput = interaction.options.getString("color") || "#ffb6c1";
+      const colorInput = interaction.options.getString("color") || "#ff69b4";
       const sortedWallets = [...wallets.entries()].sort((a, b) => b[1].exp - a[1].exp).slice(0, 10);
-      let lbDescription = "Papan pendahulu EXP tertinggi:\n\n";
+      let lbDescription = "";
       
       if (sortedWallets.length === 0) {
-        lbDescription += "• *Belum ada rekod leaderboard EXP lagi.*";
+        lbDescription = "• *Belum ada rekod leaderboard EXP lagi.*";
       } else {
         const medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
         sortedWallets.forEach(([userId, data], index) => {
@@ -374,7 +382,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const targetChannel = interaction.options.getChannel("channel");
       const imageUrl = interaction.options.getString("image_url");
       const titleText = interaction.options.getString("title");
-      const colorInput = interaction.options.getString("color") || "#ffb6c1";
+      const colorInput = interaction.options.getString("color") || "#ff69b4";
 
       const imageEmbed = new EmbedBuilder().setColor(colorInput).setImage(imageUrl);
       if (titleText) imageEmbed.setTitle(titleText);
@@ -393,7 +401,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const endTimeSeconds = Math.floor((Date.now() + durationMins * 60 * 1000) / 1000);
 
       const rumbleEmbed = new EmbedBuilder()
-        .setColor("#ffb6c1")
+        .setColor("#ff69b4")
         .setTitle("🌸・PlatoMy Rumble Arena")
         .setDescription(`🎁 **Total Prize:** ${totalPrize.toLocaleString()} ${currencyName}\n⏳ **Berakhir Pada:** <t:${endTimeSeconds}:R>\n\n👥 **Penyertaan:** 0 pemain`);
 
@@ -415,7 +423,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const endTimeSeconds = Math.floor((Date.now() + durationMins * 60 * 1000) / 1000);
 
         const gwEmbed = new EmbedBuilder()
-          .setColor("#ffb6c1")
+          .setColor("#ff69b4")
           .setTitle("🎉 GIVEAWAY")
           .setDescription(`🎁 **Prize:** ${prize}\n👑 **Winners:** ${winnersCount}\n⏳ **Ends In:** <t:${endTimeSeconds}:R>\n\n👥 **Entries:** 0`);
 
@@ -439,7 +447,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       const oldEmb = interaction.message.embeds[0];
       const newEmb = EmbedBuilder.from(oldEmb).setDescription(oldEmb.description.replace(/👥 \*\*Entries:\*\* \d+/, `👥 **Entries:** ${gw.participants.length}`));
-      await interaction.message.id.edit({ embeds: [newEmb] }).catch(() => {});
+      await interaction.message.edit({ embeds: [newEmb] }).catch(() => {});
       await interaction.editReply({ content: "✅ Berjaya sertai giveaway!" });
       return;
     }
@@ -460,4 +468,4 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
-client.login(token).catch(err => { console.error("GAGAL LOGIN:", err); });
+client.log(token).catch(err => { console.error("GAGAL LOGIN:", err); });
