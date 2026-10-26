@@ -1,17 +1,14 @@
 {
   "name": "platomy",
   "version": "1.0.0",
-  "type": "module",
+  "description": "PlatoMy Discord Bot",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "discord.js": "^14.18.0",
-    "express": "^4.19.2",
-    "express-session": "^1.18.0",
-    "passport": "^0.7.0",
-    "passport-discord": "^0.1.4",
-    "ejs": "^3.1.10"
+    "discord.js": "^14.14.0",
+    "pg": "^8.11.3"
   }
 }
