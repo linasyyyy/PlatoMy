@@ -145,6 +145,55 @@ const SERVER_LOGS_CHANNEL_NAME = "server-logs";
 const UPDATE_CHANNEL_NAME = "plato-update";
 const LOGO_URL = "https://cdn.discordapp.com/attachments/1549051773438787724/1549403998686281808/IMG_5614.png";
 
+let lastPostedUpdateId = null;
+
+// --- FUNGSI ALERT X (TWITTER) AUTOMATIK ---
+async function checkPlatoUpdates() {
+  try {
+    const rssUrl = "https://nitter.poast.org/platochat/rss";
+    const response = await fetch(rssUrl);
+    if (!response.ok) return;
+    const text = await response.text();
+
+    const matchLink = text.match(/<link>(.*?)<\/link>/);
+    const matchTitle = text.match(/<title>(.*?)<\/title>/);
+
+    if (matchLink && matchTitle) {
+      const updateUrl = matchLink[1];
+      const updateContent = matchTitle[1];
+
+      if (updateUrl !== lastPostedUpdateId && !updateUrl.includes("/rss")) {
+        lastPostedUpdateId = updateUrl;
+
+        for (const [_, guild] of client.guilds.cache) {
+          const targetChannel = guild.channels.cache.find(
+            c => c.name.toLowerCase().includes(UPDATE_CHANNEL_NAME.toLowerCase()) && c.isTextBased()
+          );
+
+          if (targetChannel) {
+            const updateRole = guild.roles.cache.find(r => r.name.toLowerCase() === "plato update" || r.name.toLowerCase() === "@plato update");
+            const pingTarget = updateRole ? `<@&${updateRole.id}>` : "@Plato Update";
+
+            const updateEmbed = new EmbedBuilder()
+              .setColor("#ff69b4")
+              .setTitle("🛠️・Plato Official Update")
+              .setDescription(`${updateContent}\n\n[🔗 Baca Update Penuh di X](${updateUrl})`)
+              .setThumbnail(LOGO_URL)
+              .setTimestamp();
+
+            await targetChannel.send({ 
+              content: `${pingTarget} ✨ **Terdapat update baharu daripada Plato!**`, 
+              embeds: [updateEmbed] 
+            }).catch(() => {});
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Gagal mengambil update Plato dari X:", error);
+  }
+}
+
 const commands = [
   new SlashCommandBuilder().setName("wallet").setDescription("Semak baki akaun PlatoMy • Wallet anda! 🏦"),
   new SlashCommandBuilder().setName("leaderboard").setDescription("Papar papan pendahulu (Leaderboard EXP) 📊")
@@ -206,6 +255,10 @@ client.once(Events.ClientReady, async (c) => {
   } catch (error) {
     console.error("Gagal mendaftarkan slash commands:", error);
   }
+
+  // Semak update X (Twitter) secara automatik setiap 3 minit (180000ms)
+  checkPlatoUpdates();
+  setInterval(checkPlatoUpdates, 180000);
 });
 
 client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
@@ -244,7 +297,6 @@ async function sendLevelUpLog(guild, userId, newLevel) {
   const channel = guild.channels.cache.find(c => c.name.toLowerCase().includes(LEVEL_LOG_CHANNEL_NAME.toLowerCase()) && c.isTextBased());
   if (!channel || !("send" in channel)) return;
 
-  // Menggunakan warna tema Pink & Hitam Y2K Crystal
   const levelUpEmbed = new EmbedBuilder()
     .setColor("#ff69b4")
     .setTitle("✨ 𝖫𝖤𝖵𝖤𝖫 𝖴𝖯! 🌸")
@@ -316,7 +368,6 @@ client.on(Events.MessageCreate, async (message) => {
     const progressBlocks = Math.floor(currentXpInLevel / 100);
     const progressBar = "🖤".repeat(progressBlocks) + "🤍".repeat(10 - progressBlocks);
 
-    // Reka bentuk kad rank bertema Pink & Hitam Y2K
     const rankEmbed = new EmbedBuilder()
       .setColor("#ff69b4")
       .setAuthor({ name: `${message.author.username}'s Rank Card`, iconURL: message.author.displayAvatarURL({ size: 128, dynamic: true }) })
@@ -468,4 +519,4 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
-client.log(token).catch(err => { console.error("GAGAL LOGIN:", err); });
+client.login(token).catch(err => { console.error("GAGAL LOGIN:", err); });
