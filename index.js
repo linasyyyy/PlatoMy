@@ -320,6 +320,16 @@ function calculateLevelData(totalExp) {
   return { level, currentExp, expRequired };
 }
 
+// Fungsi pembantu untuk mendapatkan masa Malaysia terkini
+function getMalaysiaTime() {
+  return new Date().toLocaleTimeString('en-US', { 
+    timeZone: 'Asia/Kuala_Lumpur', 
+    hour: 'numeric', 
+    minute: '2-digit', 
+    hour12: true 
+  });
+}
+
 client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot || !message.guild) return;
   const userId = message.author.id;
@@ -338,7 +348,7 @@ client.on(Events.MessageCreate, async (message) => {
   const content = message.content.trim().toLowerCase();
 
   if (content === "!wallet" || content === "!bank") {
-    const timeString = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    const timeString = getMalaysiaTime();
     const embed = new EmbedBuilder()
       .setColor("#ff69b4")
       .setTitle("💳 PlatoMy • Wallet")
@@ -383,7 +393,7 @@ client.on(Events.MessageCreate, async (message) => {
     const progressBlocks = Math.floor((data.currentExp / data.expRequired) * 4);
     const progressBar = "ꕤ".repeat(progressBlocks) + "✧".repeat(4 - progressBlocks);
 
-    const timeString = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    const timeString = getMalaysiaTime();
 
     const rankEmbed = new EmbedBuilder()
       .setColor("#ff69b4")
@@ -409,7 +419,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (interaction.isChatInputCommand()) {
     if (interaction.commandName === "wallet") {
       const w = getWallet(interaction.user.id);
-      const timeString = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      const timeString = getMalaysiaTime();
       const embed = new EmbedBuilder()
         .setColor("#ff69b4")
         .setTitle("💳 PlatoMy • Wallet")
