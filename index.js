@@ -128,6 +128,7 @@ app.post("/api/inject-assets", checkAuth, (req, res) => {
   const qty = parseInt(amount) || 0;
 
   if (assetType.includes("Coins")) targetWallet.coins += qty;
+  else if (assetType.includes("Sponsor")) targetWallet.sponsorTotal += qty;
   else targetWallet.pips += qty;
 
   res.json({ success: true, message: `Berjaya menambah ${qty} ${assetType} kepada ${cleanTargetId}!` });
@@ -305,7 +306,6 @@ async function sendLevelUpLog(guild, userId, newLevel) {
   await channel.send({ content: `🎉 Tahniah <@${userId}> atas kenaikan level anda!`, embeds: [levelUpEmbed] }).catch(() => {});
 }
 
-// Logik Pengiraan Level & EXP Bertingkat (200, 400, 600, dst)
 function calculateLevelData(totalExp) {
   let level = 1;
   let expRequired = 200;
@@ -338,10 +338,12 @@ client.on(Events.MessageCreate, async (message) => {
   const content = message.content.trim().toLowerCase();
 
   if (content === "!wallet" || content === "!bank") {
+    const timeString = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
     const embed = new EmbedBuilder()
       .setColor("#ff69b4")
       .setTitle("💳 PlatoMy • Wallet")
-      .setDescription(`🪙 **Plato Coins:** ${w.coins.toLocaleString()}\n💠 **Pips:** ${w.pips.toLocaleString()}\n✨ **EXP:** ${w.exp.toLocaleString()}`);
+      .setDescription(`🪙 **Plato Coins:** ${w.coins.toLocaleString()}\n💠 **Pips:** ${w.pips.toLocaleString()}\n🌸 **Total Sponsor:** ${w.sponsorTotal.toLocaleString()}`)
+      .setFooter({ text: `PlatoMy Bank • Today at ${timeString}` });
     await message.reply({ embeds: [embed] });
     return;
   }
@@ -407,10 +409,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (interaction.isChatInputCommand()) {
     if (interaction.commandName === "wallet") {
       const w = getWallet(interaction.user.id);
+      const timeString = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
       const embed = new EmbedBuilder()
         .setColor("#ff69b4")
         .setTitle("💳 PlatoMy • Wallet")
-        .setDescription(`🪙 **Plato Coins:** ${w.coins.toLocaleString()}\n💠 **Pips:** ${w.pips.toLocaleString()}\n✨ **EXP:** ${w.exp.toLocaleString()}`);
+        .setDescription(`🪙 **Plato Coins:** ${w.coins.toLocaleString()}\n💠 **Pips:** ${w.pips.toLocaleString()}\n🌸 **Total Sponsor:** ${w.sponsorTotal.toLocaleString()}`)
+        .setFooter({ text: `PlatoMy Bank • Today at ${timeString}` });
       await interaction.reply({ embeds: [embed], ephemeral: true });
       return;
     }
