@@ -8,6 +8,9 @@ import {
   SlashCommandBuilder,
   PermissionFlagsBits,
   ChannelType,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
 } from "discord.js";
 import pkg from 'pg';
 const { Pool } = pkg;
@@ -80,6 +83,10 @@ const commands = [
     .addStringOption(opt => opt.setName("description").setDescription("Kandungan / Deskripsi embed").setRequired(true))
     .addStringOption(opt => opt.setName("color").setDescription("Kod warna Hex (cth: #F996B1)").setRequired(false))
     .addStringOption(opt => opt.setName("image_url").setDescription("Link gambar (pilihan)").setRequired(false)),
+  new SlashCommandBuilder().setName("setup-verify").setDescription("Hantar panel butang Verifikasi ahli (Admin sahaja)")
+    .addChannelOption(opt => opt.setName("channel").setDescription("Channel verifikasi").setRequired(true)),
+  new SlashCommandBuilder().setName("setup-ticket").setDescription("Hantar panel butang Report Ticket (Admin sahaja)")
+    .addChannelOption(opt => opt.setName("channel").setDescription("Channel tiket").setRequired(true)),
   new SlashCommandBuilder().setName("giveaway-create").setDescription("Cipta acara Giveaway baharu (Admin sahaja)")
     .addChannelOption(opt => opt.setName("channel").setDescription("Channel giveaway").setRequired(true))
     .addStringOption(opt => opt.setName("prize").setDescription("Hadiah giveaway").setRequired(true))
@@ -103,7 +110,7 @@ client.once(Events.ClientReady, async (c) => {
   }
 });
 
-// Sistem Voice Channel Dinamik
+// --- SISTEM VOICE CHANNEL DINAMIK (Create Voice) ---
 client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
   const member = newState.member;
   if (!member || member.user.bot) return;
@@ -141,7 +148,7 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
   }
 });
 
-// Sistem Selamat Datang (Welcome)
+// --- SISTEM SELAMAT DATANG (Welcome) ---
 client.on(Events.GuildMemberAdd, async (member) => {   
   const channel = member.guild.channels.cache.find(c => c.name.includes(WELCOME_CHANNEL_NAME) && c.isTextBased());   
   if (!channel || !("send" in channel)) return;    
@@ -153,7 +160,7 @@ client.on(Events.GuildMemberAdd, async (member) => {
   await channel.send({ embeds: [welcomeEmbed] }); 
 });  
 
-// Sistem Prefix Commands & Tracking Mesej Masuk
+// --- SISTEM PREFIX COMMANDS & EXP ---
 client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot || !message.guild) return;
   const userId = message.author.id;
@@ -221,8 +228,53 @@ client.on(Events.MessageCreate, async (message) => {
   }
 });
 
-// Sistem Perintah Slash (Interactions)
+// --- SISTEM INTERAKSI & SLASH COMMANDS ---
 client.on(Events.InteractionCreate, async (interaction) => {
+  // Pengurusan Butang Interaktif (Verify & Ticket)
+  if (interaction.isButton()) {
+    if (interaction.customId === "btn_verify") {
+      const roleName = "Member"; // Anda boleh tukar nama role verifikasi di sini
+      const role = interaction.guild.roles.cache.find(r => r.name.toLowerCase() === roleName.toLowerCase());
+      
+      if (!role) {
+        return interaction.reply({ content: `❌ Role '${roleName}' tidak dijumpai dalam server ini. Sila hubungi admin.`, ephemeral: true });
+      }
+
+      try {
+        await interaction.member.roles.add(role);
+        await interaction.reply({ content: "✅ Tahniah! Anda telah berjaya disahkan (Verified).", ephemeral: true });
+      } catch (err) {
+        console.error("Ralat beri role verify:", err);
+        await interaction.reply({ content: "❌ Gagal memberikan role verifikasi.", ephemeral: true });
+      }
+    }
+
+    if (interaction.customId === "btn_ticket") {
+      try {
+        const ticketChannel = await interaction.guild.channels.create({
+          name: `ticket-${interaction.user.username}`,
+          type: ChannelType.GuildText,
+          permissionOverwrites: [
+            { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
+            { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] }
+          ]
+        });
+
+        const ticketEmbed = new EmbedBuilder()
+          .setColor("#F996B1")
+          .setTitle("🎫 PlatoMy • Report / Support Ticket")
+          .setDescription(`Hai ${interaction.user}, sila nyatakan masalah atau laporan anda di sini. Pihak admin akan segera membantu.`);
+
+        await ticketChannel.send({ content: `${interaction.user}`, embeds: [ticketEmbed] });
+        await interaction.reply({ content: `✅ Tiket anda telah dibuka di <#${ticketChannel.id}>!`, ephemeral: true });
+      } catch (err) {
+        console.error("Ralat buka tiket:", err);
+        await interaction.reply({ content: "❌ Gagal membuka channel tiket.", ephemeral: true });
+      }
+    }
+    return;
+  }
+
   if (!interaction.isChatInputCommand()) return;
 
   if (interaction.commandName === "wallet") {
@@ -322,7 +374,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       .setTimestamp();
 
     await targetChannel.send({ embeds: [embed] });
-    await interaction.reply({ content: `✅ Embed bergambar berjaya dihantar ke <#${targetChannel.id}> dengan kod warna **${embedColor}**!`, ephemeral: true });
+    await interaction.reply({ content: `✅ Embed bergambar berjaya dihantar ke <#${targetChannel.id}>!`, ephemeral: true });
   }
 
   if (interaction.commandName === "embed-create") {
@@ -346,12 +398,56 @@ client.on(Events.InteractionCreate, async (interaction) => {
       .setDescription(description)
       .setTimestamp();
 
-    if (imageUrl) {
-      embed.setImage(imageUrl);
-    }
+    if (imageUrl) embed.setImage(imageUrl);
 
     await targetChannel.send({ embeds: [embed] });
     await interaction.reply({ content: `✅ Embed kustom berjaya dicipta dan dihantar ke <#${targetChannel.id}>!`, ephemeral: true });
+  }
+
+  if (interaction.commandName === "setup-verify") {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      return interaction.reply({ content: "❌ Anda tidak mempunyai kebenaran Administrator!", ephemeral: true });
+    }
+    const targetChannel = interaction.options.getChannel("channel");
+
+    const verifyEmbed = new EmbedBuilder()
+      .setColor("#F996B1")
+      .setTitle("🛡️ PlatoMy • Verifikasi Ahli")
+      .setDescription("Sila klik butang **Verify** di bawah untuk mengesahkan keahlian anda dan membuka akses ke seluruh channel server ini! 🌸");
+
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId("btn_verify")
+        .setLabel("Verify Sekarang")
+        .setStyle(ButtonStyle.Success)
+        .setEmoji("✅")
+    );
+
+    await targetChannel.send({ embeds: [verifyEmbed], components: [row] });
+    await interaction.reply({ content: `✅ Panel Verifikasi berjaya dihantar ke <#${targetChannel.id}>!`, ephemeral: true });
+  }
+
+  if (interaction.commandName === "setup-ticket") {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      return interaction.reply({ content: "❌ Anda tidak mempunyai kebenaran Administrator!", ephemeral: true });
+    }
+    const targetChannel = interaction.options.getChannel("channel");
+
+    const ticketEmbed = new EmbedBuilder()
+      .setColor("#F996B1")
+      .setTitle("🎫 PlatoMy • Report & Support Ticket")
+      .setDescription("Menghadapi sebarang masalah, isu, atau ingin membuat laporan? Klik butang di bawah untuk membuka tiket peribadi dengan admin. 🎟️");
+
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId("btn_ticket")
+        .setLabel("Buka Tiket / Report")
+        .setStyle(ButtonStyle.Primary)
+        .setEmoji("📩")
+    );
+
+    await targetChannel.send({ embeds: [ticketEmbed], components: [row] });
+    await interaction.reply({ content: `✅ Panel Report Ticket berjaya dihantar ke <#${targetChannel.id}>!`, ephemeral: true });
   }
 
   if (interaction.commandName === "giveaway-create") {
