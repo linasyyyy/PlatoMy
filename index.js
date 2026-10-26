@@ -15,9 +15,7 @@ import {
   TextInputStyle,
   ChannelType,
   StringSelectMenuBuilder,
-  AttachmentBuilder,
 } from "discord.js";
-import Canvas from 'canvas';
 import express from "express";
 import session from "express-session";
 import passport from "passport";
@@ -55,7 +53,7 @@ function getWallet(id) {
   return wallets.get(id);
 }
 
-// --- INTEGRASI WEB DASHBOARD ---
+// --- INTEGRASI WEB DASHBOARD (EXPRESS + DISCORD OAUTH2 + Y2K THEME) ---
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -156,79 +154,77 @@ const LOGO_URL = "https://cdn.discordapp.com/attachments/1549051773438787724/154
 let lastPostedUpdateId = null;
 const lastActiveMap = new Map(); 
 
-// --- CANVAS GENERATOR (KAD LEVEL & LEADERBOARD DENGAN SOKONGAN HEX) ---
-async function generateLevelCard(member, w, hexColor = "#ffb6c1") {
-  const canvas = Canvas.createCanvas(1200, 600);
-  const ctx = canvas.getContext('2d');
+async function checkPlatoUpdates() {
+  try {
+    const rssUrl = "https://nitter.poast.org/platochat/rss";
+    const response = await fetch(rssUrl);
+    if (!response.ok) return;
+    const text = await response.text();
 
-  ctx.fillStyle = "#050505";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const matchLink = text.match(/<link>(.*?)<\/link>/);
+    const matchTitle = text.match(/<title>(.*?)<\/title>/);
 
-  ctx.strokeStyle = hexColor;
-  ctx.lineWidth = 6;
-  ctx.strokeRect(60, 60, canvas.width - 120, canvas.height - 120);
+    if (matchLink && matchTitle) {
+      const updateUrl = matchLink[1];
+      const updateContent = matchTitle[1];
 
-  ctx.fillStyle = hexColor;
-  ctx.font = 'bold 45px sans-serif';
-  ctx.fillText("LEVEL UP & STATUS", 100, 140);
+      if (updateUrl !== lastPostedUpdateId && !updateUrl.includes("/rss")) {
+        lastPostedUpdateId = updateUrl;
 
-  const currentLevel = Math.floor(w.exp / 1000) + 1;
-  const currentXpInLevel = Math.floor(w.exp % 1000);
+        for (const [_, guild] of client.guilds.cache) {
+          const targetChannel = guild.channels.cache.find(
+            c => c.name.toLowerCase().includes(UPDATE_CHANNEL_NAME.toLowerCase()) && c.isTextBased()
+          );
 
-  ctx.fillStyle = "#ffffff";
-  ctx.font = 'bold 35px sans-serif';
-  ctx.fillText(`Member: ${member.user.username}`, 100, 240);
-  ctx.fillText(`Current Level: ${currentLevel}`, 100, 310);
-  ctx.fillText(`Total EXP: ${w.exp.toLocaleString()}`, 100, 380);
+          if (targetChannel) {
+            const updateRole = guild.roles.cache.find(r => r.name.toLowerCase() === "plato update" || r.name.toLowerCase() === "@plato update");
+            const pingTarget = updateRole ? `<@&${updateRole.id}>` : "@Plato Update";
 
-  ctx.fillStyle = "#222222";
-  ctx.fillRect(100, 440, 1000, 40);
+            const updateEmbed = new EmbedBuilder()
+              .setColor("#ffb6c1")
+              .setTitle("🛠️・Plato Official Update")
+              .setDescription(`${updateContent}\n\n[🔗 Baca Update Penuh di X](${updateUrl})`)
+              .setThumbnail(LOGO_URL)
+              .setTimestamp();
 
-  ctx.fillStyle = hexColor;
-  const progressWidth = (currentXpInLevel / 1000) * 1000;
-  ctx.fillRect(100, 440, progressWidth, 40);
-
-  ctx.fillStyle = "#ffffff";
-  ctx.font = '24px sans-serif';
-  ctx.fillText(`Progress: ${currentXpInLevel} / 1000 EXP`, 100, 520);
-
-  return canvas.toBuffer();
+            await targetChannel.send({ 
+              content: `${pingTarget} ✨ **Terdapat update baharu daripada Plato!**`, 
+              embeds: [updateEmbed] 
+            }).catch(() => {});
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Gagal mengambil update Plato:", error);
+  }
 }
 
-async function generateLeaderboardCard(sortedWallets, guild, hexColor = "#ffb6c1") {
-  const canvas = Canvas.createCanvas(1200, 700);
-  const ctx = canvas.getContext('2d');
+async function checkActiveRoles() {
+  const now = Date.now();
+  const threeDaysMs = 3 * 24 * 60 * 60 * 1000; 
 
-  ctx.fillStyle = "#050505";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  for (const [_, guild] of client.guilds.cache) {
+    const activeRole = guild.roles.cache.find(r => r.name.toLowerCase() === ACTIVE_ROLE_NAME.toLowerCase());
+    if (!activeRole) continue;
 
-  ctx.strokeStyle = hexColor;
-  ctx.lineWidth = 6;
-  ctx.strokeRect(40, 40, canvas.width - 80, canvas.height - 80);
+    await guild.members.fetch().catch(() => {});
 
-  ctx.fillStyle = hexColor;
-  ctx.font = 'bold 45px sans-serif';
-  ctx.fillText("✨ LEADERBOARD TOP 10 ✨", 90, 110);
+    for (const [userId, lastTime] of lastActiveMap.entries()) {
+      const member = guild.members.cache.get(userId);
+      if (!member) continue;
 
-  let y = 180;
-  for (let i = 0; i < Math.min(sortedWallets.length, 10); i++) {
-    const [userId, data] = sortedWallets[i];
-    const member = guild.members.cache.get(userId);
-    const username = member ? member.user.username : `User ${userId.slice(0, 5)}`;
-    const estimatedLevel = Math.floor(data.exp / 1000) + 1;
-
-    ctx.fillStyle = i === 0 ? "#ffd700" : (i === 1 ? "#c0c0c0" : (i === 2 ? "#cd7f32" : "#ffffff"));
-    ctx.font = 'bold 26px sans-serif';
-    ctx.fillText(`#${i + 1}  ${username}`, 90, y);
-
-    ctx.fillStyle = "#aaaaaa";
-    ctx.font = '22px sans-serif';
-    ctx.fillText(`Level ${estimatedLevel}  |  EXP: ${data.exp.toLocaleString()}`, 650, y);
-
-    y += 45;
+      if (now - lastTime > threeDaysMs) {
+        if (member.roles.cache.has(activeRole.id)) {
+          await member.roles.remove(activeRole).catch(() => {});
+        }
+      } else {
+        if (!member.roles.cache.has(activeRole.id)) {
+          await member.roles.add(activeRole).catch(() => {});
+        }
+      }
+    }
   }
-
-  return canvas.toBuffer();
 }
 
 const commands = [
@@ -330,14 +326,14 @@ async function sendLevelUpLog(guild, userId, newLevel) {
   const channel = guild.channels.cache.find(c => c.name.toLowerCase().includes(LEVEL_LOG_CHANNEL_NAME.toLowerCase()) && c.isTextBased());
   if (!channel || !("send" in channel)) return;
 
-  const member = await guild.members.fetch(userId).catch(() => null);
-  if (!member) return;
+  const levelUpEmbed = new EmbedBuilder()
+    .setColor("#ffb6c1")
+    .setTitle("LEVEL UP! 🎉")
+    .setDescription(`Tahniah <@${userId}>! Anda baru sahaja naik ke **Level ${newLevel}**! ✨\n\nTeruskan aktif dalam komuniti **PlatoMy**! 🚀`)
+    .setThumbnail(LOGO_URL)
+    .setTimestamp();
 
-  const w = getWallet(userId);
-  const cardBuffer = await generateLevelCard(member, w, "#ffb6c1");
-  const attachment = new AttachmentBuilder(cardBuffer, { name: 'level-up.png' });
-
-  await channel.send({ content: `🎉 Tahniah <@${userId}> atas kenaikan level ke **Level ${newLevel}**!`, files: [attachment] }).catch(() => {});
+  await channel.send({ content: `🎉 Tahniah <@${userId}> atas kenaikan level anda!`, embeds: [levelUpEmbed] }).catch(() => {});
 }
 
 client.on(Events.MessageCreate, async (message) => {
@@ -366,17 +362,52 @@ client.on(Events.MessageCreate, async (message) => {
   }
 
   if (content === "!lb" || content === "!leaderboard") {
-    const sortedWallets = [...wallets.entries()].sort((a, b) => b[1].exp - a[1].exp);
-    const cardBuffer = await generateLeaderboardCard(sortedWallets, message.guild, "#ffb6c1");
-    const attachment = new AttachmentBuilder(cardBuffer, { name: 'leaderboard.png' });
-    await message.reply({ files: [attachment] });
+    const sortedWallets = [...wallets.entries()].sort((a, b) => b[1].exp - a[1].exp).slice(0, 10);
+    let lbDescription = "Papan pendahulu EXP tertinggi:\n\n";
+    
+    if (sortedWallets.length === 0) {
+      lbDescription += "• *Belum ada rekod leaderboard EXP lagi.*";
+    } else {
+      const medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
+      sortedWallets.forEach(([uid, data], index) => {
+        const medalIcon = medals[index] || `#${index + 1}`;           
+        const estimatedLevel = Math.floor(data.exp / 1000) + 1;           
+        lbDescription += `${medalIcon} **<@${uid}>**\nLevel ${estimatedLevel} • EXP: **${data.exp.toLocaleString()}**\n\n`;
+      });
+    }
+
+    const lbEmbed = new EmbedBuilder()
+      .setColor("#ffb6c1")
+      .setTitle("💃🏻 Leaderboard PlatoMy")
+      .setDescription(lbDescription)
+      .setThumbnail(LOGO_URL)
+      .setTimestamp();
+
+    await message.reply({ embeds: [lbEmbed] });
     return;
   }
 
   if (content === "!level" || content === "!rank") {
-    const cardBuffer = await generateLevelCard(message.member, w, "#ffb6c1");
-    const attachment = new AttachmentBuilder(cardBuffer, { name: 'level.png' });
-    await message.reply({ files: [attachment] });
+    const currentLevel = Math.floor(w.exp / 1000) + 1;
+    const currentXpInLevel = Math.floor(w.exp % 1000);
+    const progressBlocks = Math.floor(currentXpInLevel / 100);
+    const progressBar = "▓".repeat(progressBlocks) + "░".repeat(10 - progressBlocks);
+
+    const rankEmbed = new EmbedBuilder()
+      .setColor("#ffb6c1")
+      .setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL({ size: 128, dynamic: true }) })
+      .setTitle("✨ PlatoMy Level & Status Card")
+      .setDescription(
+        `👤 **Member:** ${message.author}\n` +
+        `📊 **Current Level:** Level ${currentLevel}\n` +
+        `✨ **Total EXP:** ${w.exp.toLocaleString()} EXP\n\n` +
+        `📈 **Progress to Level ${currentLevel + 1}:**\n` +
+        `\`[${progressBar}]\` **${currentXpInLevel}/1000 EXP**`
+      )
+      .setImage("https://cdn.discordapp.com/attachments/1549051773438787724/1551515791910903918/Video.gif")
+      .setTimestamp();
+
+    await message.reply({ embeds: [rankEmbed] });
     return;
   }
 });
@@ -395,10 +426,28 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     if (interaction.commandName === "leaderboard") {
       const colorInput = interaction.options.getString("color") || "#ffb6c1";
-      const sortedWallets = [...wallets.entries()].sort((a, b) => b[1].exp - a[1].exp);
-      const cardBuffer = await generateLeaderboardCard(sortedWallets, interaction.guild, colorInput);
-      const attachment = new AttachmentBuilder(cardBuffer, { name: 'leaderboard.png' });
-      await interaction.reply({ files: [attachment] });
+      const sortedWallets = [...wallets.entries()].sort((a, b) => b[1].exp - a[1].exp).slice(0, 10);
+      let lbDescription = "Papan pendahulu EXP tertinggi:\n\n";
+      
+      if (sortedWallets.length === 0) {
+        lbDescription += "• *Belum ada rekod leaderboard EXP lagi.*";
+      } else {
+        const medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
+        sortedWallets.forEach(([userId, data], index) => {
+          const medalIcon = medals[index] || `#${index + 1}`;           
+          const estimatedLevel = Math.floor(data.exp / 1000) + 1;           
+          lbDescription += `${medalIcon} **<@${userId}>**\nLevel ${estimatedLevel} • EXP: **${data.exp.toLocaleString()}**\n\n`;
+        });
+      }
+
+      const lbEmbed = new EmbedBuilder()
+        .setColor(colorInput)
+        .setTitle("💃🏻 Leaderboard PlatoMy")
+        .setDescription(lbDescription)
+        .setThumbnail(LOGO_URL)
+        .setTimestamp();
+
+      await interaction.reply({ embeds: [lbEmbed] });
       return;
     }
 
