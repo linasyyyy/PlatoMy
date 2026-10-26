@@ -53,7 +53,7 @@ function getWallet(id) {
   return wallets.get(id);
 }
 
-// --- INTEGRASI WEB DASHBOARD (EXPRESS + DISCORD OAUTH2 + Y2K THEME) ---
+// --- INTEGRASI WEB DASHBOARD ---
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -137,95 +137,13 @@ app.listen(PORT, () => {
   console.log(`Web Dashboard PlatoMy (Y2K Theme) berjalan di port ${PORT}!`);
 });
 
-// --- DISCORD BOT LOGIC ---
-const VERIFY_CHANNEL_ID = ""; 
-const WALLET_LOG_ID = "";     
-const BIRTHDAY_CHANNEL_ID = ""; 
 const LEVEL_LOG_CHANNEL_NAME = "level-up";       
 const TRADING_LOG_CHANNEL_NAME = "trading-log"; 
 const REPORT_LOG_CHANNEL_NAME = "report-log";         
 const WELCOME_CHANNEL_NAME = "selamat-datang";
 const SERVER_LOGS_CHANNEL_NAME = "server-logs";
 const UPDATE_CHANNEL_NAME = "plato-update";
-const VERIFIED_ROLE_NAME = "Member";
-const ACTIVE_ROLE_NAME = "Murai Chatters 🥵"; 
 const LOGO_URL = "https://cdn.discordapp.com/attachments/1549051773438787724/1549403998686281808/IMG_5614.png";
-
-let lastPostedUpdateId = null;
-const lastActiveMap = new Map(); 
-
-async function checkPlatoUpdates() {
-  try {
-    const rssUrl = "https://nitter.poast.org/platochat/rss";
-    const response = await fetch(rssUrl);
-    if (!response.ok) return;
-    const text = await response.text();
-
-    const matchLink = text.match(/<link>(.*?)<\/link>/);
-    const matchTitle = text.match(/<title>(.*?)<\/title>/);
-
-    if (matchLink && matchTitle) {
-      const updateUrl = matchLink[1];
-      const updateContent = matchTitle[1];
-
-      if (updateUrl !== lastPostedUpdateId && !updateUrl.includes("/rss")) {
-        lastPostedUpdateId = updateUrl;
-
-        for (const [_, guild] of client.guilds.cache) {
-          const targetChannel = guild.channels.cache.find(
-            c => c.name.toLowerCase().includes(UPDATE_CHANNEL_NAME.toLowerCase()) && c.isTextBased()
-          );
-
-          if (targetChannel) {
-            const updateRole = guild.roles.cache.find(r => r.name.toLowerCase() === "plato update" || r.name.toLowerCase() === "@plato update");
-            const pingTarget = updateRole ? `<@&${updateRole.id}>` : "@Plato Update";
-
-            const updateEmbed = new EmbedBuilder()
-              .setColor("#ffb6c1")
-              .setTitle("🛠️・Plato Official Update")
-              .setDescription(`${updateContent}\n\n[🔗 Baca Update Penuh di X](${updateUrl})`)
-              .setThumbnail(LOGO_URL)
-              .setTimestamp();
-
-            await targetChannel.send({ 
-              content: `${pingTarget} ✨ **Terdapat update baharu daripada Plato!**`, 
-              embeds: [updateEmbed] 
-            }).catch(() => {});
-          }
-        }
-      }
-    }
-  } catch (error) {
-    console.error("Gagal mengambil update Plato:", error);
-  }
-}
-
-async function checkActiveRoles() {
-  const now = Date.now();
-  const threeDaysMs = 3 * 24 * 60 * 60 * 1000; 
-
-  for (const [_, guild] of client.guilds.cache) {
-    const activeRole = guild.roles.cache.find(r => r.name.toLowerCase() === ACTIVE_ROLE_NAME.toLowerCase());
-    if (!activeRole) continue;
-
-    await guild.members.fetch().catch(() => {});
-
-    for (const [userId, lastTime] of lastActiveMap.entries()) {
-      const member = guild.members.cache.get(userId);
-      if (!member) continue;
-
-      if (now - lastTime > threeDaysMs) {
-        if (member.roles.cache.has(activeRole.id)) {
-          await member.roles.remove(activeRole).catch(() => {});
-        }
-      } else {
-        if (!member.roles.cache.has(activeRole.id)) {
-          await member.roles.add(activeRole).catch(() => {});
-        }
-      }
-    }
-  }
-}
 
 const commands = [
   new SlashCommandBuilder().setName("wallet").setDescription("Semak baki akaun PlatoMy • Wallet anda! 🏦"),
@@ -404,7 +322,7 @@ client.on(Events.MessageCreate, async (message) => {
         `📈 **Progress to Level ${currentLevel + 1}:**\n` +
         `\`[${progressBar}]\` **${currentXpInLevel}/1000 EXP**`
       )
-      .setImage("https://cdn.discordapp.com/attachments/1549051773438787724/1551515791910903918/Video.gif")
+      .setThumbnail(LOGO_URL)
       .setTimestamp();
 
     await message.reply({ embeds: [rankEmbed] });
@@ -521,7 +439,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       const oldEmb = interaction.message.embeds[0];
       const newEmb = EmbedBuilder.from(oldEmb).setDescription(oldEmb.description.replace(/👥 \*\*Entries:\*\* \d+/, `👥 **Entries:** ${gw.participants.length}`));
-      await interaction.message.edit({ embeds: [newEmb] }).catch(() => {});
+      await interaction.message.id.edit({ embeds: [newEmb] }).catch(() => {});
       await interaction.editReply({ content: "✅ Berjaya sertai giveaway!" });
       return;
     }
