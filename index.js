@@ -378,8 +378,8 @@ client.on(Events.MessageCreate, async (message) => {
     const rankDisplay = serverRank > 0 ? `#${serverRank}` : "#-";
 
     const data = calculateLevelData(w.exp);
-    const progressBlocks = Math.floor((data.currentExp / data.expRequired) * 10);
-    const progressBar = "🖤".repeat(progressBlocks) + "🤍".repeat(10 - progressBlocks);
+    const progressBlocks = Math.floor((data.currentExp / data.expRequired) * 4);
+    const progressBar = "ꕤ".repeat(progressBlocks) + "✧".repeat(4 - progressBlocks);
 
     const timeString = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 
