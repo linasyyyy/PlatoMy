@@ -366,6 +366,8 @@ client.on(Events.MessageCreate, async (message) => {
     const progressBlocks = Math.floor(currentXpInLevel / 100);
     const progressBar = "🖤".repeat(progressBlocks) + "🤍".repeat(10 - progressBlocks);
 
+    const timeString = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+
     const rankEmbed = new EmbedBuilder()
       .setColor("#ff69b4")
       .setAuthor({ name: `${message.author.username}'s Rank Card`, iconURL: message.author.displayAvatarURL({ size: 128, dynamic: true }) })
@@ -379,7 +381,7 @@ client.on(Events.MessageCreate, async (message) => {
         `\`[${progressBar}]\` **${currentXpInLevel}/1000 EXP**`
       )
       .setThumbnail(message.author.displayAvatarURL({ size: 256, dynamic: true }))
-      .setTimestamp();
+      .setFooter({ text: `PlatoMy • Today at ${timeString}` });
 
     await message.reply({ embeds: [rankEmbed] });
     return;
@@ -490,7 +492,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await interaction.deferReply({ ephemeral: true });
       const gw = giveawaysMap.get(interaction.message.id);
       if (!gw || gw.ended) return interaction.editReply({ content: "❌ Tamat." });
-      if (gw.participants.includes(interaction.user.id)) return interaction.editReply({ content: "⚠️ Awak sudah menyertai!" });
+      if (gw.participants.includes(interaction.user.id)) return interaction.editReply({ content: "⚠️ Sudah sertai!" });
       gw.participants.push(interaction.user.id);
 
       const oldEmb = interaction.message.embeds[0];
