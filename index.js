@@ -69,10 +69,25 @@ const commands = [
     .addUserOption(opt => opt.setName("target").setDescription("Ahli / Penaja").setRequired(true))
     .addIntegerOption(opt => opt.setName("amount").setDescription("Jumlah").setRequired(true))
     .addStringOption(opt => opt.setName("reason").setDescription("Sebab / Nota").setRequired(false)),
-  new SlashCommandBuilder().setName("embed-image").setDescription("Hantar embed gambar ke channel pilihan (Admin sahaja)")
+  new SlashCommandBuilder().setName("embed-image").setDescription("Hantar embed gambar pantas dengan kod warna Hex (Admin sahaja)")
     .addChannelOption(opt => opt.setName("channel").setDescription("Pilih channel tujuan").setRequired(true))
     .addStringOption(opt => opt.setName("image_url").setDescription("Link URL gambar/GIF").setRequired(true))
-    .addStringOption(opt => opt.setName("title").setDescription("Tajuk ringkas").setRequired(false)),
+    .addStringOption(opt => opt.setName("title").setDescription("Tajuk ringkas").setRequired(false))
+    .addStringOption(opt => opt.setName("color").setDescription("Kod warna Hex (cth: #F996B1)").setRequired(false)),
+  new SlashCommandBuilder().setName("embed-create").setDescription("Cipta embed lengkap dengan pelbagai tetapan dan teks (Admin sahaja)")
+    .addChannelOption(opt => opt.setName("channel").setDescription("Pilih channel tujuan").setRequired(true))
+    .addStringOption(opt => opt.setName("title").setDescription("Tajuk embed").setRequired(true))
+    .addStringOption(opt => opt.setName("description").setDescription("Kandungan / Deskripsi embed").setRequired(true))
+    .addStringOption(opt => opt.setName("color").setDescription("Kod warna Hex (cth: #F996B1)").setRequired(false))
+    .addStringOption(opt => opt.setName("image_url").setDescription("Link gambar (pilihan)").setRequired(false)),
+  new SlashCommandBuilder().setName("giveaway-create").setDescription("Cipta acara Giveaway baharu (Admin sahaja)")
+    .addChannelOption(opt => opt.setName("channel").setDescription("Channel giveaway").setRequired(true))
+    .addStringOption(opt => opt.setName("prize").setDescription("Hadiah giveaway").setRequired(true))
+    .addStringOption(opt => opt.setName("duration").setDescription("Tempoh masa (cth: 1h, 24h)").setRequired(true)),
+  new SlashCommandBuilder().setName("rumble-create").setDescription("Cipta acara Plato Rumble baharu (Admin sahaja)")
+    .addChannelOption(opt => opt.setName("channel").setDescription("Channel rumble").setRequired(true))
+    .addStringOption(opt => opt.setName("title").setDescription("Tajuk Rumble / Event").setRequired(true))
+    .addStringOption(opt => opt.setName("reward").setDescription("Ganjarannya").setRequired(true)),
 ].map(c => c.toJSON());
 
 client.once(Events.ClientReady, async (c) => {
@@ -138,7 +153,7 @@ client.on(Events.GuildMemberAdd, async (member) => {
   await channel.send({ embeds: [welcomeEmbed] }); 
 });  
 
-// Sistem EXP & Tracking Mesej Masuk (Simpan terus ke Neon)
+// Sistem Prefix Commands & Tracking Mesej Masuk
 client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot || !message.guild) return;
   const userId = message.author.id;
@@ -154,6 +169,7 @@ client.on(Events.MessageCreate, async (message) => {
   }
 
   const content = message.content.trim().toLowerCase();
+
   if (content === "!wallet" || content === "!bank") {
     try {
       const res = await pool.query("SELECT * FROM wallets WHERE user_id = $1", [userId]);
@@ -166,6 +182,41 @@ client.on(Events.MessageCreate, async (message) => {
       await message.reply({ embeds: [embed] });
     } catch (err) {
       console.error("Ralat semak wallet:", err);
+    }
+  }
+
+  if (content === "!level" || content === "!exp") {
+    try {
+      const res = await pool.query("SELECT * FROM wallets WHERE user_id = $1", [userId]);
+      const w = res.rows[0] || { exp: 0 };
+      
+      const embed = new EmbedBuilder()
+        .setColor("#F996B1")
+        .setTitle("✨ PlatoMy • Level & EXP")
+        .setDescription(`👤 Ahli: ${message.author}\n⚡ **EXP Semasa:** ${w.exp.toLocaleString()} EXP`);
+      await message.reply({ embeds: [embed] });
+    } catch (err) {
+      console.error("Ralat semak level:", err);
+    }
+  }
+
+  if (content === "!leaderboard" || content === "!lb") {
+    try {
+      const result = await pool.query("SELECT user_id, exp FROM wallets ORDER BY exp DESC LIMIT 10;");
+      
+      const desc = result.rows.length === 0 
+        ? "Belum ada rekod EXP." 
+        : result.rows.map((row, idx) => `${idx + 1}. <@${row.user_id}> — **${row.exp}** EXP`).join("\n");
+      
+      const embed = new EmbedBuilder()
+        .setColor("#F996B1")
+        .setTitle("📊 PlatoMy Leaderboard (Top 10)")
+        .setDescription(desc)
+        .setTimestamp();
+
+      await message.reply({ embeds: [embed] });
+    } catch (err) {
+      console.error("Ralat ambil leaderboard:", err);
     }
   }
 });
@@ -222,7 +273,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const targetId = target.id;
 
     try {
-      // Pastikan rekod user wujud dalam database
       await pool.query(`
         INSERT INTO wallets (user_id, coins, pips, exp) VALUES ($1, 0, 0, 0)
         ON CONFLICT (user_id) DO NOTHING;
@@ -258,15 +308,87 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const targetChannel = interaction.options.getChannel("channel");
     const imageUrl = interaction.options.getString("image_url");
     const title = interaction.options.getString("title") || "PlatoMy Announcement";
+    const colorInput = interaction.options.getString("color");
+
+    let embedColor = "#F996B1"; 
+    if (colorInput) {
+      embedColor = colorInput.startsWith("#") ? colorInput : `#${colorInput}`;
+    }
 
     const embed = new EmbedBuilder()
-      .setColor("#F996B1")
+      .setColor(embedColor)
       .setTitle(title)
       .setImage(imageUrl)
       .setTimestamp();
 
     await targetChannel.send({ embeds: [embed] });
-    await interaction.reply({ content: `✅ Embed berjaya dihantar ke <#${targetChannel.id}>!`, ephemeral: true });
+    await interaction.reply({ content: `✅ Embed bergambar berjaya dihantar ke <#${targetChannel.id}> dengan kod warna **${embedColor}**!`, ephemeral: true });
+  }
+
+  if (interaction.commandName === "embed-create") {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      return interaction.reply({ content: "❌ Anda tidak mempunyai kebenaran Administrator!", ephemeral: true });
+    }
+    const targetChannel = interaction.options.getChannel("channel");
+    const title = interaction.options.getString("title");
+    const description = interaction.options.getString("description");
+    const colorInput = interaction.options.getString("color");
+    const imageUrl = interaction.options.getString("image_url");
+
+    let embedColor = "#F996B1"; 
+    if (colorInput) {
+      embedColor = colorInput.startsWith("#") ? colorInput : `#${colorInput}`;
+    }
+
+    const embed = new EmbedBuilder()
+      .setColor(embedColor)
+      .setTitle(title)
+      .setDescription(description)
+      .setTimestamp();
+
+    if (imageUrl) {
+      embed.setImage(imageUrl);
+    }
+
+    await targetChannel.send({ embeds: [embed] });
+    await interaction.reply({ content: `✅ Embed kustom berjaya dicipta dan dihantar ke <#${targetChannel.id}>!`, ephemeral: true });
+  }
+
+  if (interaction.commandName === "giveaway-create") {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      return interaction.reply({ content: "❌ Anda tidak mempunyai kebenaran Administrator!", ephemeral: true });
+    }
+    const targetChannel = interaction.options.getChannel("channel");
+    const prize = interaction.options.getString("prize");
+    const duration = interaction.options.getString("duration");
+
+    const giveawayEmbed = new EmbedBuilder()
+      .setColor("#F996B1")
+      .setTitle("🎉 GIVEAWAY PLATOMY 🎉")
+      .setDescription(`🎁 **Hadiah:** ${prize}\n⏳ **Tempoh:** ${duration}\n👤 **Dicipta oleh:** ${interaction.user}\n\nReaksi pada emoji di bawah untuk menyertai! 👇`)
+      .setTimestamp();
+
+    const sentMsg = await targetChannel.send({ embeds: [giveawayEmbed] });
+    await sentMsg.react("🎉");
+    await interaction.reply({ content: `✅ Giveaway berjaya dimulakan di <#${targetChannel.id}>!`, ephemeral: true });
+  }
+
+  if (interaction.commandName === "rumble-create") {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      return interaction.reply({ content: "❌ Anda tidak mempunyai kebenaran Administrator!", ephemeral: true });
+    }
+    const targetChannel = interaction.options.getChannel("channel");
+    const title = interaction.options.getString("title");
+    const reward = interaction.options.getString("reward");
+
+    const rumbleEmbed = new EmbedBuilder()
+      .setColor("#F996B1")
+      .setTitle(`⚔️ PLATO RUMBLE EVENT: ${title}`)
+      .setDescription(`🏆 **Ganjaran:** ${reward}\n👤 **Hos:** ${interaction.user}\n\nBersedia untuk bertarung di dalam bilik Plato sekarang! 🚀`)
+      .setTimestamp();
+
+    await targetChannel.send({ embeds: [rumbleEmbed] });
+    await interaction.reply({ content: `✅ Plato Rumble Event berjaya diumumkan di <#${targetChannel.id}>!`, ephemeral: true });
   }
 });
 
