@@ -147,7 +147,6 @@ const LOGO_URL = "https://cdn.discordapp.com/attachments/1549051773438787724/154
 
 let lastPostedUpdateId = null;
 
-// --- FUNGSI ALERT X (TWITTER) AUTOMATIK ---
 async function checkPlatoUpdates() {
   try {
     const rssUrl = "https://nitter.poast.org/platochat/rss";
@@ -256,7 +255,6 @@ client.once(Events.ClientReady, async (c) => {
     console.error("Gagal mendaftarkan slash commands:", error);
   }
 
-  // Semak update X (Twitter) secara automatik setiap 3 minit (180000ms)
   checkPlatoUpdates();
   setInterval(checkPlatoUpdates, 180000);
 });
@@ -381,7 +379,6 @@ client.on(Events.MessageCreate, async (message) => {
         `\`[${progressBar}]\` **${currentXpInLevel}/1000 EXP**`
       )
       .setThumbnail(message.author.displayAvatarURL({ size: 256, dynamic: true }))
-      .setFooter({ text: "PlatoMy • Y2K Crystal Pink & Black Edition ♡" })
       .setTimestamp();
 
     await message.reply({ embeds: [rankEmbed] });
@@ -493,7 +490,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await interaction.deferReply({ ephemeral: true });
       const gw = giveawaysMap.get(interaction.message.id);
       if (!gw || gw.ended) return interaction.editReply({ content: "❌ Tamat." });
-      if (gw.participants.includes(interaction.user.id)) return interaction.editReply({ content: "⚠️ Sudah sertai!" });
+      if (gw.participants.includes(interaction.user.id)) return interaction.editReply({ content: "⚠️ Awak sudah menyertai!" });
       gw.participants.push(interaction.user.id);
 
       const oldEmb = interaction.message.embeds[0];
