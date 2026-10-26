@@ -139,8 +139,10 @@ app.listen(PORT, () => {
 });
 
 const LEVEL_LOG_CHANNEL_NAME = "level-up";       
+const WALLET_LOG_CHANNEL_NAME = "wallet-log";       
 const TRADING_LOG_CHANNEL_NAME = "trading-log"; 
-const REPORT_LOG_CHANNEL_NAME = "report-log";         
+const ADMIN_REVIEW_CHANNEL_NAME = "admin-review";         
+const EVENT_LOG_CHANNEL_NAME = "event-log";         
 const WELCOME_CHANNEL_NAME = "selamat-datang";
 const SERVER_LOGS_CHANNEL_NAME = "server-logs";
 const UPDATE_CHANNEL_NAME = "plato-update";
@@ -235,7 +237,10 @@ const commands = [
   new SlashCommandBuilder().setName("birthday").setDescription("Urus tarikh lahir anda")
     .addSubcommand(sub => sub.setName("set").setDescription("Tetapkan tarikh lahir anda")),
   new SlashCommandBuilder().setName("event").setDescription("Urus event komuniti")
-    .addSubcommand(sub => sub.setName("create").setDescription("Cipta event baharu (Admin sahaja)")),
+    .addSubcommand(sub => sub.setName("create").setDescription("Cipta event baharu (Admin sahaja)")
+      .addStringOption(opt => opt.setName("title").setDescription("Tajuk event").setRequired(true))
+      .addStringOption(opt => opt.setName("description").setDescription("Butiran event").setRequired(true))
+    ),
   new SlashCommandBuilder().setName("giveaway").setDescription("Urus sistem giveaway (Admin sahaja)")
     .addSubcommand(sub => sub.setName("start").setDescription("Mula giveaway baharu")
       .addStringOption(opt => opt.setName("prize").setDescription("Hadiah giveaway").setRequired(true))
@@ -428,7 +433,51 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return;
     }
 
-    // --- PENGENDALI ARAHAN ADMIN-WALLET ---
+    // --- PENGENDALI ARAHAN EVENT ---
+    if (interaction.commandName === "event") {
+      const sub = interaction.options.getSubcommand();
+      if (sub === "create") {
+        if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+          return interaction.reply({ content: "❌ Anda tidak mempunyai kebenaran Administrator!", ephemeral: true });
+        }
+
+        const title = interaction.options.getString("title");
+        const description = interaction.options.getString("description");
+        const timeString = getMalaysiaTime();
+
+        // Hantar pengumuman event ke channel semasa
+        const eventEmbed = new EmbedBuilder()
+          .setColor("#ff69b4")
+          .setTitle(`🎉・${title}`)
+          .setDescription(`${description}\n\n🎀 Dianjurkan oleh: ${interaction.user}`)
+          .setThumbnail(LOGO_URL)
+          .setTimestamp();
+
+        await interaction.channel.send({ content: "✨ **Pengumuman Event Baharu!**", embeds: [eventEmbed] });
+        await interaction.reply({ content: "✅ Event berjaya dicipta dan diumumkan!", ephemeral: true });
+
+        // Hantar salinan log ke channel event-log
+        const eventLogChannel = interaction.guild.channels.cache.find(
+          c => c.name.toLowerCase().includes(EVENT_LOG_CHANNEL_NAME.toLowerCase()) && c.isTextBased()
+        );
+
+        if (eventLogChannel) {
+          const logEmbed = new EmbedBuilder()
+            .setColor("#ff69b4")
+            .setTitle("🛡️・Event Log: New Event Created")
+            .setDescription(
+              `📌 **Tajuk:** ${title}\n` +
+              `📝 **Butiran:** ${description}\n` +
+              `👤 **Admin:** ${interaction.user} (\`${interaction.user.id}\`)`
+            )
+            .setFooter({ text: `Event Log • Today at ${timeString}` })
+            .setTimestamp();
+          await eventLogChannel.send({ embeds: [logEmbed] }).catch(() => {});
+        }
+      }
+      return;
+    }
+
     if (interaction.commandName === "admin-wallet") {
       if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
         return interaction.reply({ content: "❌ Anda tidak mempunyai kebenaran Administrator!", ephemeral: true });
@@ -440,34 +489,60 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const reason = interaction.options.getString("reason") || "Tiada sebab dinyatakan";
 
       const targetWallet = getWallet(targetUser.id);
-      let responseText = "";
+      let actionTitle = "";
+      let actionDesc = "";
 
       if (action === "add_coins") {
         targetWallet.coins += amount;
-        responseText = `✅ Berjaya menambah **${amount} Plato Coins** kepada ${targetUser}. (Sebab: ${reason})`;
+        actionTitle = "🪙 Plato Coins Added";
+        actionDesc = `Berjaya menambah **${amount.toLocaleString()} Coins** kepada ${targetUser}.`;
       } else if (action === "deduct_coins") {
         targetWallet.coins = Math.max(0, targetWallet.coins - amount);
-        responseText = `✅ Berjaya menolak **${amount} Plato Coins** daripada ${targetUser}. (Sebab: ${reason})`;
+        actionTitle = "🪙 Plato Coins Deducted";
+        actionDesc = `Berjaya menolak **${amount.toLocaleString()} Coins** daripada ${targetUser}.`;
       } else if (action === "add_pips") {
         targetWallet.pips += amount;
-        responseText = `✅ Berjaya menambah **${amount} Pips** kepada ${targetUser}. (Sebab: ${reason})`;
+        actionTitle = "💠 Pips Added";
+        actionDesc = `Berjaya menambah **${amount.toLocaleString()} Pips** kepada ${targetUser}.`;
       } else if (action === "deduct_pips") {
         targetWallet.pips = Math.max(0, targetWallet.pips - amount);
-        responseText = `✅ Berjaya menolak **${amount} Pips** daripada ${targetUser}. (Sebab: ${reason})`;
+        actionTitle = "💠 Pips Deducted";
+        actionDesc = `Berjaya menolak **${amount.toLocaleString()} Pips** daripada ${targetUser}.`;
       } else if (action === "add_sponsor") {
         targetWallet.sponsorTotal += amount;
-        responseText = `✅ Berjaya menambah **${amount} Total Sponsor** kepada ${targetUser}. (Sebab: ${reason})`;
+        actionTitle = "🌸 Total Sponsor Added";
+        actionDesc = `Berjaya menambah **${amount.toLocaleString()} Total Sponsor** kepada ${targetUser}.`;
       } else if (action === "check") {
-        responseText = `📊 **Baki Wallet ${targetUser.username}:**\n🪙 Coins: ${targetWallet.coins.toLocaleString()}\n💠 Pips: ${targetWallet.pips.toLocaleString()}\n🌸 Total Sponsor: ${targetWallet.sponsorTotal.toLocaleString()}`;
+        actionTitle = "📊 Wallet Checked";
+        actionDesc = `Menyemak baki wallet ${targetUser}.`;
       }
 
-      const adminEmbed = new EmbedBuilder()
-        .setColor("#ff69b4")
-        .setTitle("🏦 PlatoMy • Admin Wallet Action")
-        .setDescription(responseText)
-        .setTimestamp();
+      await interaction.reply({ content: `✅ Tindakan berjaya dilaksana untuk ${targetUser}!`, ephemeral: true });
 
-      await interaction.reply({ embeds: [adminEmbed], ephemeral: true });
+      const logChannel = interaction.guild.channels.cache.find(
+        c => c.name.toLowerCase().includes(WALLET_LOG_CHANNEL_NAME.toLowerCase()) && c.isTextBased()
+      );
+
+      if (logChannel) {
+        const timeString = getMalaysiaTime();
+        const logEmbed = new EmbedBuilder()
+          .setColor("#ff69b4")
+          .setTitle(`💳・Wallet Log: ${actionTitle}`)
+          .setDescription(
+            `👤 **Target:** ${targetUser} (\`${targetUser.id}\`)\n` +
+            `🛡️ **Admin:** ${interaction.user}\n` +
+            `📝 **Details:** ${actionDesc}\n` +
+            `📌 **Reason:** ${reason}\n\n` +
+            `📊 **Current Balances:**\n` +
+            `🪙 Coins: \`${targetWallet.coins.toLocaleString()}\`\n` +
+            `💠 Pips: \`${targetWallet.pips.toLocaleString()}\`\n` +
+            `🌸 Total Sponsor: \`${targetWallet.sponsorTotal.toLocaleString()}\``
+          )
+          .setFooter({ text: `PlatoMy Bank Log • Today at ${timeString}` })
+          .setTimestamp();
+
+        await logChannel.send({ embeds: [logEmbed] }).catch(() => {});
+      }
       return;
     }
 
@@ -559,6 +634,25 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 
   if (interaction.isButton()) {
+    const customId = interaction.customId;
+    const buttonLabel = interaction.component?.label?.toLowerCase() || "";
+
+    if (customId === "open_report_modal" || buttonLabel.includes("submit report")) {
+      const modal = new ModalBuilder().setCustomId("report_modal").setTitle("🛡️ PlatoMy Report Form");
+      const reportInput = new TextInputBuilder().setCustomId("report_text").setLabel("Nyatakan aduan / laporan anda").setStyle(TextInputStyle.Paragraph).setRequired(true);
+      modal.addComponents(new ActionRowBuilder().addComponents(reportInput));
+      await interaction.showModal(modal);
+      return;
+    }
+
+    if (customId === "open_trading_modal" || buttonLabel.includes("trading ticket")) {
+      const modal = new ModalBuilder().setCustomId("trading_modal").setTitle("📦 PlatoMy Trading Ticket");
+      const tradingInput = new TextInputBuilder().setCustomId("trading_text").setLabel("Butiran trading / item").setStyle(TextInputStyle.Paragraph).setRequired(true);
+      modal.addComponents(new ActionRowBuilder().addComponents(tradingInput));
+      await interaction.showModal(modal);
+      return;
+    }
+
     if (interaction.customId === "join_giveaway") {
       await interaction.deferReply({ ephemeral: true });
       const gw = giveawaysMap.get(interaction.message.id);
@@ -584,6 +678,50 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const newEmb = EmbedBuilder.from(oldEmb).setDescription(oldEmb.description.replace(/👥 \*\*Penyertaan:\*\* \d+ pemain/, `👥 **Penyertaan:** ${game.participants.length} pemain`));
       await interaction.message.edit({ embeds: [newEmb] }).catch(() => {});
       await interaction.editReply({ content: "✅ Berjaya menyertai PlatoMy Rumble!" });
+      return;
+    }
+  }
+
+  if (interaction.isModalSubmit()) {
+    const timeString = getMalaysiaTime();
+
+    if (interaction.customId === "report_modal") {
+      const reportContent = interaction.fields.getTextInputValue("report_text");
+      await interaction.reply({ content: "✅ Laporan anda telah dihantar kepada pihak Admin!", ephemeral: true });
+
+      const reviewChannel = interaction.guild.channels.cache.find(
+        c => c.name.toLowerCase().includes(ADMIN_REVIEW_CHANNEL_NAME.toLowerCase()) && c.isTextBased()
+      );
+
+      if (reviewChannel) {
+        const reportEmbed = new EmbedBuilder()
+          .setColor("#ff69b4")
+          .setTitle("🚨 New Report Received")
+          .setDescription(`👤 **Pengadu:** ${interaction.user} (\`${interaction.user.id}\`)\n📝 **Aduan:**\n${reportContent}`)
+          .setFooter({ text: `Admin Review • Today at ${timeString}` })
+          .setTimestamp();
+        await reviewChannel.send({ embeds: [reportEmbed] }).catch(() => {});
+      }
+      return;
+    }
+
+    if (interaction.customId === "trading_modal") {
+      const tradingContent = interaction.fields.getTextInputValue("trading_text");
+      await interaction.reply({ content: "✅ Maklumat trading anda telah dihantar!", ephemeral: true });
+
+      const tradingChannel = interaction.guild.channels.cache.find(
+        c => c.name.toLowerCase().includes(TRADING_LOG_CHANNEL_NAME.toLowerCase()) && c.isTextBased()
+      );
+
+      if (tradingChannel) {
+        const tradingEmbed = new EmbedBuilder()
+          .setColor("#ff69b4")
+          .setTitle("📦 New Trading Ticket Log")
+          .setDescription(`👤 **Pengguna:** ${interaction.user} (\`${interaction.user.id}\`)\n📝 **Butiran Trading:**\n${tradingContent}`)
+          .setFooter({ text: `Trading Log • Today at ${timeString}` })
+          .setTimestamp();
+        await tradingChannel.send({ embeds: [tradingEmbed] }).catch(() => {});
+      }
       return;
     }
   }
