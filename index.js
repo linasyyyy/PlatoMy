@@ -320,7 +320,6 @@ function calculateLevelData(totalExp) {
   return { level, currentExp, expRequired };
 }
 
-// Fungsi pembantu untuk mendapatkan masa Malaysia terkini
 function getMalaysiaTime() {
   return new Date().toLocaleTimeString('en-US', { 
     timeZone: 'Asia/Kuala_Lumpur', 
@@ -426,6 +425,49 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setDescription(`🪙 **Plato Coins:** ${w.coins.toLocaleString()}\n💠 **Pips:** ${w.pips.toLocaleString()}\n🌸 **Total Sponsor:** ${w.sponsorTotal.toLocaleString()}`)
         .setFooter({ text: `PlatoMy Bank • Today at ${timeString}` });
       await interaction.reply({ embeds: [embed], ephemeral: true });
+      return;
+    }
+
+    // --- PENGENDALI ARAHAN ADMIN-WALLET ---
+    if (interaction.commandName === "admin-wallet") {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return interaction.reply({ content: "❌ Anda tidak mempunyai kebenaran Administrator!", ephemeral: true });
+      }
+
+      const action = interaction.options.getString("action");
+      const targetUser = interaction.options.getUser("target");
+      const amount = interaction.options.getInteger("amount");
+      const reason = interaction.options.getString("reason") || "Tiada sebab dinyatakan";
+
+      const targetWallet = getWallet(targetUser.id);
+      let responseText = "";
+
+      if (action === "add_coins") {
+        targetWallet.coins += amount;
+        responseText = `✅ Berjaya menambah **${amount} Plato Coins** kepada ${targetUser}. (Sebab: ${reason})`;
+      } else if (action === "deduct_coins") {
+        targetWallet.coins = Math.max(0, targetWallet.coins - amount);
+        responseText = `✅ Berjaya menolak **${amount} Plato Coins** daripada ${targetUser}. (Sebab: ${reason})`;
+      } else if (action === "add_pips") {
+        targetWallet.pips += amount;
+        responseText = `✅ Berjaya menambah **${amount} Pips** kepada ${targetUser}. (Sebab: ${reason})`;
+      } else if (action === "deduct_pips") {
+        targetWallet.pips = Math.max(0, targetWallet.pips - amount);
+        responseText = `✅ Berjaya menolak **${amount} Pips** daripada ${targetUser}. (Sebab: ${reason})`;
+      } else if (action === "add_sponsor") {
+        targetWallet.sponsorTotal += amount;
+        responseText = `✅ Berjaya menambah **${amount} Total Sponsor** kepada ${targetUser}. (Sebab: ${reason})`;
+      } else if (action === "check") {
+        responseText = `📊 **Baki Wallet ${targetUser.username}:**\n🪙 Coins: ${targetWallet.coins.toLocaleString()}\n💠 Pips: ${targetWallet.pips.toLocaleString()}\n🌸 Total Sponsor: ${targetWallet.sponsorTotal.toLocaleString()}`;
+      }
+
+      const adminEmbed = new EmbedBuilder()
+        .setColor("#ff69b4")
+        .setTitle("🏦 PlatoMy • Admin Wallet Action")
+        .setDescription(responseText)
+        .setTimestamp();
+
+      await interaction.reply({ embeds: [adminEmbed], ephemeral: true });
       return;
     }
 
