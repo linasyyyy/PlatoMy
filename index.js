@@ -14,9 +14,8 @@ import {
   TextInputBuilder,
   TextInputStyle,
   ChannelType,
+  StringSelectMenuBuilder,
 } from "discord.js";
-import pkg from 'pg';
-const { Pool } = pkg;
 import express from "express";
 import session from "express-session";
 import passport from "passport";
@@ -32,67 +31,6 @@ if (!token) {
   console.error("RALAT: DISCORD_TOKEN tidak ditemui di dalam Environment Variables!");
 }
 
-// === TETAPAN NEON POSTGRESQL POOL ===
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-});
-
-// Ambil atau cipta wallet dari Database Neon
-async function getWallet(userId) {
-  try {
-    const res = await pool.query("SELECT * FROM wallets WHERE user_id = $1", [userId]);
-    if (res.rows.length > 0) {
-      return {
-        coins: parseInt(res.rows[0].coins),
-        pips: parseInt(res.rows[0].pips),
-        exp: parseInt(res.rows[0].exp),
-        sponsorTotal: parseInt(res.rows[0].sponsor_total)
-      };
-    } else {
-      await pool.query(
-        "INSERT INTO wallets (user_id, coins, pips, exp, sponsor_total) VALUES ($1, 0, 0, 0, 0)",
-        [userId]
-      );
-      return { coins: 0, pips: 0, exp: 0, sponsorTotal: 0 };
-    }
-  } catch (err) {
-    console.error("Database Error (getWallet):", err);
-    return { coins: 0, pips: 0, exp: 0, sponsorTotal: 0 };
-  }
-}
-
-// Simpan kemaskini wallet ke Database Neon
-async function saveWallet(userId, w) {
-  try {
-    await pool.query(
-      `INSERT INTO wallets (user_id, coins, pips, exp, sponsor_total) 
-       VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT (user_id) 
-       DO UPDATE SET coins = $2, pips = $3, exp = $4, sponsor_total = $5`,
-      [userId, w.coins, w.pips, w.exp, w.sponsorTotal]
-    );
-  } catch (err) {
-    console.error("Database Error (saveWallet):", err);
-  }
-}
-
-// === TETAPAN GOOGLE SHEETS WEB APP URL ===
-const GOOGLE_SHEET_WEB_APP_URL = process.env.GOOGLE_SHEET_WEB_APP_URL || "";
-
-async function sendToGoogleSheet(sheetName, headers, values) {
-  if (!GOOGLE_SHEET_WEB_APP_URL || GOOGLE_SHEET_WEB_APP_URL.includes("MASUKKAN_URL")) return;
-  try {
-    await fetch(`${GOOGLE_SHEET_WEB_APP_URL}?sheet=${encodeURIComponent(sheetName)}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ headers, values })
-    });
-  } catch (error) {
-    console.error(`[Google Sheets Error] Gagal menghantar log ke ${sheetName}:`, error);
-  }
-}
-
 const client = new Client({ 
   intents: [
     GatewayIntentBits.Guilds, 
@@ -103,11 +41,19 @@ const client = new Client({
   ] 
 });
 
+const wallets = new Map();
+const eventsMap = new Map();
+const birthdaysMap = new Map(); 
 const giveawaysMap = new Map(); 
 const rumbleMap = new Map(); 
 const tempVoiceOwners = new Map();
 
-// --- INTEGRASI WEB DASHBOARD (EXPRESS & PASSPORT) ---
+function getWallet(id) {
+  if (!wallets.has(id)) wallets.set(id, { coins: 0, pips: 0, exp: 0, sponsorTotal: 0 });
+  return wallets.get(id);
+}
+
+// --- INTEGRASI WEB DASHBOARD ---
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -131,7 +77,7 @@ const CLIENT_ID = process.env.CLIENT_ID || "1556578779437072546";
 const CLIENT_SECRET = process.env.CLIENT_SECRET || "XIfRq23FWQttp-5E9JSgRLfizc03Io_9";
 const DOMAIN_URL = process.env.RAILWAY_STATIC_URL 
   ? `https://${process.env.RAILWAY_STATIC_URL}` 
-  : `http://localhost:${PORT}`;
+  : (process.env.CALLBACK_URL ? process.env.CALLBACK_URL.replace('/discord/callback', '') : `http://localhost:${PORT}`);
 
 passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((obj, done) => done(null, obj));
@@ -141,7 +87,7 @@ passport.use(
     {
       clientID: CLIENT_ID,
       clientSecret: CLIENT_SECRET,
-      callbackURL: `${DOMAIN_URL}/discord/callback`,
+      callbackURL: process.env.CALLBACK_URL || `${DOMAIN_URL}/discord/callback`,
       scope: ["identify", "guilds"],
     },
     (accessToken, refreshToken, profile, done) => {
@@ -159,45 +105,32 @@ app.get("/login", passport.authenticate("discord"));
 app.get("/discord/callback", passport.authenticate("discord", { failureRedirect: "/" }), (req, res) => { res.redirect("/"); });
 app.get("/logout", (req, res) => { req.logout(() => { res.redirect("/"); }); });
 
-app.get("/", checkAuth, async (req, res) => {
-  try {
-    const userWallet = await getWallet(req.user.id);
-    const result = await pool.query("SELECT * FROM wallets");
-    const allWallets = result.rows.map(row => ({
-      id: row.user_id,
-      coins: parseInt(row.coins),
-      pips: parseInt(row.pips),
-      exp: parseInt(row.exp),
-      sponsorTotal: parseInt(row.sponsor_total)
-    }));
+app.get("/", checkAuth, (req, res) => {
+  const userWallet = getWallet(req.user.id);
+  const allWallets = [...wallets.entries()].map(([id, data]) => ({ id, ...data }));
 
-    res.render("dashboard", {
-      user: req.user,
-      wallet: userWallet,
-      allWallets: allWallets,
-      totalCoins: allWallets.reduce((a, b) => a + b.coins, 0),
-      totalPips: allWallets.reduce((a, b) => a + b.pips, 0),
-      botClient: client
-    });
-  } catch (err) {
-    console.error("Dashboard Error:", err);
-    res.status(500).send("Internal Server Error: " + err.message);
-  }
+  res.render("dashboard", {
+    user: req.user,
+    wallet: userWallet,
+    allWallets: allWallets,
+    totalCoins: Array.from(wallets.values()).reduce((a, b) => a + b.coins, 0),
+    totalPips: Array.from(wallets.values()).reduce((a, b) => a + b.pips, 0),
+    botClient: client
+  });
 });
 
-app.post("/api/inject-assets", checkAuth, async (req, res) => {
+app.post("/api/inject-assets", checkAuth, (req, res) => {
   const { targetId, assetType, amount } = req.body;
   if (!targetId || !amount) return res.status(400).json({ error: "Sila isi semua maklumat!" });
 
   const cleanTargetId = targetId.replace(/[<@!>]/g, "").trim();
-  const targetWallet = await getWallet(cleanTargetId);
+  const targetWallet = getWallet(cleanTargetId);
   const qty = parseInt(amount) || 0;
 
   if (assetType.includes("Coins")) targetWallet.coins += qty;
   else if (assetType.includes("Sponsor")) targetWallet.sponsorTotal += qty;
   else targetWallet.pips += qty;
 
-  await saveWallet(cleanTargetId, targetWallet);
   res.json({ success: true, message: `Berjaya menambah ${qty} ${assetType} kepada ${cleanTargetId}!` });
 });
 
@@ -210,46 +143,28 @@ const WALLET_LOG_CHANNEL_NAME = "wallet-log";
 const TRADING_LOG_CHANNEL_NAME = "trading-log"; 
 const ADMIN_REVIEW_CHANNEL_NAME = "admin-review";         
 const EVENT_LOG_CHANNEL_NAME = "event-log";         
+const WELCOME_CHANNEL_NAME = "selamat-datang";
+const SERVER_LOGS_CHANNEL_NAME = "server-logs";
 const UPDATE_CHANNEL_NAME = "plato-update";
 const LOGO_URL = "https://cdn.discordapp.com/attachments/1549051773438787724/1549403998686281808/IMG_5614.png";
 
 let lastPostedUpdateId = null;
 
 async function checkPlatoUpdates() {
-  const rssUrls = [
-    "https://nitter.privacydev.net/platochat/rss",
-    "https://nitter.poast.org/platochat/rss",
-    "https://rsshub.app/twitter/user/platochat"
-  ];
-
-  let text = null;
-  for (const url of rssUrls) {
-    try {
-      const response = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
-      if (response.ok) {
-        text = await response.text();
-        break;
-      }
-    } catch (err) {}
-  }
-
-  if (!text) return;
-
   try {
-    const itemMatch = text.match(/<item>[\s\S]*?<\/item>/i);
-    if (!itemMatch) return;
+    const rssUrl = "https://nitter.poast.org/platochat/rss";
+    const response = await fetch(rssUrl);
+    if (!response.ok) return;
+    const text = await response.text();
 
-    const itemXml = itemMatch[0];
-    const matchLink = itemXml.match(/<link>(.*?)<\/link>/i) || itemXml.match(/<guid.*?>(.*?)<\/guid>/i);
-    const matchTitle = itemXml.match(/<title>(.*?)<\/title>/i) || itemXml.match(/<description>(.*?)<\/description>/i);
+    const matchLink = text.match(/<link>(.*?)<\/link>/);
+    const matchTitle = text.match(/<title>(.*?)<\/title>/);
 
     if (matchLink && matchTitle) {
-      const updateUrl = matchLink[1].replace("<![CDATA[", "").replace("]]>", "").trim();
-      let updateContent = matchTitle[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/gi, "$1").replace(/<[^>]+>/g, "").trim();
+      const updateUrl = matchLink[1];
+      const updateContent = matchTitle[1];
 
-      if (updateContent.length > 280) updateContent = updateContent.substring(0, 277) + "...";
-
-      if (updateUrl !== lastPostedUpdateId && !updateUrl.endsWith("/rss")) {
+      if (updateUrl !== lastPostedUpdateId && !updateUrl.includes("/rss")) {
         lastPostedUpdateId = updateUrl;
 
         for (const [_, guild] of client.guilds.cache) {
@@ -258,13 +173,13 @@ async function checkPlatoUpdates() {
           );
 
           if (targetChannel) {
-            const updateRole = guild.roles.cache.find(r => r.name.toLowerCase().includes("plato update"));
+            const updateRole = guild.roles.cache.find(r => r.name.toLowerCase() === "plato update" || r.name.toLowerCase() === "@plato update");
             const pingTarget = updateRole ? `<@&${updateRole.id}>` : "@Plato Update";
 
             const updateEmbed = new EmbedBuilder()
               .setColor("#ff69b4")
               .setTitle("🛠️・Plato Official Update")
-              .setDescription(`${updateContent}\n\n[🔗 Baca Update Penuh di X/Twitter](${updateUrl})`)
+              .setDescription(`${updateContent}\n\n[🔗 Baca Update Penuh di X](${updateUrl})`)
               .setThumbnail(LOGO_URL)
               .setTimestamp();
 
@@ -276,7 +191,9 @@ async function checkPlatoUpdates() {
         }
       }
     }
-  } catch (error) {}
+  } catch (error) {
+    console.error("Gagal mengambil update Plato dari X:", error);
+  }
 }
 
 const commands = [
@@ -345,7 +262,7 @@ client.once(Events.ClientReady, async (c) => {
   }
 
   checkPlatoUpdates();
-  setInterval(checkPlatoUpdates, 120000);
+  setInterval(checkPlatoUpdates, 180000);
 });
 
 client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
@@ -368,7 +285,7 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
       });
       await member.voice.setChannel(userVc);
       tempVoiceOwners.set(userVc.id, member.id);
-    } catch (err) {}
+    } catch (err) { console.error(err); }
   }
 
   if (oldState.channel) {
@@ -421,10 +338,9 @@ client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot || !message.guild) return;
   const userId = message.author.id;
 
-  const w = await getWallet(userId);
+  const w = getWallet(userId);
   const oldExp = w.exp;
   w.exp += 2;
-  await saveWallet(userId, w);
 
   const oldData = calculateLevelData(oldExp);
   const newData = calculateLevelData(w.exp);
@@ -447,17 +363,17 @@ client.on(Events.MessageCreate, async (message) => {
   }
 
   if (content === "!lb" || content === "!leaderboard") {
-    const result = await pool.query("SELECT * FROM wallets ORDER BY exp DESC LIMIT 10");
+    const sortedWallets = [...wallets.entries()].sort((a, b) => b[1].exp - a[1].exp).slice(0, 10);
     let lbDescription = "";
     
-    if (result.rows.length === 0) {
+    if (sortedWallets.length === 0) {
       lbDescription = "• *Belum ada rekod leaderboard EXP lagi.*";
     } else {
       const medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
-      result.rows.forEach((row, index) => {
+      sortedWallets.forEach(([uid, data], index) => {
         const medalIcon = medals[index] || `#${index + 1}`;           
-        const userLevelData = calculateLevelData(parseInt(row.exp));           
-        lbDescription += `${medalIcon} **<@${row.user_id}>**\nLevel ${userLevelData.level} • EXP: **${parseInt(row.exp).toLocaleString()}**\n\n`;
+        const userLevelData = calculateLevelData(data.exp);           
+        lbDescription += `${medalIcon} **<@${uid}>**\nLevel ${userLevelData.level} • EXP: **${data.exp.toLocaleString()}**\n\n`;
       });
     }
 
@@ -473,8 +389,8 @@ client.on(Events.MessageCreate, async (message) => {
   }
 
   if (content === "!level" || content === "!rank") {
-    const allRes = await pool.query("SELECT user_id, exp FROM wallets ORDER BY exp DESC");
-    const serverRank = allRes.rows.findIndex(r => r.user_id === userId) + 1;
+    const sortedArr = [...wallets.entries()].sort((a, b) => b[1].exp - a[1].exp);
+    const serverRank = sortedArr.findIndex(([id]) => id === userId) + 1;
     const rankDisplay = serverRank > 0 ? `#${serverRank}` : "#-";
 
     const data = calculateLevelData(w.exp);
@@ -506,7 +422,7 @@ client.on(Events.MessageCreate, async (message) => {
 client.on(Events.InteractionCreate, async (interaction) => {
   if (interaction.isChatInputCommand()) {
     if (interaction.commandName === "wallet") {
-      const w = await getWallet(interaction.user.id);
+      const w = getWallet(interaction.user.id);
       const timeString = getMalaysiaTime();
       const embed = new EmbedBuilder()
         .setColor("#ff69b4")
@@ -517,6 +433,42 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return;
     }
 
+    if (interaction.commandName === "setup-report") {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) return;
+      const embed = new EmbedBuilder()
+        .setColor("#ff69b4")
+        .setTitle("🛡️ PlatoMy Report Center")
+        .setDescription("Ada sebarang aduan, masalah atau laporan? Klik butang di bawah untuk menghantar laporan kepada pihak admin secara sulit.");
+      const btn = new ButtonBuilder().setCustomId("open_report_modal").setLabel("🚨 Submit Report").setStyle(ButtonStyle.Danger);
+      await interaction.channel.send({ embeds: [embed], components: [new ActionRowBuilder().addComponents(btn)] });
+      await interaction.reply({ content: "✅ Panel Report berjaya dihantar!", ephemeral: true });
+      return;
+    }
+
+    if (interaction.commandName === "setup-trading") {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) return;
+      const embed = new EmbedBuilder()
+        .setColor("#ff69b4")
+        .setTitle("📦 PlatoMy Trading Center")
+        .setDescription("Ingin melakukan transaksi, jual beli atau trade item? Klik butang di bawah untuk membuka tiket trading.");
+      const btn = new ButtonBuilder().setCustomId("open_trading_modal").setLabel("🤝 Trading Ticket").setStyle(ButtonStyle.Success);
+      await interaction.channel.send({ embeds: [embed], components: [new ActionRowBuilder().addComponents(btn)] });
+      await interaction.reply({ content: "✅ Panel Trading berjaya dihantar!", ephemeral: true });
+      return;
+    }
+
+    if (interaction.commandName === "setup-birthday") {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) return;
+      const embed = new EmbedBuilder()
+        .setColor("#ff69b4")
+        .setTitle("🎂 PlatoMy Birthday Corner")
+        .setDescription("Ingin tarikh lahir anda disambut? Gunakan arahan `/birthday set` untuk mendaftarkan hari istimewa anda!");
+      await interaction.channel.send({ embeds: [embed] });
+      await interaction.reply({ content: "✅ Panel Birthday Corner berjaya dihantar!", ephemeral: true });
+      return;
+    }
+
+    // --- PENGENDALI ARAHAN EVENT ---
     if (interaction.commandName === "event") {
       const sub = interaction.options.getSubcommand();
       if (sub === "create") {
@@ -555,12 +507,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
             .setTimestamp();
           await eventLogChannel.send({ embeds: [logEmbed] }).catch(() => {});
         }
-
-        sendToGoogleSheet(
-          "EVENT LOG",
-          ["Timestamp", "Title", "Description", "Admin User", "Admin ID"],
-          [new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }), title, description, interaction.user.tag, interaction.user.id]
-        );
       }
       return;
     }
@@ -575,10 +521,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const amount = interaction.options.getInteger("amount");
       const reason = interaction.options.getString("reason") || "Tiada sebab dinyatakan";
 
-      const targetWallet = await getWallet(targetUser.id);
+      const targetWallet = getWallet(targetUser.id);
       let actionTitle = "";
       let actionDesc = "";
-      let sheetTarget = "WALLET LOG";
 
       if (action === "add_coins") {
         targetWallet.coins += amount;
@@ -600,13 +545,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
         targetWallet.sponsorTotal += amount;
         actionTitle = "🌸 Total Sponsor Added";
         actionDesc = `Berjaya menambah **${amount.toLocaleString()} Total Sponsor** kepada ${targetUser}.`;
-        sheetTarget = "SPONSOR LOG";
       } else if (action === "check") {
         actionTitle = "📊 Wallet Checked";
         actionDesc = `Menyemak baki wallet ${targetUser}.`;
       }
 
-      await saveWallet(targetUser.id, targetWallet);
       await interaction.reply({ content: `✅ Tindakan berjaya dilaksana untuk ${targetUser}!`, ephemeral: true });
 
       const logChannel = interaction.guild.channels.cache.find(
@@ -633,37 +576,22 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         await logChannel.send({ embeds: [logEmbed] }).catch(() => {});
       }
-
-      if (sheetTarget === "SPONSOR LOG") {
-        sendToGoogleSheet(
-          "SPONSOR LOG",
-          ["Timestamp", "Sponsor / Plato ID", "Asset Type", "Amount", "Admin", "Notes / Reason"],
-          [new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }), targetUser.tag, "Sponsor Points", amount, interaction.user.tag, reason]
-        );
-      } else {
-        sendToGoogleSheet(
-          "WALLET LOG",
-          ["Timestamp", "User / Plato ID", "Action", "Amount", "Admin", "Reason", "Current Balance"],
-          [new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }), targetUser.tag, action, amount, interaction.user.tag, reason, targetWallet.coins]
-        );
-      }
-
       return;
     }
 
     if (interaction.commandName === "leaderboard") {
       const colorInput = interaction.options.getString("color") || "#ff69b4";
-      const result = await pool.query("SELECT * FROM wallets ORDER BY exp DESC LIMIT 10");
+      const sortedWallets = [...wallets.entries()].sort((a, b) => b[1].exp - a[1].exp).slice(0, 10);
       let lbDescription = "";
       
-      if (result.rows.length === 0) {
+      if (sortedWallets.length === 0) {
         lbDescription = "• *Belum ada rekod leaderboard EXP lagi.*";
       } else {
         const medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
-        result.rows.forEach((row, index) => {
+        sortedWallets.forEach(([userId, data], index) => {
           const medalIcon = medals[index] || `#${index + 1}`;           
-          const userLevelData = calculateLevelData(parseInt(row.exp));           
-          lbDescription += `${medalIcon} **<@${row.user_id}>**\nLevel ${userLevelData.level} • EXP: **${parseInt(row.exp).toLocaleString()}**\n\n`;
+          const userLevelData = calculateLevelData(data.exp);           
+          lbDescription += `${medalIcon} **<@${userId}>**\nLevel ${userLevelData.level} • EXP: **${data.exp.toLocaleString()}**\n\n`;
         });
       }
 
@@ -758,18 +686,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return;
     }
 
-    if (customId === "birthday_setup_btn" || buttonLabel.includes("set/update birthday")) {
-      const modal = new ModalBuilder().setCustomId("birthday_modal").setTitle("🎂 PlatoMy • Birthday Corner");
-      const bdayInput = new TextInputBuilder()
-        .setCustomId("birthday_date")
-        .setLabel("Masukkan tarikh lahir anda (Cth: 23/02)")
-        .setStyle(TextInputStyle.Short)
-        .setRequired(true);
-      modal.addComponents(new ActionRowBuilder().addComponents(bdayInput));
-      await interaction.showModal(modal);
-      return;
-    }
-
     if (interaction.customId === "join_giveaway") {
       await interaction.deferReply({ ephemeral: true });
       const gw = giveawaysMap.get(interaction.message.id);
@@ -819,12 +735,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
           .setTimestamp();
         await reviewChannel.send({ embeds: [reportEmbed] }).catch(() => {});
       }
-
-      sendToGoogleSheet(
-        "ADMIN REVIEW",
-        ["Timestamp", "User Tag", "User ID", "Report Content"],
-        [new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }), interaction.user.tag, interaction.user.id, reportContent]
-      );
       return;
     }
 
@@ -845,30 +755,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
           .setTimestamp();
         await tradingChannel.send({ embeds: [tradingEmbed] }).catch(() => {});
       }
-
-      sendToGoogleSheet(
-        "TRADING LOG",
-        ["Timestamp", "User Tag", "User ID", "Trading Details"],
-        [new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }), interaction.user.tag, interaction.user.id, tradingContent]
-      );
-      return;
-    }
-
-    if (interaction.customId === "birthday_modal") {
-      const bdayValue = interaction.fields.getTextInputValue("birthday_date");
-      await interaction.reply({ content: `✅ Tarikh lahir anda (${bdayValue}) berjaya disimpan! 🌸`, ephemeral: true });
-
-      sendToGoogleSheet(
-        "BIRTHDAY LOG",
-        ["Timestamp", "User / Plato ID", "Birthday Date", "Admin / Log Source", "Notes / Status"],
-        [
-          new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }),
-          interaction.user.tag,
-          bdayValue,
-          interaction.user.tag,
-          "Registered via Birthday Panel"
-        ]
-      );
       return;
     }
   }
