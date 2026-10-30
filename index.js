@@ -107,7 +107,7 @@ const giveawaysMap = new Map();
 const rumbleMap = new Map(); 
 const tempVoiceOwners = new Map();
 
-// --- INTEGRASI WEB DASHBOARD ---
+// --- INTEGRASI WEB DASHBOARD (EXPRESS & PASSPORT) ---
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -127,8 +127,8 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
-const CLIENT_ID = "1556578779437072546";
-const CLIENT_SECRET = "XIfRq23FWQttp-5E9JSgRLfizc03Io_9";
+const CLIENT_ID = process.env.CLIENT_ID || "1556578779437072546";
+const CLIENT_SECRET = process.env.CLIENT_SECRET || "XIfRq23FWQttp-5E9JSgRLfizc03Io_9";
 const DOMAIN_URL = process.env.RAILWAY_STATIC_URL 
   ? `https://${process.env.RAILWAY_STATIC_URL}` 
   : `http://localhost:${PORT}`;
@@ -160,24 +160,29 @@ app.get("/discord/callback", passport.authenticate("discord", { failureRedirect:
 app.get("/logout", (req, res) => { req.logout(() => { res.redirect("/"); }); });
 
 app.get("/", checkAuth, async (req, res) => {
-  const userWallet = await getWallet(req.user.id);
-  const result = await pool.query("SELECT * FROM wallets");
-  const allWallets = result.rows.map(row => ({
-    id: row.user_id,
-    coins: parseInt(row.coins),
-    pips: parseInt(row.pips),
-    exp: parseInt(row.exp),
-    sponsorTotal: parseInt(row.sponsor_total)
-  }));
+  try {
+    const userWallet = await getWallet(req.user.id);
+    const result = await pool.query("SELECT * FROM wallets");
+    const allWallets = result.rows.map(row => ({
+      id: row.user_id,
+      coins: parseInt(row.coins),
+      pips: parseInt(row.pips),
+      exp: parseInt(row.exp),
+      sponsorTotal: parseInt(row.sponsor_total)
+    }));
 
-  res.render("dashboard", {
-    user: req.user,
-    wallet: userWallet,
-    allWallets: allWallets,
-    totalCoins: allWallets.reduce((a, b) => a + b.coins, 0),
-    totalPips: allWallets.reduce((a, b) => a + b.pips, 0),
-    botClient: client
-  });
+    res.render("dashboard", {
+      user: req.user,
+      wallet: userWallet,
+      allWallets: allWallets,
+      totalCoins: allWallets.reduce((a, b) => a + b.coins, 0),
+      totalPips: allWallets.reduce((a, b) => a + b.pips, 0),
+      botClient: client
+    });
+  } catch (err) {
+    console.error("Dashboard Error:", err);
+    res.status(500).send("Internal Server Error: " + err.message);
+  }
 });
 
 app.post("/api/inject-assets", checkAuth, async (req, res) => {
