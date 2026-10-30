@@ -31,7 +31,6 @@ if (!token) {
 }
 
 // === TETAPAN GOOGLE SHEETS WEB APP URL ===
-// Gantikan dengan URL Web App Apps Script anda (berakhiran /exec)
 const GOOGLE_SHEET_WEB_APP_URL = process.env.GOOGLE_SHEET_WEB_APP_URL || "MASUKKAN_URL_WEB_APP_GOOGLE_SCRIPT_ANDA_DI_SINI";
 
 async function sendToGoogleSheet(sheetName, headers, values) {
@@ -168,7 +167,6 @@ let lastPostedUpdateId = null;
 
 // --- PEMBAIKAN ALERT TWITTER / NITTER RSS ---
 async function checkPlatoUpdates() {
-  // Senarai fallback mirror Nitter & RSSHub untuk mengelakkan isu rate-limit/server down
   const rssUrls = [
     "https://nitter.privacydev.net/platochat/rss",
     "https://nitter.poast.org/platochat/rss",
@@ -184,14 +182,11 @@ async function checkPlatoUpdates() {
         break;
       }
     } catch (err) {
-      // Cuba URL seterusnya jika pelayan Nitter semasa gagal
+      // Cuba pelayan seterusnya jika gagal
     }
   }
 
-  if (!text) {
-    console.log("[Twitter Update] Semua pelayan RSS Nitter/X sedang sibuk atau tidak dapat dicapai.");
-    return;
-  }
+  if (!text) return;
 
   try {
     const itemMatch = text.match(/<item>[\s\S]*?<\/item>/i);
@@ -305,7 +300,7 @@ client.once(Events.ClientReady, async (c) => {
   }
 
   checkPlatoUpdates();
-  setInterval(checkPlatoUpdates, 120000); // Semak update setiap 2 minit
+  setInterval(checkPlatoUpdates, 120000);
 });
 
 client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
@@ -515,7 +510,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
           await eventLogChannel.send({ embeds: [logEmbed] }).catch(() => {});
         }
 
-        // AUTO-LOG KE GOOGLE SHEETS
         sendToGoogleSheet(
           "EVENT LOG",
           ["Timestamp", "Title", "Description", "Admin User", "Admin ID"],
@@ -593,7 +587,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await logChannel.send({ embeds: [logEmbed] }).catch(() => {});
       }
 
-      // AUTO-LOG KE GOOGLE SHEETS
       if (sheetTarget === "SPONSOR LOG") {
         sendToGoogleSheet(
           "SPONSOR LOG",
@@ -718,6 +711,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return;
     }
 
+    if (customId === "birthday_setup_btn" || buttonLabel.includes("set/update birthday")) {
+      const modal = new ModalBuilder().setCustomId("birthday_modal").setTitle("🎂 PlatoMy • Birthday Corner");
+      const bdayInput = new TextInputBuilder()
+        .setCustomId("birthday_date")
+        .setLabel("Masukkan tarikh lahir anda (Cth: 23/02)")
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
+      modal.addComponents(new ActionRowBuilder().addComponents(bdayInput));
+      await interaction.showModal(modal);
+      return;
+    }
+
     if (interaction.customId === "join_giveaway") {
       await interaction.deferReply({ ephemeral: true });
       const gw = giveawaysMap.get(interaction.message.id);
@@ -768,7 +773,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await reviewChannel.send({ embeds: [reportEmbed] }).catch(() => {});
       }
 
-      // AUTO-LOG KE GOOGLE SHEETS
       sendToGoogleSheet(
         "ADMIN REVIEW",
         ["Timestamp", "User Tag", "User ID", "Report Content"],
@@ -795,11 +799,28 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await tradingChannel.send({ embeds: [tradingEmbed] }).catch(() => {});
       }
 
-      // AUTO-LOG KE GOOGLE SHEETS
       sendToGoogleSheet(
         "TRADING LOG",
         ["Timestamp", "User Tag", "User ID", "Trading Details"],
         [new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }), interaction.user.tag, interaction.user.id, tradingContent]
+      );
+      return;
+    }
+
+    if (interaction.customId === "birthday_modal") {
+      const bdayValue = interaction.fields.getTextInputValue("birthday_date");
+      await interaction.reply({ content: `✅ Tarikh lahir anda (${bdayValue}) berjaya disimpan! 🌸`, ephemeral: true });
+
+      sendToGoogleSheet(
+        "BIRTHDAY LOG",
+        ["Timestamp", "User / Plato ID", "Birthday Date", "Admin / Log Source", "Notes / Status"],
+        [
+          new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }),
+          interaction.user.tag,
+          bdayValue,
+          interaction.user.tag,
+          "Registered via Birthday Panel"
+        ]
       );
       return;
     }
