@@ -14,7 +14,6 @@ import {
   TextInputBuilder,
   TextInputStyle,
   ChannelType,
-  StringSelectMenuBuilder,
 } from "discord.js";
 import express from "express";
 import session from "express-session";
@@ -42,8 +41,6 @@ const client = new Client({
 });
 
 const wallets = new Map();
-const eventsMap = new Map();
-const birthdaysMap = new Map(); 
 const giveawaysMap = new Map(); 
 const rumbleMap = new Map(); 
 const tempVoiceOwners = new Map();
@@ -55,16 +52,17 @@ function getWallet(id) {
 
 // --- INTEGRASI WEB DASHBOARD ---
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
+app.use(express.static(path.join(__dirname, "public")));
 
 app.use(
   session({
-    secret: "platomy_y2k_secret_key_123",
+    secret: process.env.SESSION_SECRET || "platomy_y2k_secret_key_123",
     resave: false,
     saveUninitialized: false,
   })
@@ -73,28 +71,28 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
-const CLIENT_ID = process.env.CLIENT_ID || "1556578779437072546";
-const CLIENT_SECRET = process.env.CLIENT_SECRET || "XIfRq23FWQttp-5E9JSgRLfizc03Io_9";
-const DOMAIN_URL = process.env.RAILWAY_STATIC_URL 
-  ? `https://${process.env.RAILWAY_STATIC_URL}` 
-  : (process.env.CALLBACK_URL ? process.env.CALLBACK_URL.replace('/discord/callback', '') : `http://localhost:${PORT}`);
+const CLIENT_ID = process.env.CLIENT_ID;
+const CLIENT_SECRET = process.env.CLIENT_SECRET;
+const CALLBACK_URL = process.env.CALLBACK_URL || "https://platomy-production.up.railway.app/discord/callback";
 
 passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((obj, done) => done(null, obj));
 
-passport.use(
-  new DiscordStrategy(
-    {
-      clientID: CLIENT_ID,
-      clientSecret: CLIENT_SECRET,
-      callbackURL: process.env.CALLBACK_URL || `${DOMAIN_URL}/discord/callback`,
-      scope: ["identify", "guilds"],
-    },
-    (accessToken, refreshToken, profile, done) => {
-      process.nextTick(() => done(null, profile));
-    }
-  )
-);
+if (CLIENT_ID && CLIENT_SECRET) {
+  passport.use(
+    new DiscordStrategy(
+      {
+        clientID: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        callbackURL: CALLBACK_URL,
+        scope: ["identify", "guilds"],
+      },
+      (accessToken, refreshToken, profile, done) => {
+        process.nextTick(() => done(null, profile));
+      }
+    )
+  );
+}
 
 function checkAuth(req, res, next) {
   if (req.isAuthenticated()) return next();
@@ -143,58 +141,7 @@ const WALLET_LOG_CHANNEL_NAME = "wallet-log";
 const TRADING_LOG_CHANNEL_NAME = "trading-log"; 
 const ADMIN_REVIEW_CHANNEL_NAME = "admin-review";         
 const EVENT_LOG_CHANNEL_NAME = "event-log";         
-const WELCOME_CHANNEL_NAME = "selamat-datang";
-const SERVER_LOGS_CHANNEL_NAME = "server-logs";
-const UPDATE_CHANNEL_NAME = "plato-update";
 const LOGO_URL = "https://cdn.discordapp.com/attachments/1549051773438787724/1549403998686281808/IMG_5614.png";
-
-let lastPostedUpdateId = null;
-
-async function checkPlatoUpdates() {
-  try {
-    const rssUrl = "https://nitter.poast.org/platochat/rss";
-    const response = await fetch(rssUrl);
-    if (!response.ok) return;
-    const text = await response.text();
-
-    const matchLink = text.match(/<link>(.*?)<\/link>/);
-    const matchTitle = text.match(/<title>(.*?)<\/title>/);
-
-    if (matchLink && matchTitle) {
-      const updateUrl = matchLink[1];
-      const updateContent = matchTitle[1];
-
-      if (updateUrl !== lastPostedUpdateId && !updateUrl.includes("/rss")) {
-        lastPostedUpdateId = updateUrl;
-
-        for (const [_, guild] of client.guilds.cache) {
-          const targetChannel = guild.channels.cache.find(
-            c => c.name.toLowerCase().includes(UPDATE_CHANNEL_NAME.toLowerCase()) && c.isTextBased()
-          );
-
-          if (targetChannel) {
-            const updateRole = guild.roles.cache.find(r => r.name.toLowerCase() === "plato update" || r.name.toLowerCase() === "@plato update");
-            const pingTarget = updateRole ? `<@&${updateRole.id}>` : "@Plato Update";
-
-            const updateEmbed = new EmbedBuilder()
-              .setColor("#ff69b4")
-              .setTitle("🛠️・Plato Official Update")
-              .setDescription(`${updateContent}\n\n[🔗 Baca Update Penuh di X](${updateUrl})`)
-              .setThumbnail(LOGO_URL)
-              .setTimestamp();
-
-            await targetChannel.send({ 
-              content: `${pingTarget} ✨ **Terdapat update baharu daripada Plato!**`, 
-              embeds: [updateEmbed] 
-            }).catch(() => {});
-          }
-        }
-      }
-    }
-  } catch (error) {
-    console.error("Gagal mengambil update Plato dari X:", error);
-  }
-}
 
 const commands = [
   new SlashCommandBuilder().setName("wallet").setDescription("Semak baki akaun PlatoMy • Wallet anda! 🏦"),
@@ -260,9 +207,6 @@ client.once(Events.ClientReady, async (c) => {
   } catch (error) {
     console.error("Gagal mendaftarkan slash commands:", error);
   }
-
-  checkPlatoUpdates();
-  setInterval(checkPlatoUpdates, 180000);
 });
 
 client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
@@ -468,7 +412,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return;
     }
 
-    // --- PENGENDALI ARAHAN EVENT ---
     if (interaction.commandName === "event") {
       const sub = interaction.options.getSubcommand();
       if (sub === "create") {
