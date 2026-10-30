@@ -50,7 +50,7 @@ function getWallet(id) {
   return wallets.get(id);
 }
 
-// --- INTEGRASI WEB DASHBOARD ---
+// --- INTEGRASI WEB DASHBOARD & PASSPORT ---
 const app = express();
 const PORT = process.env.PORT || 8080;
 
@@ -78,21 +78,20 @@ const CALLBACK_URL = process.env.CALLBACK_URL || "https://platomy-production.up.
 passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((obj, done) => done(null, obj));
 
-if (CLIENT_ID && CLIENT_SECRET) {
-  passport.use(
-    new DiscordStrategy(
-      {
-        clientID: CLIENT_ID,
-        clientSecret: CLIENT_SECRET,
-        callbackURL: CALLBACK_URL,
-        scope: ["identify", "guilds"],
-      },
-      (accessToken, refreshToken, profile, done) => {
-        process.nextTick(() => done(null, profile));
-      }
-    )
-  );
-}
+// Didaftarkan secara langsung tanpa syarat if untuk mengelakkan Unknown Strategy
+passport.use(
+  new DiscordStrategy(
+    {
+      clientID: CLIENT_ID,
+      clientSecret: CLIENT_SECRET,
+      callbackURL: CALLBACK_URL,
+      scope: ["identify", "guilds"],
+    },
+    (accessToken, refreshToken, profile, done) => {
+      process.nextTick(() => done(null, profile));
+    }
+  )
+);
 
 function checkAuth(req, res, next) {
   if (req.isAuthenticated()) return next();
