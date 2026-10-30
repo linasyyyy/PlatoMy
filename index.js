@@ -71,14 +71,14 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
-const CLIENT_ID = process.env.CLIENT_ID;
-const CLIENT_SECRET = process.env.CLIENT_SECRET;
+// Diambil dari env Railway atau fallback selamat
+const CLIENT_ID = process.env.CLIENT_ID || "1556578779437072546";
+const CLIENT_SECRET = process.env.CLIENT_SECRET || "XIfRq23FWQttp-5E9JSgRLfizc03Io_9";
 const CALLBACK_URL = process.env.CALLBACK_URL || "https://platomy-production.up.railway.app/discord/callback";
 
 passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((obj, done) => done(null, obj));
 
-// Didaftarkan secara langsung tanpa syarat if untuk mengelakkan Unknown Strategy
 passport.use(
   new DiscordStrategy(
     {
