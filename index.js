@@ -15,6 +15,8 @@ import {
   TextInputStyle,
   ChannelType,
 } from "discord.js";
+import pkg from 'pg';
+const { Pool } = pkg;
 import express from "express";
 import session from "express-session";
 import passport from "passport";
@@ -30,21 +32,62 @@ if (!token) {
   console.error("RALAT: DISCORD_TOKEN tidak ditemui di dalam Environment Variables!");
 }
 
+// === TETAPAN NEON POSTGRESQL POOL ===
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
+
+// Ambil atau cipta wallet dari Database Neon
+async function getWallet(userId) {
+  try {
+    const res = await pool.query("SELECT * FROM wallets WHERE user_id = $1", [userId]);
+    if (res.rows.length > 0) {
+      return {
+        coins: parseInt(res.rows[0].coins),
+        pips: parseInt(res.rows[0].pips),
+        exp: parseInt(res.rows[0].exp),
+        sponsorTotal: parseInt(res.rows[0].sponsor_total)
+      };
+    } else {
+      await pool.query(
+        "INSERT INTO wallets (user_id, coins, pips, exp, sponsor_total) VALUES ($1, 0, 0, 0, 0)",
+        [userId]
+      );
+      return { coins: 0, pips: 0, exp: 0, sponsorTotal: 0 };
+    }
+  } catch (err) {
+    console.error("Database Error (getWallet):", err);
+    return { coins: 0, pips: 0, exp: 0, sponsorTotal: 0 };
+  }
+}
+
+// Simpan kemaskini wallet ke Database Neon
+async function saveWallet(userId, w) {
+  try {
+    await pool.query(
+      `INSERT INTO wallets (user_id, coins, pips, exp, sponsor_total) 
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (user_id) 
+       DO UPDATE SET coins = $2, pips = $3, exp = $4, sponsor_total = $5`,
+      [userId, w.coins, w.pips, w.exp, w.sponsorTotal]
+    );
+  } catch (err) {
+    console.error("Database Error (saveWallet):", err);
+  }
+}
+
 // === TETAPAN GOOGLE SHEETS WEB APP URL ===
-const GOOGLE_SHEET_WEB_APP_URL = process.env.GOOGLE_SHEET_WEB_APP_URL || "MASUKKAN_URL_WEB_APP_GOOGLE_SCRIPT_ANDA_DI_SINI";
+const GOOGLE_SHEET_WEB_APP_URL = process.env.GOOGLE_SHEET_WEB_APP_URL || "";
 
 async function sendToGoogleSheet(sheetName, headers, values) {
-  if (!GOOGLE_SHEET_WEB_APP_URL || GOOGLE_SHEET_WEB_APP_URL.includes("MASUKKAN_URL")) {
-    console.log(`[Google Sheets] Skip logging to ${sheetName}: URL Web App belum ditetapkan.`);
-    return;
-  }
+  if (!GOOGLE_SHEET_WEB_APP_URL || GOOGLE_SHEET_WEB_APP_URL.includes("MASUKKAN_URL")) return;
   try {
     await fetch(`${GOOGLE_SHEET_WEB_APP_URL}?sheet=${encodeURIComponent(sheetName)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ headers, values })
     });
-    console.log(`[Google Sheets] Berjaya log data ke tab ${sheetName}!`);
   } catch (error) {
     console.error(`[Google Sheets Error] Gagal menghantar log ke ${sheetName}:`, error);
   }
@@ -60,15 +103,9 @@ const client = new Client({
   ] 
 });
 
-const wallets = new Map();
 const giveawaysMap = new Map(); 
 const rumbleMap = new Map(); 
 const tempVoiceOwners = new Map();
-
-function getWallet(id) {
-  if (!wallets.has(id)) wallets.set(id, { coins: 0, pips: 0, exp: 0, sponsorTotal: 0 });
-  return wallets.get(id);
-}
 
 // --- INTEGRASI WEB DASHBOARD ---
 const app = express();
@@ -122,32 +159,40 @@ app.get("/login", passport.authenticate("discord"));
 app.get("/discord/callback", passport.authenticate("discord", { failureRedirect: "/" }), (req, res) => { res.redirect("/"); });
 app.get("/logout", (req, res) => { req.logout(() => { res.redirect("/"); }); });
 
-app.get("/", checkAuth, (req, res) => {
-  const userWallet = getWallet(req.user.id);
-  const allWallets = [...wallets.entries()].map(([id, data]) => ({ id, ...data }));
+app.get("/", checkAuth, async (req, res) => {
+  const userWallet = await getWallet(req.user.id);
+  const result = await pool.query("SELECT * FROM wallets");
+  const allWallets = result.rows.map(row => ({
+    id: row.user_id,
+    coins: parseInt(row.coins),
+    pips: parseInt(row.pips),
+    exp: parseInt(row.exp),
+    sponsorTotal: parseInt(row.sponsor_total)
+  }));
 
   res.render("dashboard", {
     user: req.user,
     wallet: userWallet,
     allWallets: allWallets,
-    totalCoins: Array.from(wallets.values()).reduce((a, b) => a + b.coins, 0),
-    totalPips: Array.from(wallets.values()).reduce((a, b) => a + b.pips, 0),
+    totalCoins: allWallets.reduce((a, b) => a + b.coins, 0),
+    totalPips: allWallets.reduce((a, b) => a + b.pips, 0),
     botClient: client
   });
 });
 
-app.post("/api/inject-assets", checkAuth, (req, res) => {
+app.post("/api/inject-assets", checkAuth, async (req, res) => {
   const { targetId, assetType, amount } = req.body;
   if (!targetId || !amount) return res.status(400).json({ error: "Sila isi semua maklumat!" });
 
   const cleanTargetId = targetId.replace(/[<@!>]/g, "").trim();
-  const targetWallet = getWallet(cleanTargetId);
+  const targetWallet = await getWallet(cleanTargetId);
   const qty = parseInt(amount) || 0;
 
   if (assetType.includes("Coins")) targetWallet.coins += qty;
   else if (assetType.includes("Sponsor")) targetWallet.sponsorTotal += qty;
   else targetWallet.pips += qty;
 
+  await saveWallet(cleanTargetId, targetWallet);
   res.json({ success: true, message: `Berjaya menambah ${qty} ${assetType} kepada ${cleanTargetId}!` });
 });
 
@@ -165,7 +210,6 @@ const LOGO_URL = "https://cdn.discordapp.com/attachments/1549051773438787724/154
 
 let lastPostedUpdateId = null;
 
-// --- PEMBAIKAN ALERT TWITTER / NITTER RSS ---
 async function checkPlatoUpdates() {
   const rssUrls = [
     "https://nitter.privacydev.net/platochat/rss",
@@ -181,9 +225,7 @@ async function checkPlatoUpdates() {
         text = await response.text();
         break;
       }
-    } catch (err) {
-      // Cuba pelayan seterusnya jika gagal
-    }
+    } catch (err) {}
   }
 
   if (!text) return;
@@ -229,9 +271,7 @@ async function checkPlatoUpdates() {
         }
       }
     }
-  } catch (error) {
-    console.error("Gagal memproses update Plato dari X:", error);
-  }
+  } catch (error) {}
 }
 
 const commands = [
@@ -323,7 +363,7 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
       });
       await member.voice.setChannel(userVc);
       tempVoiceOwners.set(userVc.id, member.id);
-    } catch (err) { console.error(err); }
+    } catch (err) {}
   }
 
   if (oldState.channel) {
@@ -376,9 +416,10 @@ client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot || !message.guild) return;
   const userId = message.author.id;
 
-  const w = getWallet(userId);
+  const w = await getWallet(userId);
   const oldExp = w.exp;
   w.exp += 2;
+  await saveWallet(userId, w);
 
   const oldData = calculateLevelData(oldExp);
   const newData = calculateLevelData(w.exp);
@@ -401,17 +442,17 @@ client.on(Events.MessageCreate, async (message) => {
   }
 
   if (content === "!lb" || content === "!leaderboard") {
-    const sortedWallets = [...wallets.entries()].sort((a, b) => b[1].exp - a[1].exp).slice(0, 10);
+    const result = await pool.query("SELECT * FROM wallets ORDER BY exp DESC LIMIT 10");
     let lbDescription = "";
     
-    if (sortedWallets.length === 0) {
+    if (result.rows.length === 0) {
       lbDescription = "• *Belum ada rekod leaderboard EXP lagi.*";
     } else {
       const medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
-      sortedWallets.forEach(([uid, data], index) => {
+      result.rows.forEach((row, index) => {
         const medalIcon = medals[index] || `#${index + 1}`;           
-        const userLevelData = calculateLevelData(data.exp);           
-        lbDescription += `${medalIcon} **<@${uid}>**\nLevel ${userLevelData.level} • EXP: **${data.exp.toLocaleString()}**\n\n`;
+        const userLevelData = calculateLevelData(parseInt(row.exp));           
+        lbDescription += `${medalIcon} **<@${row.user_id}>**\nLevel ${userLevelData.level} • EXP: **${parseInt(row.exp).toLocaleString()}**\n\n`;
       });
     }
 
@@ -427,8 +468,8 @@ client.on(Events.MessageCreate, async (message) => {
   }
 
   if (content === "!level" || content === "!rank") {
-    const sortedArr = [...wallets.entries()].sort((a, b) => b[1].exp - a[1].exp);
-    const serverRank = sortedArr.findIndex(([id]) => id === userId) + 1;
+    const allRes = await pool.query("SELECT user_id, exp FROM wallets ORDER BY exp DESC");
+    const serverRank = allRes.rows.findIndex(r => r.user_id === userId) + 1;
     const rankDisplay = serverRank > 0 ? `#${serverRank}` : "#-";
 
     const data = calculateLevelData(w.exp);
@@ -460,7 +501,7 @@ client.on(Events.MessageCreate, async (message) => {
 client.on(Events.InteractionCreate, async (interaction) => {
   if (interaction.isChatInputCommand()) {
     if (interaction.commandName === "wallet") {
-      const w = getWallet(interaction.user.id);
+      const w = await getWallet(interaction.user.id);
       const timeString = getMalaysiaTime();
       const embed = new EmbedBuilder()
         .setColor("#ff69b4")
@@ -529,7 +570,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const amount = interaction.options.getInteger("amount");
       const reason = interaction.options.getString("reason") || "Tiada sebab dinyatakan";
 
-      const targetWallet = getWallet(targetUser.id);
+      const targetWallet = await getWallet(targetUser.id);
       let actionTitle = "";
       let actionDesc = "";
       let sheetTarget = "WALLET LOG";
@@ -560,6 +601,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         actionDesc = `Menyemak baki wallet ${targetUser}.`;
       }
 
+      await saveWallet(targetUser.id, targetWallet);
       await interaction.reply({ content: `✅ Tindakan berjaya dilaksana untuk ${targetUser}!`, ephemeral: true });
 
       const logChannel = interaction.guild.channels.cache.find(
@@ -606,17 +648,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     if (interaction.commandName === "leaderboard") {
       const colorInput = interaction.options.getString("color") || "#ff69b4";
-      const sortedWallets = [...wallets.entries()].sort((a, b) => b[1].exp - a[1].exp).slice(0, 10);
+      const result = await pool.query("SELECT * FROM wallets ORDER BY exp DESC LIMIT 10");
       let lbDescription = "";
       
-      if (sortedWallets.length === 0) {
+      if (result.rows.length === 0) {
         lbDescription = "• *Belum ada rekod leaderboard EXP lagi.*";
       } else {
         const medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
-        sortedWallets.forEach(([userId, data], index) => {
+        result.rows.forEach((row, index) => {
           const medalIcon = medals[index] || `#${index + 1}`;           
-          const userLevelData = calculateLevelData(data.exp);           
-          lbDescription += `${medalIcon} **<@${userId}>**\nLevel ${userLevelData.level} • EXP: **${data.exp.toLocaleString()}**\n\n`;
+          const userLevelData = calculateLevelData(parseInt(row.exp));           
+          lbDescription += `${medalIcon} **<@${row.user_id}>**\nLevel ${userLevelData.level} • EXP: **${parseInt(row.exp).toLocaleString()}**\n\n`;
         });
       }
 
