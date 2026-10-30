@@ -11,7 +11,6 @@
     :root {
       --bg-dark: #050508;
       --bg-card: #0d0814;
-      --bg-card-hover: #150d21;
       --pink-accent: #F996B1;
       --pink-dark: #a84763;
       --pink-glow: rgba(249, 150, 177, 0.4);
@@ -31,6 +30,7 @@
       font-family: 'Space Grotesk', sans-serif;
       min-height: 100vh;
       display: flex;
+      flex-direction: column;
       overflow-x: hidden;
       background-image: 
         radial-gradient(circle at 10% 20%, rgba(249, 150, 177, 0.1) 0%, transparent 35%),
@@ -52,18 +52,26 @@
       opacity: 0.5;
     }
 
+    /* Layout Wrapper for Mobile */
+    .app-wrapper {
+      display: flex;
+      width: 100%;
+      min-height: 100vh;
+    }
+
     /* Sidebar */
     .sidebar {
       width: var(--sidebar-width);
-      background: rgba(8, 5, 12, 0.95);
+      background: rgba(8, 5, 12, 0.98);
       border-right: 1px solid rgba(249, 150, 177, 0.2);
       padding: 24px 18px;
       display: flex;
       flex-direction: column;
       position: fixed;
       height: 100vh;
-      z-index: 10;
+      z-index: 100;
       backdrop-filter: blur(10px);
+      transition: transform 0.3s ease;
     }
 
     .brand {
@@ -76,7 +84,7 @@
       color: #fff;
       text-transform: uppercase;
       letter-spacing: 2px;
-      margin-bottom: 30px;
+      margin-bottom: 20px;
       padding-bottom: 15px;
       border-bottom: 1px solid rgba(249, 150, 177, 0.2);
     }
@@ -103,46 +111,39 @@
       background: rgba(0, 0, 0, 0.4);
       border: 1px solid rgba(249, 150, 177, 0.2);
       border-radius: 8px;
-      padding: 12px;
+      padding: 10px;
       display: flex;
       align-items: center;
-      gap: 12px;
-      margin-bottom: 25px;
+      gap: 10px;
+      margin-bottom: 20px;
     }
 
     .user-avatar {
-      width: 40px;
-      height: 40px;
+      width: 36px;
+      height: 36px;
       border-radius: 50%;
       border: 2px solid var(--pink-accent);
     }
 
-    .user-info h4 {
-      font-size: 0.9rem;
-      color: #fff;
-    }
-
-    .user-info p {
-      font-size: 0.75rem;
-      color: var(--pink-accent);
-    }
+    .user-info h4 { font-size: 0.85rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .user-info p { font-size: 0.7rem; color: var(--pink-accent); }
 
     .nav-menu {
       list-style: none;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
     }
 
     .nav-item a {
       display: flex;
       align-items: center;
       gap: 12px;
-      padding: 12px 16px;
+      padding: 10px 14px;
       color: var(--text-muted);
       text-decoration: none;
       font-weight: 600;
-      font-size: 0.9rem;
+      font-size: 0.85rem;
       border-radius: 6px;
       transition: all 0.25s ease;
       border: 1px solid transparent;
@@ -155,32 +156,29 @@
       text-shadow: 0 0 8px var(--pink-glow);
     }
 
-    .nav-item a.active {
-      border-left: 4px solid var(--pink-accent);
-    }
+    .nav-item a.active { border-left: 4px solid var(--pink-accent); }
 
     .bot-status-widget {
       margin-top: auto;
       background: rgba(0, 0, 0, 0.5);
       border: 1px solid rgba(249, 150, 177, 0.25);
       border-radius: 8px;
-      padding: 14px;
+      padding: 12px;
     }
 
     .status-indicator {
       display: flex;
       align-items: center;
       gap: 8px;
-      font-size: 0.8rem;
+      font-size: 0.75rem;
       font-weight: 700;
       color: var(--pink-accent);
       text-transform: uppercase;
-      letter-spacing: 1px;
     }
 
     .dot-online {
-      width: 8px;
-      height: 8px;
+      width: 7px;
+      height: 7px;
       background-color: #50fa7b;
       border-radius: 50%;
       box-shadow: 0 0 8px #50fa7b;
@@ -190,22 +188,48 @@
     .main-content {
       margin-left: var(--sidebar-width);
       flex: 1;
-      padding: 30px;
+      padding: 25px;
       min-height: 100vh;
+      width: calc(100% - var(--sidebar-width));
+    }
+
+    /* Mobile Menu Toggle Button */
+    .mobile-header {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      padding: 15px 20px;
+      background: rgba(8, 5, 12, 0.95);
+      border-bottom: 1px solid rgba(249, 150, 177, 0.2);
+      position: sticky;
+      top: 0;
+      z-index: 99;
+    }
+
+    .menu-toggle-btn {
+      background: transparent;
+      border: 1px solid var(--pink-accent);
+      color: var(--pink-accent);
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 1.1rem;
+      cursor: pointer;
     }
 
     .top-bar {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 30px;
-      padding-bottom: 20px;
+      margin-bottom: 25px;
+      padding-bottom: 15px;
       border-bottom: 1px solid rgba(249, 150, 177, 0.15);
+      flex-wrap: wrap;
+      gap: 15px;
     }
 
     .page-title h1 {
       font-family: 'Orbitron', sans-serif;
-      font-size: 1.8rem;
+      font-size: 1.5rem;
       font-weight: 900;
       text-transform: uppercase;
       background: linear-gradient(180deg, #ffffff 0%, var(--pink-accent) 100%);
@@ -213,27 +237,25 @@
       -webkit-text-fill-color: transparent;
     }
 
-    .page-title p {
-      color: var(--text-muted);
-      font-size: 0.85rem;
-    }
+    .page-title p { color: var(--text-muted); font-size: 0.8rem; }
 
     .btn-cyber {
       background: var(--pink-accent);
       color: #050508;
       font-family: 'Orbitron', sans-serif;
       font-weight: 800;
-      padding: 10px 20px;
+      padding: 10px 18px;
       border: none;
       border-radius: 4px;
       cursor: pointer;
       text-transform: uppercase;
       letter-spacing: 1px;
-      font-size: 0.8rem;
+      font-size: 0.75rem;
       box-shadow: 0 0 15px var(--pink-glow);
       transition: all 0.2s ease;
       text-decoration: none;
       display: inline-block;
+      text-align: center;
     }
 
     .btn-cyber:hover {
@@ -249,33 +271,28 @@
       color: var(--pink-accent);
       font-family: 'Orbitron', sans-serif;
       font-weight: 700;
-      padding: 8px 16px;
+      padding: 8px 14px;
       border-radius: 4px;
       cursor: pointer;
       text-transform: uppercase;
-      font-size: 0.75rem;
+      font-size: 0.7rem;
       transition: all 0.2s ease;
       text-decoration: none;
-    }
-
-    .btn-outline:hover {
-      background: rgba(249, 150, 177, 0.15);
-      box-shadow: 0 0 12px var(--pink-glow);
     }
 
     /* Stats Cards Grid */
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 20px;
-      margin-bottom: 30px;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 15px;
+      margin-bottom: 25px;
     }
 
     .stat-card {
       background: var(--grad-card);
       border: 1px solid rgba(249, 150, 177, 0.2);
       border-radius: 8px;
-      padding: 20px;
+      padding: 16px;
       position: relative;
       overflow: hidden;
     }
@@ -288,27 +305,14 @@
       background: var(--grad-chrome);
     }
 
-    .stat-label {
-      color: var(--text-muted);
-      font-size: 0.8rem;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 8px;
-    }
-
-    .stat-value {
-      font-family: 'Orbitron', sans-serif;
-      font-size: 1.8rem;
-      font-weight: 900;
-      color: #fff;
-      text-shadow: 0 0 10px rgba(249, 150, 177, 0.3);
-    }
+    .stat-label { color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+    .stat-value { font-family: 'Orbitron', sans-serif; font-size: 1.5rem; font-weight: 900; color: #fff; text-shadow: 0 0 10px rgba(249, 150, 177, 0.3); }
 
     /* Panels & Layout */
     .dashboard-layout {
       display: grid;
       grid-template-columns: 2fr 1fr;
-      gap: 25px;
+      gap: 20px;
     }
 
     @media (max-width: 992px) {
@@ -319,22 +323,24 @@
       background: var(--grad-card);
       border: 1px solid rgba(249, 150, 177, 0.2);
       border-radius: 10px;
-      padding: 24px;
-      margin-bottom: 25px;
+      padding: 20px;
+      margin-bottom: 20px;
     }
 
     .panel-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 20px;
-      padding-bottom: 10px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
       border-bottom: 1px solid rgba(249, 150, 177, 0.15);
+      flex-wrap: wrap;
+      gap: 10px;
     }
 
     .panel-title {
       font-family: 'Orbitron', sans-serif;
-      font-size: 1.1rem;
+      font-size: 1rem;
       color: #fff;
       text-transform: uppercase;
       display: flex;
@@ -344,25 +350,32 @@
 
     .panel-title span { color: var(--pink-accent); }
 
-    /* Tables */
+    /* Tables & Responsive Scroll */
+    .table-responsive {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
     .command-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 0.9rem;
+      font-size: 0.85rem;
+      white-space: nowrap;
     }
 
     .command-table th {
       text-align: left;
-      padding: 12px;
+      padding: 10px;
       color: var(--pink-accent);
       font-family: 'Orbitron', sans-serif;
-      font-size: 0.75rem;
+      font-size: 0.7rem;
       text-transform: uppercase;
       border-bottom: 1px solid rgba(249, 150, 177, 0.2);
     }
 
     .command-table td {
-      padding: 14px 12px;
+      padding: 12px 10px;
       border-bottom: 1px solid rgba(249, 150, 177, 0.08);
       color: var(--text-main);
     }
@@ -371,210 +384,226 @@
       background: rgba(0,0,0,0.5);
       border: 1px solid rgba(249, 150, 177, 0.3);
       color: var(--pink-accent);
-      padding: 4px 8px;
+      padding: 3px 6px;
       border-radius: 4px;
       font-family: monospace;
-      font-size: 0.85rem;
+      font-size: 0.8rem;
     }
 
     /* Form Inputs */
-    .cyber-form-group {
-      margin-bottom: 16px;
-    }
-
-    .cyber-form-group label {
-      display: block;
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      margin-bottom: 6px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-
+    .cyber-form-group { margin-bottom: 14px; }
+    .cyber-form-group label { display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; }
     .cyber-input, .cyber-select {
       width: 100%;
       background: rgba(0, 0, 0, 0.6);
       border: 1px solid rgba(249, 150, 177, 0.3);
-      padding: 10px 14px;
+      padding: 10px 12px;
       border-radius: 4px;
       color: #fff;
       font-family: 'Space Grotesk', sans-serif;
       outline: none;
-      transition: all 0.2s ease;
+      font-size: 0.9rem;
     }
+    .cyber-input:focus, .cyber-select:focus { border-color: var(--pink-accent); box-shadow: 0 0 10px var(--pink-glow); }
 
-    .cyber-input:focus, .cyber-select:focus {
-      border-color: var(--pink-accent);
-      box-shadow: 0 0 10px var(--pink-glow);
-    }
+    .alert-box { margin-top: 12px; padding: 10px; border-radius: 4px; font-size: 0.8rem; display: none; }
 
-    .alert-box {
-      margin-top: 15px;
-      padding: 10px;
-      border-radius: 4px;
-      font-size: 0.85rem;
-      display: none;
+    /* Mobile Responsive Breakpoints */
+    @media (max-width: 768px) {
+      .sidebar {
+        transform: translateX(-100%);
+      }
+      .sidebar.open {
+        transform: translateX(0);
+      }
+      .main-content {
+        margin-left: 0;
+        width: 100%;
+        padding: 15px;
+      }
+      .mobile-header {
+        display: flex;
+      }
+      .page-title h1 {
+        font-size: 1.2rem;
+      }
     }
   </style>
 </head>
 <body>
 
-  <!-- Sidebar Nav -->
-  <aside class="sidebar">
-    <div class="brand">
-      <div class="brand-logo">PM</div>
-      Plato<span>Bot</span>
+  <!-- Mobile Top Header -->
+  <div class="mobile-header">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <div class="brand-logo" style="width: 30px; height: 30px; font-size: 0.8rem;">PM</div>
+      <span style="font-family: 'Orbitron', sans-serif; font-weight: bold; color: #fff; font-size: 0.9rem;">Plato<span style="color:var(--pink-accent)">My</span></span>
     </div>
+    <button class="menu-toggle-btn" onclick="toggleSidebar()">☰ Menu</button>
+  </div>
 
-    <div class="user-profile-widget">
-      <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="Avatar" class="user-avatar" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
-      <div class="user-info">
-        <h4><%= user.username %></h4>
-        <p>✦ Admin Cyber</p>
+  <div class="app-wrapper">
+    <!-- Sidebar Nav -->
+    <aside class="sidebar" id="sidebarNav">
+      <div class="brand">
+        <div class="brand-logo">PM</div>
+        Plato<span>My</span>
       </div>
-    </div>
 
-    <ul class="nav-menu">
-      <li class="nav-item"><a href="#" class="active">✦ Overview</a></li>
-      <li class="nav-item"><a href="#wallet-panel">💳 Wallet Control</a></li>
-      <li class="nav-item"><a href="#database-panel">📊 All Wallets</a></li>
-    </ul>
-
-    <div class="bot-status-widget">
-      <div class="status-indicator">
-        <span class="dot-online"></span> Bot Status: Active
-      </div>
-      <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px;">Ping: <%= botClient.ws.ping %> ms</p>
-    </div>
-  </aside>
-
-  <!-- Main Content Area -->
-  <main class="main-content">
-
-    <div class="top-bar">
-      <div class="page-title">
-        <h1>PlatoMy Bot Control Center</h1>
-        <p>Pengurusan Bot & Sistem Ekonomi Komuniti PlatoMy</p>
-      </div>
-      <a href="/logout" class="btn-outline">🚪 Log Keluar</a>
-    </div>
-
-    <!-- Quick Stats Grid -->
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-label">Total Servers</div>
-        <div class="stat-value"><%= botClient.guilds.cache.size %></div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Total Plato Coins</div>
-        <div class="stat-value"><%= totalCoins.toLocaleString() %></div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Total Pips</div>
-        <div class="stat-value"><%= totalPips.toLocaleString() %></div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Wallet Saya (Coins)</div>
-        <div class="stat-value" style="color: var(--pink-accent);"><%= wallet.coins.toLocaleString() %></div>
-      </div>
-    </div>
-
-    <!-- Dashboard Main Layout -->
-    <div class="dashboard-layout">
-
-      <!-- Left Column: Admin Wallet Injector -->
-      <div class="left-col">
-        <div class="panel" id="wallet-panel">
-          <div class="panel-header">
-            <h2 class="panel-title"><span>✦</span> Inject Assets / Wallet Admin</h2>
-          </div>
-
-          <form id="injectForm" onsubmit="handleInject(event)">
-            <div class="cyber-form-group">
-              <label>Discord ID Target</label>
-              <input type="text" id="targetId" class="cyber-input" placeholder="Cth: 3829102938491" required>
-            </div>
-
-            <div class="cyber-form-group">
-              <label>Jenis Aset</label>
-              <select id="assetType" class="cyber-select">
-                <option value="Plato Coins">🪙 Plato Coins</option>
-                <option value="Pips">💠 Pips</option>
-                <option value="Total Sponsor">🌸 Total Sponsor</option>
-              </select>
-            </div>
-
-            <div class="cyber-form-group">
-              <label>Jumlah (Amount)</label>
-              <input type="number" id="amount" class="cyber-input" placeholder="Cth: 5000" required>
-            </div>
-
-            <button type="submit" class="btn-cyber" style="width: 100%;">⚡ Masukkan Aset</button>
-            <div id="alertBox" class="alert-box"></div>
-          </form>
+      <div class="user-profile-widget">
+        <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="Avatar" class="user-avatar" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
+        <div class="user-info">
+          <h4><%= user.username %></h4>
+          <p>✦ Admin Cyber</p>
         </div>
       </div>
 
-      <!-- Right Column: My Profile Quick Info -->
-      <div class="right-col">
-        <div class="panel">
-          <div class="panel-header">
-            <h2 class="panel-title"><span>✦</span> Akaun Anda</h2>
-          </div>
-          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 15px;">Maklumat akaun Discord yang sedang log masuk:</p>
-          <div style="background: rgba(0,0,0,0.5); padding: 15px; border-radius: 6px; border: 1px solid rgba(249,150,177,0.2);">
-            <p>🪙 <b>Coins:</b> <%= wallet.coins.toLocaleString() %></p>
-            <p style="margin-top: 8px;">💠 <b>Pips:</b> <%= wallet.pips.toLocaleString() %></p>
-            <p style="margin-top: 8px;">🌸 <b>Sponsor:</b> <%= wallet.sponsorTotal.toLocaleString() %></p>
-            <p style="margin-top: 8px;">✨ <b>EXP:</b> <%= wallet.exp.toLocaleString() %></p>
-          </div>
+      <ul class="nav-menu">
+        <li class="nav-item"><a href="#" class="active" onclick="toggleSidebar()">✦ Overview</a></li>
+        <li class="nav-item"><a href="#wallet-panel" onclick="toggleSidebar()">💳 Wallet Control</a></li>
+        <li class="nav-item"><a href="#database-panel" onclick="toggleSidebar()">📊 All Wallets</a></li>
+      </ul>
+
+      <div class="bot-status-widget">
+        <div class="status-indicator">
+          <span class="dot-online"></span> Bot Status: Active
+        </div>
+        <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 5px;">Ping: <%= botClient.ws.ping %> ms</p>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+
+      <div class="top-bar">
+        <div class="page-title">
+          <h1>PlatoMy</h1>
+          <p>Pengurusan Bot & Sistem Ekonomi Komuniti</p>
+        </div>
+        <a href="/logout" class="btn-outline">🚪 Log Keluar</a>
+      </div>
+
+      <!-- Quick Stats Grid -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Total Servers</div>
+          <div class="stat-value"><%= botClient.guilds.cache.size %></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Coins</div>
+          <div class="stat-value"><%= totalCoins.toLocaleString() %></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Pips</div>
+          <div class="stat-value"><%= totalPips.toLocaleString() %></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Wallet Anda</div>
+          <div class="stat-value" style="color: var(--pink-accent);"><%= wallet.coins.toLocaleString() %></div>
         </div>
       </div>
 
-    </div>
+      <!-- Dashboard Main Layout -->
+      <div class="dashboard-layout">
 
-    <!-- Bottom Full Width Panel: All Wallets Database -->
-    <div class="panel" id="database-panel">
-      <div class="panel-header">
-        <h2 class="panel-title"><span>✦</span> Senarai Wallet Ahli Komuniti</h2>
-        <span style="font-size: 0.8rem; color: var(--pink-accent);"><%= allWallets.length %> Pengguna Berdaftar</span>
+        <!-- Left Column: Admin Wallet Injector -->
+        <div class="left-col">
+          <div class="panel" id="wallet-panel">
+            <div class="panel-header">
+              <h2 class="panel-title"><span>✦</span> Inject Assets</h2>
+            </div>
+
+            <form id="injectForm" onsubmit="handleInject(event)">
+              <div class="cyber-form-group">
+                <label>Discord ID Target</label>
+                <input type="text" id="targetId" class="cyber-input" placeholder="Cth: 3829102938491" required>
+              </div>
+
+              <div class="cyber-form-group">
+                <label>Jenis Aset</label>
+                <select id="assetType" class="cyber-select">
+                  <option value="Plato Coins">🪙 Plato Coins</option>
+                  <option value="Pips">💠 Pips</option>
+                  <option value="Total Sponsor">🌸 Total Sponsor</option>
+                </select>
+              </div>
+
+              <div class="cyber-form-group">
+                <label>Jumlah (Amount)</label>
+                <input type="number" id="amount" class="cyber-input" placeholder="Cth: 5000" required>
+              </div>
+
+              <button type="submit" class="btn-cyber" style="width: 100%;">⚡ Masukkan Aset</button>
+              <div id="alertBox" class="alert-box"></div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Right Column: My Profile Quick Info -->
+        <div class="right-col">
+          <div class="panel">
+            <div class="panel-header">
+              <h2 class="panel-title"><span>✦</span> Akaun Anda</h2>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 12px;">Maklumat akaun Discord semasa:</p>
+            <div style="background: rgba(0,0,0,0.5); padding: 12px; border-radius: 6px; border: 1px solid rgba(249,150,177,0.2); font-size: 0.9rem;">
+              <p>🪙 <b>Coins:</b> <%= wallet.coins.toLocaleString() %></p>
+              <p style="margin-top: 6px;">💠 <b>Pips:</b> <%= wallet.pips.toLocaleString() %></p>
+              <p style="margin-top: 6px;">🌸 <b>Sponsor:</b> <%= wallet.sponsorTotal.toLocaleString() %></p>
+              <p style="margin-top: 6px;">✨ <b>EXP:</b> <%= wallet.exp.toLocaleString() %></p>
+            </div>
+          </div>
+        </div>
+
       </div>
 
-      <div style="overflow-x: auto;">
-        <table class="command-table">
-          <thead>
-            <tr>
-              <th>Discord ID</th>
-              <th>Plato Coins</th>
-              <th>Pips</th>
-              <th>Total Sponsor</th>
-              <th>EXP / Level</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% if (allWallets.length === 0) { %>
+      <!-- Bottom Full Width Panel: All Wallets Database -->
+      <div class="panel" id="database-panel">
+        <div class="panel-header">
+          <h2 class="panel-title"><span>✦</span> Senarai Wallet Ahli</h2>
+          <span style="font-size: 0.75rem; color: var(--pink-accent);"><%= allWallets.length %> Pengguna</span>
+        </div>
+
+        <div class="table-responsive">
+          <table class="command-table">
+            <thead>
               <tr>
-                <td colspan="5" style="text-align: center; color: var(--text-muted);">Tiada data wallet direkodkan lagi.</td>
+                <th>Discord ID</th>
+                <th>Plato Coins</th>
+                <th>Pips</th>
+                <th>Total Sponsor</th>
+                <th>EXP</th>
               </tr>
-            <% } else { %>
-              <% allWallets.forEach(w => { %>
+            </thead>
+            <tbody>
+              <% if (allWallets.length === 0) { %>
                 <tr>
-                  <td><span class="command-code"><%= w.id %></span></td>
-                  <td>🪙 <%= w.coins.toLocaleString() %></td>
-                  <td>💠 <%= w.pips.toLocaleString() %></td>
-                  <td>🌸 <%= w.sponsorTotal.toLocaleString() %></td>
-                  <td>✨ <%= w.exp.toLocaleString() %> EXP</td>
+                  <td colspan="5" style="text-align: center; color: var(--text-muted);">Tiada data wallet direkodkan lagi.</td>
                 </tr>
-              <% }) %>
-            <% } %>
-          </tbody>
-        </table>
+              <% } else { %>
+                <% allWallets.forEach(w => { %>
+                  <tr>
+                    <td><span class="command-code"><%= w.id %></span></td>
+                    <td>🪙 <%= w.coins.toLocaleString() %></td>
+                    <td>💠 <%= w.pips.toLocaleString() %></td>
+                    <td>🌸 <%= w.sponsorTotal.toLocaleString() %></td>
+                    <td>✨ <%= w.exp.toLocaleString() %> EXP</td>
+                  </tr>
+                <% }) %>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
 
-  </main>
+    </main>
+  </div>
 
   <script>
+    function toggleSidebar() {
+      const sidebar = document.getElementById('sidebarNav');
+      sidebar.classList.toggle('open');
+    }
+
     async function handleInject(event) {
       event.preventDefault();
       const targetId = document.getElementById('targetId').value;
