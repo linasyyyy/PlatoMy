@@ -14,7 +14,6 @@ import {
   TextInputBuilder,
   TextInputStyle,
   ChannelType,
-  StringSelectMenuBuilder,
 } from "discord.js";
 import express from "express";
 import session from "express-session";
@@ -31,6 +30,27 @@ if (!token) {
   console.error("RALAT: DISCORD_TOKEN tidak ditemui di dalam Environment Variables!");
 }
 
+// === TETAPAN GOOGLE SHEETS WEB APP URL ===
+// Gantikan dengan URL Web App Apps Script anda (berakhiran /exec)
+const GOOGLE_SHEET_WEB_APP_URL = process.env.GOOGLE_SHEET_WEB_APP_URL || "MASUKKAN_URL_WEB_APP_GOOGLE_SCRIPT_ANDA_DI_SINI";
+
+async function sendToGoogleSheet(sheetName, headers, values) {
+  if (!GOOGLE_SHEET_WEB_APP_URL || GOOGLE_SHEET_WEB_APP_URL.includes("MASUKKAN_URL")) {
+    console.log(`[Google Sheets] Skip logging to ${sheetName}: URL Web App belum ditetapkan.`);
+    return;
+  }
+  try {
+    await fetch(`${GOOGLE_SHEET_WEB_APP_URL}?sheet=${encodeURIComponent(sheetName)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ headers, values })
+    });
+    console.log(`[Google Sheets] Berjaya log data ke tab ${sheetName}!`);
+  } catch (error) {
+    console.error(`[Google Sheets Error] Gagal menghantar log ke ${sheetName}:`, error);
+  }
+}
+
 const client = new Client({ 
   intents: [
     GatewayIntentBits.Guilds, 
@@ -42,8 +62,6 @@ const client = new Client({
 });
 
 const wallets = new Map();
-const eventsMap = new Map();
-const birthdaysMap = new Map(); 
 const giveawaysMap = new Map(); 
 const rumbleMap = new Map(); 
 const tempVoiceOwners = new Map();
@@ -143,28 +161,53 @@ const WALLET_LOG_CHANNEL_NAME = "wallet-log";
 const TRADING_LOG_CHANNEL_NAME = "trading-log"; 
 const ADMIN_REVIEW_CHANNEL_NAME = "admin-review";         
 const EVENT_LOG_CHANNEL_NAME = "event-log";         
-const WELCOME_CHANNEL_NAME = "selamat-datang";
-const SERVER_LOGS_CHANNEL_NAME = "server-logs";
 const UPDATE_CHANNEL_NAME = "plato-update";
 const LOGO_URL = "https://cdn.discordapp.com/attachments/1549051773438787724/1549403998686281808/IMG_5614.png";
 
 let lastPostedUpdateId = null;
 
+// --- PEMBAIKAN ALERT TWITTER / NITTER RSS ---
 async function checkPlatoUpdates() {
-  try {
-    const rssUrl = "https://nitter.poast.org/platochat/rss";
-    const response = await fetch(rssUrl);
-    if (!response.ok) return;
-    const text = await response.text();
+  // Senarai fallback mirror Nitter & RSSHub untuk mengelakkan isu rate-limit/server down
+  const rssUrls = [
+    "https://nitter.privacydev.net/platochat/rss",
+    "https://nitter.poast.org/platochat/rss",
+    "https://rsshub.app/twitter/user/platochat"
+  ];
 
-    const matchLink = text.match(/<link>(.*?)<\/link>/);
-    const matchTitle = text.match(/<title>(.*?)<\/title>/);
+  let text = null;
+  for (const url of rssUrls) {
+    try {
+      const response = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
+      if (response.ok) {
+        text = await response.text();
+        break;
+      }
+    } catch (err) {
+      // Cuba URL seterusnya jika pelayan Nitter semasa gagal
+    }
+  }
+
+  if (!text) {
+    console.log("[Twitter Update] Semua pelayan RSS Nitter/X sedang sibuk atau tidak dapat dicapai.");
+    return;
+  }
+
+  try {
+    const itemMatch = text.match(/<item>[\s\S]*?<\/item>/i);
+    if (!itemMatch) return;
+
+    const itemXml = itemMatch[0];
+    const matchLink = itemXml.match(/<link>(.*?)<\/link>/i) || itemXml.match(/<guid.*?>(.*?)<\/guid>/i);
+    const matchTitle = itemXml.match(/<title>(.*?)<\/title>/i) || itemXml.match(/<description>(.*?)<\/description>/i);
 
     if (matchLink && matchTitle) {
-      const updateUrl = matchLink[1];
-      const updateContent = matchTitle[1];
+      const updateUrl = matchLink[1].replace("<![CDATA[", "").replace("]]>", "").trim();
+      let updateContent = matchTitle[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/gi, "$1").replace(/<[^>]+>/g, "").trim();
 
-      if (updateUrl !== lastPostedUpdateId && !updateUrl.includes("/rss")) {
+      if (updateContent.length > 280) updateContent = updateContent.substring(0, 277) + "...";
+
+      if (updateUrl !== lastPostedUpdateId && !updateUrl.endsWith("/rss")) {
         lastPostedUpdateId = updateUrl;
 
         for (const [_, guild] of client.guilds.cache) {
@@ -173,13 +216,13 @@ async function checkPlatoUpdates() {
           );
 
           if (targetChannel) {
-            const updateRole = guild.roles.cache.find(r => r.name.toLowerCase() === "plato update" || r.name.toLowerCase() === "@plato update");
+            const updateRole = guild.roles.cache.find(r => r.name.toLowerCase().includes("plato update"));
             const pingTarget = updateRole ? `<@&${updateRole.id}>` : "@Plato Update";
 
             const updateEmbed = new EmbedBuilder()
               .setColor("#ff69b4")
               .setTitle("🛠️・Plato Official Update")
-              .setDescription(`${updateContent}\n\n[🔗 Baca Update Penuh di X](${updateUrl})`)
+              .setDescription(`${updateContent}\n\n[🔗 Baca Update Penuh di X/Twitter](${updateUrl})`)
               .setThumbnail(LOGO_URL)
               .setTimestamp();
 
@@ -192,7 +235,7 @@ async function checkPlatoUpdates() {
       }
     }
   } catch (error) {
-    console.error("Gagal mengambil update Plato dari X:", error);
+    console.error("Gagal memproses update Plato dari X:", error);
   }
 }
 
@@ -262,7 +305,7 @@ client.once(Events.ClientReady, async (c) => {
   }
 
   checkPlatoUpdates();
-  setInterval(checkPlatoUpdates, 180000);
+  setInterval(checkPlatoUpdates, 120000); // Semak update setiap 2 minit
 });
 
 client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
@@ -433,7 +476,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return;
     }
 
-    // --- PENGENDALI ARAHAN EVENT ---
     if (interaction.commandName === "event") {
       const sub = interaction.options.getSubcommand();
       if (sub === "create") {
@@ -445,7 +487,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const description = interaction.options.getString("description");
         const timeString = getMalaysiaTime();
 
-        // Hantar pengumuman event ke channel semasa
         const eventEmbed = new EmbedBuilder()
           .setColor("#ff69b4")
           .setTitle(`🎉・${title}`)
@@ -456,7 +497,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await interaction.channel.send({ content: "✨ **Pengumuman Event Baharu!**", embeds: [eventEmbed] });
         await interaction.reply({ content: "✅ Event berjaya dicipta dan diumumkan!", ephemeral: true });
 
-        // Hantar salinan log ke channel event-log
         const eventLogChannel = interaction.guild.channels.cache.find(
           c => c.name.toLowerCase().includes(EVENT_LOG_CHANNEL_NAME.toLowerCase()) && c.isTextBased()
         );
@@ -474,6 +514,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
             .setTimestamp();
           await eventLogChannel.send({ embeds: [logEmbed] }).catch(() => {});
         }
+
+        // AUTO-LOG KE GOOGLE SHEETS
+        sendToGoogleSheet(
+          "EVENT LOG",
+          ["Timestamp", "Title", "Description", "Admin User", "Admin ID"],
+          [new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }), title, description, interaction.user.tag, interaction.user.id]
+        );
       }
       return;
     }
@@ -491,6 +538,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const targetWallet = getWallet(targetUser.id);
       let actionTitle = "";
       let actionDesc = "";
+      let sheetTarget = "WALLET LOG";
 
       if (action === "add_coins") {
         targetWallet.coins += amount;
@@ -512,6 +560,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         targetWallet.sponsorTotal += amount;
         actionTitle = "🌸 Total Sponsor Added";
         actionDesc = `Berjaya menambah **${amount.toLocaleString()} Total Sponsor** kepada ${targetUser}.`;
+        sheetTarget = "SPONSOR LOG";
       } else if (action === "check") {
         actionTitle = "📊 Wallet Checked";
         actionDesc = `Menyemak baki wallet ${targetUser}.`;
@@ -543,6 +592,22 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         await logChannel.send({ embeds: [logEmbed] }).catch(() => {});
       }
+
+      // AUTO-LOG KE GOOGLE SHEETS
+      if (sheetTarget === "SPONSOR LOG") {
+        sendToGoogleSheet(
+          "SPONSOR LOG",
+          ["Timestamp", "Sponsor / Plato ID", "Asset Type", "Amount", "Admin", "Notes / Reason"],
+          [new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }), targetUser.tag, "Sponsor Points", amount, interaction.user.tag, reason]
+        );
+      } else {
+        sendToGoogleSheet(
+          "WALLET LOG",
+          ["Timestamp", "User / Plato ID", "Action", "Amount", "Admin", "Reason", "Current Balance"],
+          [new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }), targetUser.tag, action, amount, interaction.user.tag, reason, targetWallet.coins]
+        );
+      }
+
       return;
     }
 
@@ -702,6 +767,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
           .setTimestamp();
         await reviewChannel.send({ embeds: [reportEmbed] }).catch(() => {});
       }
+
+      // AUTO-LOG KE GOOGLE SHEETS
+      sendToGoogleSheet(
+        "ADMIN REVIEW",
+        ["Timestamp", "User Tag", "User ID", "Report Content"],
+        [new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }), interaction.user.tag, interaction.user.id, reportContent]
+      );
       return;
     }
 
@@ -722,6 +794,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
           .setTimestamp();
         await tradingChannel.send({ embeds: [tradingEmbed] }).catch(() => {});
       }
+
+      // AUTO-LOG KE GOOGLE SHEETS
+      sendToGoogleSheet(
+        "TRADING LOG",
+        ["Timestamp", "User Tag", "User ID", "Trading Details"],
+        [new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }), interaction.user.tag, interaction.user.id, tradingContent]
+      );
       return;
     }
   }
