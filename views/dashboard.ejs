@@ -1,246 +1,445 @@
-import { EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, ChannelType, PermissionFlagsBits } from "discord.js";
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#050508">
+<title>PlatoMy | Komuniti Plato Malaysia</title>
+<link rel="icon" href="/logo.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#050508;--pink:#F996B1;--pink-d:#a84763;--glow:rgba(249,150,177,.4);--text:#f0e6f5;--muted:#9e8aa8;--line:rgba(249,150,177,.2);--ok:#50fa7b;--bad:#ff5555;--sw:240px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-serif;min-height:100vh;overflow-x:hidden;
+background-image:radial-gradient(circle at 10% 10%,rgba(249,150,177,.12),transparent 35%),radial-gradient(circle at 90% 90%,rgba(249,150,177,.08),transparent 40%)}
+h1,h2,h3{font-family:'Orbitron',sans-serif;text-transform:uppercase}
+a{color:inherit;text-decoration:none}
+button{font:inherit;cursor:pointer}
 
-const PINK = "#ff69b4";
-const SUPPORT_EMAIL = "hello@platoteam.com";
+/* Navigasi */
+.side{position:fixed;inset:0 auto 0 0;width:var(--sw);background:rgba(8,5,12,.98);border-right:1px solid var(--line);padding:20px 14px;display:flex;flex-direction:column;gap:6px;z-index:50}
+.brand{display:flex;align-items:center;gap:10px;font-family:'Orbitron';font-weight:900;letter-spacing:2px;padding-bottom:14px;margin-bottom:8px;border-bottom:1px solid var(--line)}
+.brand img{width:44px;height:44px;border-radius:50%;border:2px solid var(--pink);box-shadow:0 0 14px var(--glow)}
+.brand b{color:var(--pink)}
+.nb{display:block;width:100%;text-align:left;background:none;border:1px solid transparent;color:var(--muted);padding:11px 12px;border-radius:6px;font-weight:600;font-size:.88rem;transition:.2s}
+.nb:hover,.nb.active{color:#fff;background:rgba(249,150,177,.12);border-color:rgba(249,150,177,.4)}
+.me{margin-top:auto;display:flex;align-items:center;gap:10px;background:rgba(0,0,0,.45);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:.8rem}
+.me img{width:34px;height:34px;border-radius:50%;border:2px solid var(--pink)}
+.me small{color:var(--pink);display:block}
+.bottom{display:none;position:fixed;inset:auto 0 0 0;z-index:50;background:rgba(8,5,12,.97);border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px));justify-content:space-around}
+.bottom button{flex:1;background:none;border:0;color:var(--muted);font-size:.65rem;font-weight:600;padding:4px}
+.bottom button span{display:block;font-size:1.2rem}
+.bottom button.active{color:var(--pink)}
 
-export function registerDashboardApi({ app, client, wallets, getWallet, giveawaysMap, rumbleMap }) {
-  // Admin tambahan (pilihan): ADMIN_IDS=123,456 di Railway. Selain itu, sesiapa yang
-  // ada permission Administrator di mana-mana server bot ini dikira admin.
-  const ADMIN_IDS = (process.env.ADMIN_IDS || "").split(",").map(s => s.trim()).filter(Boolean);
-  const listings = [];
-  let listingSeq = 1;
+main{margin-left:var(--sw);padding:26px;max-width:1150px}
+.view{display:none}.view.on{display:block}
+h2{font-size:1.05rem;margin:0 0 14px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+h2 i{font-style:normal;color:var(--pink);margin-right:6px}
+.sub{color:var(--muted);font-size:.85rem;margin:-6px 0 14px}
+.grid{display:grid;gap:14px;margin-bottom:22px}
+.g4{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.g2{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.card{background:linear-gradient(145deg,rgba(20,12,28,.92),rgba(8,5,12,.96));border:1px solid var(--line);border-radius:10px;padding:16px}
+.card h3{font-size:.85rem;color:var(--pink);margin-bottom:10px}
+.m{color:var(--muted);font-size:.82rem;line-height:1.5}
 
-  // ---------- Helpers ----------
-  const clean = (s, max) => String(s ?? "").trim().slice(0, max);
-  const int = (v, min, max) => { const n = parseInt(v, 10); return Number.isFinite(n) && n >= min && n <= max ? n : null; };
-  const handle = fn => async (req, res) => {
-    try { await fn(req, res); }
-    catch (e) { console.error(e); res.status(500).json({ error: "Ralat pelayan: " + e.message }); }
-  };
+/* Hero + tiles */
+.hero{display:flex;align-items:center;gap:22px;border:1px solid var(--line);border-radius:14px;padding:22px;margin-bottom:22px;background:linear-gradient(145deg,rgba(60,18,40,.55),rgba(8,5,12,.95))}
+.hero img{width:140px;height:140px;border-radius:50%;border:2px solid var(--pink);box-shadow:0 0 30px var(--glow);flex-shrink:0}
+.hero h1{font-size:clamp(1.6rem,5vw,2.6rem);font-weight:900;background:linear-gradient(180deg,#fff,var(--pink));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.hero p{color:var(--muted);margin:6px 0 14px}
+.tile{text-align:left;color:var(--text);transition:.2s;width:100%}
+.tile:hover{border-color:var(--pink);box-shadow:0 0 16px var(--glow);transform:translateY(-2px)}
+.tile .ic{font-size:1.8rem;display:block;margin-bottom:8px}
+.tile h3{margin-bottom:4px}
+.stat small{display:block;color:var(--muted);font-size:.7rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.stat b{font-family:'Orbitron';font-size:1.45rem;font-weight:900}
 
-  const pageAuth = (req, res, next) => (req.isAuthenticated() ? next() : res.redirect("/login"));
-  const apiAuth = (req, res, next) => (req.isAuthenticated() ? next() : res.status(401).json({ error: "Sila log masuk semula." }));
+/* Forms */
+label{display:block;font-size:.7rem;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:1px}
+.in{width:100%;background:rgba(0,0,0,.6);border:1px solid rgba(249,150,177,.3);padding:10px 12px;border-radius:4px;color:#fff;font:inherit;font-size:.9rem;outline:none;margin-bottom:11px}
+.in:focus{border-color:var(--pink);box-shadow:0 0 10px var(--glow)}
+textarea.in{min-height:80px;resize:vertical}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{display:inline-block;background:var(--pink);color:#050508;font-family:'Orbitron';font-weight:800;font-size:.72rem;letter-spacing:1px;text-transform:uppercase;padding:11px 16px;border:0;border-radius:4px;box-shadow:0 0 14px var(--glow);transition:.2s;text-align:center}
+.btn:hover{background:#fff;color:var(--pink-d)}
+.btn.line{background:transparent;color:var(--pink);border:1px solid var(--pink);box-shadow:none}
+.btn.sm{padding:6px 10px;font-size:.62rem}
+.btn.full{width:100%}
 
-  async function isAdmin(userId) {
-    if (ADMIN_IDS.includes(userId)) return true;
-    for (const g of client.guilds.cache.values()) {
-      try {
-        const m = await g.members.fetch(userId);
-        if (m.permissions.has(PermissionFlagsBits.Administrator)) return true;
-      } catch {}
-    }
-    return false;
-  }
-  const requireAdmin = async (req, res, next) =>
-    (await isAdmin(req.user.id)) ? next() : res.status(403).json({ error: "Admin sahaja." });
+/* Table / lists */
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:.85rem;white-space:nowrap}
+th{text-align:left;padding:9px;color:var(--pink);font-family:'Orbitron';font-size:.66rem;text-transform:uppercase;border-bottom:1px solid var(--line)}
+td{padding:10px 9px;border-bottom:1px solid rgba(249,150,177,.08)}
+code{background:rgba(0,0,0,.5);border:1px solid rgba(249,150,177,.3);color:var(--pink);padding:2px 6px;border-radius:4px;font-size:.78rem}
+.rank{font-family:'Orbitron';color:var(--pink);font-weight:800}
+.empty{color:var(--muted);text-align:center;padding:18px;font-size:.85rem}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.chip{background:none;border:1px solid var(--line);color:var(--muted);padding:6px 14px;border-radius:20px;font-size:.78rem;font-weight:600}
+.chip.active{background:var(--pink);color:#050508;border-color:var(--pink)}
+.badge{display:inline-block;font-size:.68rem;font-weight:700;padding:3px 9px;border-radius:12px;background:rgba(249,150,177,.15);border:1px solid var(--line);color:var(--pink);margin-bottom:8px}
+.price{font-family:'Orbitron';font-weight:800;color:#fff;margin:6px 0}
+.warn{border-left:3px solid var(--pink);padding:10px 14px;background:rgba(249,150,177,.07);font-size:.8rem;color:var(--muted);border-radius:0 6px 6px 0;margin-bottom:16px}
+.rules li{list-style:none;padding:7px 0 7px 20px;position:relative;font-size:.86rem;border-bottom:1px solid rgba(249,150,177,.08)}
+.rules li::before{content:"✦";position:absolute;left:0;color:var(--pink)}
 
-  function getChannels() {
-    const out = [];
-    client.guilds.cache.forEach(g => g.channels.cache.forEach(c => {
-      if (c.type === ChannelType.GuildText) out.push({ id: c.id, name: c.name, guild: g.name });
-    }));
-    return out;
-  }
-  const getTextChannel = id => {
-    const c = client.channels.cache.get(String(id));
-    return c && c.type === ChannelType.GuildText ? c : null;
-  };
-  const findLogAny = name => {
-    for (const g of client.guilds.cache.values()) {
-      const c = g.channels.cache.find(ch => ch.name.toLowerCase().includes(name) && ch.isTextBased());
-      if (c) return c;
-    }
-    return null;
-  };
-  const pickWinners = (list, n) => {
-    const pool = [...list], out = [];
-    while (out.length < n && pool.length) out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
-    return out;
-  };
-  const footer = req => ({ text: `PlatoMy Dashboard • ${req.user.username}` });
+#toast{position:fixed;left:50%;top:18px;transform:translateX(-50%) translateY(-120px);z-index:200;padding:11px 18px;border-radius:6px;font-size:.85rem;max-width:90vw;background:#0d0814;transition:.3s}
+#toast.show{transform:translateX(-50%) translateY(0)}
 
-  // ---------- Tamat Giveaway / Rumble ----------
-  async function endGiveaway(channel, msgId) {
-    const gw = giveawaysMap.get(msgId);
-    if (!gw || gw.ended) return;
-    gw.ended = true;
-    const winners = pickWinners(gw.participants, gw.winnersCount);
-    const tag = winners.map(id => `<@${id}>`).join(", ");
-    const msg = await channel.messages.fetch(msgId).catch(() => null);
-    if (msg?.embeds[0]) {
-      const e = EmbedBuilder.from(msg.embeds[0]).setTitle("🎉 GIVEAWAY TAMAT")
-        .setDescription(`🎁 **Prize:** ${gw.prize}\n👑 **Pemenang:** ${tag || "Tiada penyertaan"}\n\n👥 **Entries:** ${gw.participants.length}`);
-      await msg.edit({ embeds: [e], components: [] }).catch(() => {});
-    }
-    await channel.send(winners.length
-      ? `🎊 Tahniah ${tag}! Anda memenangi **${gw.prize}**!`
-      : `😢 Giveaway **${gw.prize}** tamat tanpa penyertaan.`).catch(() => {});
-  }
-
-  async function endRumble(channel, msgId) {
-    const game = rumbleMap.get(msgId);
-    if (!game || game.ended) return;
-    game.ended = true;
-    const [winner] = pickWinners(game.participants, 1);
-    const label = game.currencyType === "coins" ? "🪙 Plato Coins" : "💠 Pips";
-    if (winner) {
-      const w = getWallet(winner);
-      if (game.currencyType === "coins") w.coins += game.totalPrize; else w.pips += game.totalPrize;
-    }
-    const msg = await channel.messages.fetch(msgId).catch(() => null);
-    if (msg?.embeds[0]) {
-      const e = EmbedBuilder.from(msg.embeds[0]).setTitle("🌸・Rumble Tamat")
-        .setDescription(`🎁 **Hadiah:** ${game.totalPrize.toLocaleString()} ${label}\n🏆 **Pemenang:** ${winner ? `<@${winner}>` : "Tiada penyertaan"}\n\n👥 **Penyertaan:** ${game.participants.length} pemain`);
-      await msg.edit({ embeds: [e], components: [] }).catch(() => {});
-    }
-    await channel.send(winner
-      ? `🏆 <@${winner}> menang **${game.totalPrize.toLocaleString()} ${label}** dalam PlatoMy Rumble!`
-      : "😢 Rumble tamat tanpa penyertaan.").catch(() => {});
-  }
-
-  // ---------- Halaman utama ----------
-  app.get("/", pageAuth, handle(async (req, res) => {
-    const admin = await isAdmin(req.user.id);
-    const all = [...wallets.entries()].map(([id, d]) => ({
-      id, name: client.users.cache.get(id)?.username || id, ...d,
-    }));
-    res.render("dashboard", {
-      user: req.user,
-      wallet: getWallet(req.user.id),
-      allWallets: all,
-      totalCoins: all.reduce((a, b) => a + b.coins, 0),
-      totalPips: all.reduce((a, b) => a + b.pips, 0),
-      botClient: client,
-      isAdmin: admin,
-      channels: admin ? getChannels() : [],
-      listings: listings.filter(l => l.status === "open").slice().reverse(),
-      supportEmail: SUPPORT_EMAIL,
-    });
-  }));
-
-  // ---------- Kawalan Bot (Admin) ----------
-  app.post("/api/bot/event", apiAuth, requireAdmin, handle(async (req, res) => {
-    const ch = getTextChannel(req.body.channelId);
-    const title = clean(req.body.title, 100), desc = clean(req.body.description, 1500);
-    if (!ch) return res.status(400).json({ error: "Channel tidak sah." });
-    if (!title || !desc) return res.status(400).json({ error: "Sila isi tajuk dan butiran." });
-
-    const embed = new EmbedBuilder().setColor(PINK).setTitle(`🎉・${title}`)
-      .setDescription(`${desc}\n\n🎀 Dianjurkan oleh: ${req.user.username}`)
-      .setThumbnail(client.user.displayAvatarURL()).setTimestamp();
-    await ch.send({ content: "✨ **Pengumuman Event Baharu!**", embeds: [embed] });
-
-    const log = ch.guild.channels.cache.find(c => c.name.toLowerCase().includes("event-log") && c.isTextBased());
-    if (log) await log.send({ embeds: [new EmbedBuilder().setColor(PINK).setTitle("🛡️・Event Log: New Event Created")
-      .setDescription(`📌 **Tajuk:** ${title}\n📝 **Butiran:** ${desc}\n👤 **Admin (web):** <@${req.user.id}>`).setTimestamp()] }).catch(() => {});
-
-    res.json({ message: `Event "${title}" dihantar ke #${ch.name}!` });
-  }));
-
-  app.post("/api/bot/giveaway", apiAuth, requireAdmin, handle(async (req, res) => {
-    const ch = getTextChannel(req.body.channelId);
-    const prize = clean(req.body.prize, 200), reqmt = clean(req.body.requirement, 200), image = clean(req.body.image, 500);
-    const mins = int(req.body.duration, 1, 10080), winners = int(req.body.winners, 1, 20);
-    if (!ch) return res.status(400).json({ error: "Channel tidak sah." });
-    if (!prize || !mins || !winners) return res.status(400).json({ error: "Hadiah, tempoh (1-10080 min) dan pemenang (1-20) diperlukan." });
-
-    const endSec = Math.floor((Date.now() + mins * 60000) / 1000);
-    const embed = new EmbedBuilder().setColor(PINK).setTitle("🎉 GIVEAWAY")
-      .setDescription(`🎁 **Prize:** ${prize}\n👑 **Winners:** ${winners}\n⏳ **Ends In:** <t:${endSec}:R>${reqmt ? `\n📌 **Syarat:** ${reqmt}` : ""}\n\n👥 **Entries:** 0`)
-      .setFooter(footer(req));
-    if (/^https?:\/\//.test(image)) embed.setImage(image);
-
-    const btn = new ButtonBuilder().setCustomId("join_giveaway").setLabel("🎉 Join Giveaway").setStyle(ButtonStyle.Success);
-    const msg = await ch.send({ embeds: [embed], components: [new ActionRowBuilder().addComponents(btn)] });
-    giveawaysMap.set(msg.id, { prize, winnersCount: winners, participants: [], ended: false });
-    setTimeout(() => endGiveaway(ch, msg.id), mins * 60000);
-
-    res.json({ message: `Giveaway "${prize}" bermula di #${ch.name}!` });
-  }));
-
-  app.post("/api/bot/rumble", apiAuth, requireAdmin, handle(async (req, res) => {
-    const ch = getTextChannel(req.body.channelId);
-    const currency = req.body.currency === "pips" ? "pips" : "coins";
-    const prize = int(req.body.prize, 1, 1e9), mins = int(req.body.duration, 1, 10080);
-    if (!ch) return res.status(400).json({ error: "Channel tidak sah." });
-    if (!prize || !mins) return res.status(400).json({ error: "Hadiah dan tempoh diperlukan." });
-
-    const label = currency === "coins" ? "🪙 Plato Coins" : "💠 Pips";
-    const endSec = Math.floor((Date.now() + mins * 60000) / 1000);
-    const embed = new EmbedBuilder().setColor(PINK).setTitle("🌸・PlatoMy Rumble Arena")
-      .setDescription(`🎁 **Total Prize:** ${prize.toLocaleString()} ${label}\n⏳ **Berakhir Pada:** <t:${endSec}:R>\n\n👥 **Penyertaan:** 0 pemain`);
-    const btn = new ButtonBuilder().setCustomId(`join_rumble_${currency}_${prize}`).setLabel("🎟️ Enter Free Rumble").setStyle(ButtonStyle.Success);
-    const msg = await ch.send({ embeds: [embed], components: [new ActionRowBuilder().addComponents(btn)] });
-    rumbleMap.set(msg.id, { currencyType: currency, totalPrize: prize, participants: [], ended: false });
-    setTimeout(() => endRumble(ch, msg.id), mins * 60000);
-
-    res.json({ message: `Rumble ${prize.toLocaleString()} ${label} bermula di #${ch.name}!` });
-  }));
-
-  app.post("/api/bot/announce", apiAuth, requireAdmin, handle(async (req, res) => {
-    const ch = getTextChannel(req.body.channelId);
-    const title = clean(req.body.title, 200), message = clean(req.body.message, 3000), image = clean(req.body.image, 500);
-    let color = clean(req.body.color, 7);
-    if (!/^#[0-9a-fA-F]{6}$/.test(color)) color = PINK;
-    if (!ch) return res.status(400).json({ error: "Channel tidak sah." });
-    if (!title && !message && !image) return res.status(400).json({ error: "Isi sekurang-kurangnya satu medan." });
-
-    const embed = new EmbedBuilder().setColor(color);
-    if (title) embed.setTitle(title);
-    if (message) embed.setDescription(message);
-    if (/^https?:\/\//.test(image)) embed.setImage(image);
-    await ch.send({ embeds: [embed] });
-    res.json({ message: `Embed dihantar ke #${ch.name}!` });
-  }));
-
-  app.post("/api/wallet/adjust", apiAuth, requireAdmin, handle(async (req, res) => {
-    const targetId = clean(req.body.targetId, 40).replace(/[<@!>]/g, "");
-    const amount = int(req.body.amount, 1, 1e9), reason = clean(req.body.reason, 200) || "Tiada sebab dinyatakan";
-    const type = ["coins", "pips", "sponsor"].includes(req.body.assetType) ? req.body.assetType : null;
-    const deduct = req.body.action === "deduct";
-    if (!/^\d{5,25}$/.test(targetId) || !amount || !type) return res.status(400).json({ error: "Discord ID, jenis aset dan jumlah tidak sah." });
-
-    const w = getWallet(targetId);
-    const key = type === "sponsor" ? "sponsorTotal" : type;
-    w[key] = Math.max(0, w[key] + (deduct ? -amount : amount));
-
-    const log = findLogAny("wallet-log");
-    if (log) await log.send({ embeds: [new EmbedBuilder().setColor(PINK).setTitle(`💳・Wallet Log (Web): ${deduct ? "Deduct" : "Add"} ${type}`)
-      .setDescription(`👤 **Target:** <@${targetId}> (\`${targetId}\`)\n🛡️ **Admin:** <@${req.user.id}>\n📝 **Jumlah:** ${amount.toLocaleString()}\n📌 **Reason:** ${reason}\n\n🪙 \`${w.coins.toLocaleString()}\` • 💠 \`${w.pips.toLocaleString()}\` • 🌸 \`${w.sponsorTotal.toLocaleString()}\``).setTimestamp()] }).catch(() => {});
-
-    res.json({ message: `${deduct ? "Menolak" : "Menambah"} ${amount.toLocaleString()} ${type} ${deduct ? "daripada" : "kepada"} ${targetId}!` });
-  }));
-
-  // ---------- Trading Plato Item ----------
-  const TYPES = { jual: "💰 Jual", beli: "🛒 Beli", tukar: "🔄 Tukar" };
-
-  app.post("/api/trade", apiAuth, handle(async (req, res) => {
-    const item = clean(req.body.item, 80), notes = clean(req.body.notes, 300);
-    const type = TYPES[req.body.type] ? req.body.type : null;
-    const price = clean(req.body.price, 40);
-    const currency = ["Coins", "Pips", "RM", "Tukar item"].includes(req.body.currency) ? req.body.currency : "Coins";
-    if (!item || !type) return res.status(400).json({ error: "Nama item dan jenis diperlukan." });
-    if (listings.filter(l => l.userId === req.user.id && l.status === "open").length >= 5)
-      return res.status(400).json({ error: "Maksimum 5 listing aktif. Tutup listing lama dahulu." });
-
-    const l = { id: listingSeq++, userId: req.user.id, username: req.user.username, item, type, price, currency, notes, status: "open", createdAt: Date.now() };
-    listings.push(l);
-
-    const log = findLogAny("trading-log");
-    if (log) await log.send({ embeds: [new EmbedBuilder().setColor(PINK).setTitle(`📦 Trading #${l.id}: ${TYPES[type]}`)
-      .setDescription(`🎁 **Item:** ${item}\n💎 **Harga:** ${price ? `${price} ${currency}` : "Runding"}\n📝 **Nota:** ${notes || "-"}\n👤 **Penjual/Pembeli:** <@${l.userId}>`)
-      .setFooter({ text: "PlatoMy Trading • via Web Dashboard" }).setTimestamp()] }).catch(() => {});
-
-    res.json({ message: "Listing berjaya dipaparkan!" });
-  }));
-
-  const tradeAction = status => handle(async (req, res) => {
-    const l = listings.find(x => x.id === parseInt(req.params.id, 10));
-    if (!l) return res.status(404).json({ error: "Listing tidak dijumpai." });
-    if (l.userId !== req.user.id && !(await isAdmin(req.user.id))) return res.status(403).json({ error: "Bukan listing anda." });
-    l.status = status;
-    res.json({ message: status === "sold" ? "Ditanda selesai." : "Listing dipadam." });
-  });
-  app.post("/api/trade/:id/close", apiAuth, tradeAction("sold"));
-  app.post("/api/trade/:id/delete", apiAuth, tradeAction("deleted"));
+@media(max-width:768px){
+ .side{display:none}.bottom{display:flex}
+ main{margin-left:0;padding:16px 14px 96px}
+ .hero{flex-direction:column;text-align:center}.hero img{width:110px;height:110px}
+ .row{grid-template-columns:1fr}
 }
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<%
+const lvl = exp => { let l=1, r=200, c=exp; while(c>=r){c-=r;l++;r=l*200;} return l; };
+const esc = s => String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+const chOptions = channels.map(c => `<option value="${esc(c.id)}">#${esc(c.name)} • ${esc(c.guild)}</option>`).join('');
+const top10 = allWallets.slice().sort((a,b)=>b.exp-a.exp).slice(0,10);
+const medals = ['🥇','🥈','🥉'];
+%>
+
+<div id="toast"></div>
+
+<!-- Sidebar desktop -->
+<aside class="side">
+  <div class="brand"><img src="/logo.jpg" alt="PlatoMy">Plato<b>My</b></div>
+  <button class="nb active" data-go="home">🏠 Utama</button>
+  <button class="nb" data-go="wallet">💳 Wallet</button>
+  <button class="nb" data-go="trading">📦 Trading Item</button>
+  <% if (isAdmin) { %><button class="nb" data-go="control">🤖 Kawalan Bot</button><% } %>
+  <button class="nb" data-go="info">📜 Peraturan & Bantuan</button>
+  <div class="me">
+    <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
+    <div><%= user.username %><small><%= isAdmin ? '✦ Admin' : '✦ Ahli' %> • <%= botClient.ws.ping %>ms</small></div>
+  </div>
+  <a href="/logout" class="btn line full" style="margin-top:8px">Log Keluar</a>
+</aside>
+
+<!-- Bottom nav mobile -->
+<nav class="bottom">
+  <button class="active" data-go="home"><span>🏠</span>Utama</button>
+  <button data-go="wallet"><span>💳</span>Wallet</button>
+  <button data-go="trading"><span>📦</span>Trading</button>
+  <% if (isAdmin) { %><button data-go="control"><span>🤖</span>Bot</button><% } %>
+  <button data-go="info"><span>📜</span>Bantuan</button>
+</nav>
+
+<main>
+
+<!-- ============ UTAMA ============ -->
+<section class="view on" id="v-home">
+  <div class="hero">
+    <img src="/logo.jpg" alt="PlatoMy">
+    <div>
+      <h1>PlatoMy</h1>
+      <p>Komuniti Plato Malaysia. Urus wallet, trading item dan acara di satu tempat.</p>
+      <a class="btn" href="https://discord.gg/plato" target="_blank" rel="noopener">Sertai Discord</a>
+    </div>
+  </div>
+
+  <div class="grid g4">
+    <div class="card stat"><small>Server Bot</small><b><%= botClient.guilds.cache.size %></b></div>
+    <div class="card stat"><small>Jumlah Coins</small><b><%= totalCoins.toLocaleString() %></b></div>
+    <div class="card stat"><small>Jumlah Pips</small><b><%= totalPips.toLocaleString() %></b></div>
+    <div class="card stat"><small>Level Anda</small><b style="color:var(--pink)"><%= lvl(wallet.exp) %></b></div>
+  </div>
+
+  <div class="grid g3">
+    <button class="card tile" data-go="wallet"><span class="ic">💳</span><h3>Wallet Saya</h3><p class="m">Semak coins, pips, EXP dan papan pendahulu.</p></button>
+    <button class="card tile" data-go="trading"><span class="ic">📦</span><h3>Trading Item</h3><p class="m">Jual, beli atau tukar item Plato dengan ahli lain.</p></button>
+    <% if (isAdmin) { %><button class="card tile" data-go="control"><span class="ic">🤖</span><h3>Kawalan Bot</h3><p class="m">Cipta event, giveaway, rumble dan embed terus dari web.</p></button><% } %>
+    <button class="card tile" data-go="info"><span class="ic">📜</span><h3>Peraturan & Bantuan</h3><p class="m">Panduan komuniti dan hubungi pasukan sokongan.</p></button>
+  </div>
+</section>
+
+<!-- ============ WALLET ============ -->
+<section class="view" id="v-wallet">
+  <h2><i>✦</i>Wallet Saya</h2>
+  <div class="grid g4">
+    <div class="card stat"><small>🪙 Plato Coins</small><b><%= wallet.coins.toLocaleString() %></b></div>
+    <div class="card stat"><small>💠 Pips</small><b><%= wallet.pips.toLocaleString() %></b></div>
+    <div class="card stat"><small>🌸 Sponsor</small><b><%= wallet.sponsorTotal.toLocaleString() %></b></div>
+    <div class="card stat"><small>✨ EXP (Lv <%= lvl(wallet.exp) %>)</small><b><%= wallet.exp.toLocaleString() %></b></div>
+  </div>
+
+  <h2><i>✦</i>Papan Pendahulu EXP</h2>
+  <div class="card tw" style="padding:6px;margin-bottom:22px">
+    <table>
+      <thead><tr><th>#</th><th>Ahli</th><th>Level</th><th>EXP</th></tr></thead>
+      <tbody>
+      <% if (top10.length === 0) { %><tr><td colspan="4" class="empty">Belum ada rekod.</td></tr>
+      <% } else { top10.forEach((w,i) => { %>
+        <tr><td class="rank"><%= medals[i] || (i+1) %></td><td><%= w.name %></td><td><%= lvl(w.exp) %></td><td>✨ <%= w.exp.toLocaleString() %></td></tr>
+      <% }) } %>
+      </tbody>
+    </table>
+  </div>
+
+  <% if (isAdmin) { %>
+  <h2><i>✦</i>Semua Wallet <span style="float:right;font-size:.72rem;color:var(--pink);font-family:'Space Grotesk';text-transform:none"><%= allWallets.length %> pengguna</span></h2>
+  <input type="search" id="walletSearch" class="in" placeholder="Cari nama atau Discord ID...">
+  <div class="card tw" style="padding:6px">
+    <table id="walletTable">
+      <thead><tr><th>Ahli</th><th>Discord ID</th><th>Coins</th><th>Pips</th><th>Sponsor</th><th>EXP</th></tr></thead>
+      <tbody>
+      <% if (allWallets.length === 0) { %><tr><td colspan="6" class="empty">Tiada data wallet lagi.</td></tr>
+      <% } else { allWallets.slice().sort((a,b)=>b.coins-a.coins).forEach(w => { %>
+        <tr><td><%= w.name %></td><td><code><%= w.id %></code></td><td>🪙 <%= w.coins.toLocaleString() %></td><td>💠 <%= w.pips.toLocaleString() %></td><td>🌸 <%= w.sponsorTotal.toLocaleString() %></td><td>✨ <%= w.exp.toLocaleString() %></td></tr>
+      <% }) } %>
+      </tbody>
+    </table>
+  </div>
+  <% } %>
+</section>
+
+<!-- ============ TRADING ============ -->
+<section class="view" id="v-trading">
+  <h2><i>✦</i>Trading Item Plato</h2>
+  <div class="warn">⚠️ PlatoMy hanya memaparkan listing. Urus transaksi sendiri dalam Plato dan berhati-hati dengan penipuan. Jangan kongsi kata laluan akaun.</div>
+
+  <div class="grid g2">
+    <div class="card">
+      <h3>Pasang Listing Baharu</h3>
+      <form data-api="/api/trade" data-reload="1">
+        <label>Nama item</label>
+        <input class="in" name="item" maxlength="80" placeholder="Cth: Bingkai Sakura Limited" required>
+        <div class="row">
+          <div><label>Jenis</label>
+            <select class="in" name="type"><option value="jual">💰 Jual</option><option value="beli">🛒 Beli</option><option value="tukar">🔄 Tukar</option></select></div>
+          <div><label>Mata wang</label>
+            <select class="in" name="currency"><option>Coins</option><option>Pips</option><option>RM</option><option>Tukar item</option></select></div>
+        </div>
+        <label>Harga / tawaran (kosong = runding)</label>
+        <input class="in" name="price" maxlength="40" placeholder="Cth: 5000">
+        <label>Nota</label>
+        <textarea class="in" name="notes" maxlength="300" placeholder="Keadaan item, masa online, dll."></textarea>
+        <button class="btn full" type="submit">📦 Paparkan Listing</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h3>Cara Guna</h3>
+      <ul class="rules">
+        <li>Isi borang, listing anda terus dipaparkan dan dihantar ke channel trading-log.</li>
+        <li>Pembeli tekan <b>Hubungi</b> untuk buka profil Discord anda.</li>
+        <li>Selepas selesai, tekan <b>Selesai</b> supaya listing hilang.</li>
+        <li>Maksimum 5 listing aktif setiap ahli.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="chips">
+    <button class="chip active" data-filter="all">Semua</button>
+    <button class="chip" data-filter="jual">💰 Jual</button>
+    <button class="chip" data-filter="beli">🛒 Beli</button>
+    <button class="chip" data-filter="tukar">🔄 Tukar</button>
+  </div>
+
+  <div class="grid g3" id="tradeGrid">
+    <% const T = {jual:'💰 Jual',beli:'🛒 Beli',tukar:'🔄 Tukar'}; %>
+    <% if (listings.length === 0) { %>
+      <div class="card empty" style="grid-column:1/-1">Belum ada listing. Jadilah yang pertama!</div>
+    <% } else { listings.forEach(l => { %>
+      <div class="card" data-type="<%= l.type %>">
+        <span class="badge"><%= T[l.type] %></span>
+        <h3 style="margin-bottom:2px"><%= l.item %></h3>
+        <div class="price"><%= l.price ? l.price + ' ' + l.currency : 'Runding' %></div>
+        <p class="m"><%= l.notes || 'Tiada nota.' %></p>
+        <p class="m" style="margin-top:8px">👤 <%= l.username %></p>
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+          <a class="btn sm" href="https://discord.com/users/<%= l.userId %>" target="_blank" rel="noopener">💬 Hubungi</a>
+          <% if (l.userId === user.id || isAdmin) { %>
+            <button class="btn sm line" data-trade="close" data-id="<%= l.id %>">✔ Selesai</button>
+            <button class="btn sm line" data-trade="delete" data-id="<%= l.id %>">🗑 Padam</button>
+          <% } %>
+        </div>
+      </div>
+    <% }) } %>
+  </div>
+</section>
+
+<!-- ============ KAWALAN BOT ============ -->
+<% if (isAdmin) { %>
+<section class="view" id="v-control">
+  <h2><i>✦</i>Kawalan Bot Discord</h2>
+  <p class="sub">Semua tindakan dihantar terus ke channel pilihan anda melalui bot.</p>
+  <% if (channels.length === 0) { %><div class="warn">Bot tidak menjumpai sebarang text channel. Pastikan bot berada dalam server.</div><% } %>
+
+  <div class="grid g2">
+    <div class="card"><h3>🎉 Cipta Event</h3>
+      <form data-api="/api/bot/event">
+        <label>Channel</label><select class="in" name="channelId" required><%- chOptions %></select>
+        <label>Tajuk</label><input class="in" name="title" maxlength="100" required>
+        <label>Butiran</label><textarea class="in" name="description" maxlength="1500" required></textarea>
+        <button class="btn full" type="submit">Umumkan Event</button>
+      </form></div>
+
+    <div class="card"><h3>🎁 Mula Giveaway</h3>
+      <form data-api="/api/bot/giveaway">
+        <label>Channel</label><select class="in" name="channelId" required><%- chOptions %></select>
+        <label>Hadiah</label><input class="in" name="prize" maxlength="200" required>
+        <div class="row">
+          <div><label>Tempoh (minit)</label><input class="in" type="number" name="duration" min="1" max="10080" value="60" required></div>
+          <div><label>Pemenang</label><input class="in" type="number" name="winners" min="1" max="20" value="1" required></div>
+        </div>
+        <label>Syarat (pilihan)</label><input class="in" name="requirement" maxlength="200">
+        <label>URL imej (pilihan)</label><input class="in" name="image" placeholder="https://...">
+        <button class="btn full" type="submit">Mula Giveaway</button>
+      </form></div>
+
+    <div class="card"><h3>🌸 Mula Rumble</h3>
+      <form data-api="/api/bot/rumble">
+        <label>Channel</label><select class="in" name="channelId" required><%- chOptions %></select>
+        <div class="row">
+          <div><label>Mata wang</label><select class="in" name="currency"><option value="coins">🪙 Plato Coins</option><option value="pips">💠 Pips</option></select></div>
+          <div><label>Hadiah</label><input class="in" type="number" name="prize" min="1" required></div>
+        </div>
+        <label>Tempoh (minit)</label><input class="in" type="number" name="duration" min="1" max="10080" value="10" required>
+        <button class="btn full" type="submit">Mula Rumble</button>
+      </form></div>
+
+    <div class="card"><h3>📢 Hantar Embed</h3>
+      <form data-api="/api/bot/announce">
+        <label>Channel</label><select class="in" name="channelId" required><%- chOptions %></select>
+        <label>Tajuk</label><input class="in" name="title" maxlength="200">
+        <label>Mesej</label><textarea class="in" name="message" maxlength="3000"></textarea>
+        <div class="row">
+          <div><label>Warna Hex</label><input class="in" name="color" value="#ff69b4" maxlength="7"></div>
+          <div><label>URL imej</label><input class="in" name="image" placeholder="https://..."></div>
+        </div>
+        <button class="btn full" type="submit">Hantar Embed</button>
+      </form></div>
+
+    <div class="card"><h3>💳 Urus Wallet Ahli</h3>
+      <form data-api="/api/wallet/adjust">
+        <label>Discord ID sasaran</label><input class="in" name="targetId" inputmode="numeric" placeholder="Cth: 3829102938491" required>
+        <div class="row">
+          <div><label>Aset</label><select class="in" name="assetType"><option value="coins">🪙 Plato Coins</option><option value="pips">💠 Pips</option><option value="sponsor">🌸 Total Sponsor</option></select></div>
+          <div><label>Tindakan</label><select class="in" name="action"><option value="add">Tambah</option><option value="deduct">Tolak</option></select></div>
+        </div>
+        <label>Jumlah</label><input class="in" type="number" name="amount" min="1" required>
+        <label>Sebab (pilihan)</label><input class="in" name="reason" maxlength="200">
+        <button class="btn full" type="submit">⚡ Laksana</button>
+      </form></div>
+  </div>
+</section>
+<% } %>
+
+<!-- ============ INFO ============ -->
+<section class="view" id="v-info">
+  <h2><i>✦</i>Peraturan Komuniti</h2>
+  <div class="grid g3 rules">
+    <div class="card"><h3>Umum</h3><ul>
+      <li>Dilarang eksploit app atau ganggu pengguna lain.</li>
+      <li>Dilarang tukar-menang atau manipulasi ranking.</li>
+      <li>Dilarang guna perisian pihak ketiga.</li>
+      <li>Dilarang jual beli akaun dengan wang sebenar.</li></ul></div>
+    <div class="card"><h3>Chat Bilik Awam</h3><ul>
+      <li>Tiada kandungan lucah atau haram.</li>
+      <li>Jangan kongsi maklumat peribadi orang lain.</li>
+      <li>Tiada spam. Gunakan Bahasa Melayu.</li>
+      <li>Tiada galakan keganasan atau kebencian.</li></ul></div>
+    <div class="card"><h3>Gambar Profil</h3><ul>
+      <li>Tiada kandungan lucah atau berdarah.</li>
+      <li>Tiada simbol kebencian.</li>
+      <li>Tiada gangguan atau penyamaran.</li></ul></div>
+  </div>
+
+  <h2><i>✦</i>Hubungi Sokongan</h2>
+  <div class="card" style="max-width:560px">
+    <p class="m" style="margin-bottom:12px">Jumpa bug atau ada masalah? Mesej anda dihantar terus ke <b style="color:var(--pink)"><%= supportEmail %></b>.</p>
+    <form id="mailForm">
+      <label>Subjek</label>
+      <select class="in" id="mSubject"><option>Laporan Bug</option><option>Aduan Ahli</option><option>Masalah Wallet</option><option>Lain-lain</option></select>
+      <label>Mesej</label>
+      <textarea class="in" id="mBody" required placeholder="Terangkan masalah anda..."></textarea>
+      <button class="btn full" type="submit">✉ Hantar E-mel</button>
+    </form>
+  </div>
+</section>
+
+</main>
+
+<script>
+const USER = <%- JSON.stringify({ id: user.id, username: user.username }) %>;
+const SUPPORT = <%- JSON.stringify(supportEmail) %>;
+
+/* Navigasi tab (butang -> halaman) */
+function go(v){
+  if(!document.getElementById('v-'+v)) v='home';
+  document.querySelectorAll('.view').forEach(e=>e.classList.toggle('on',e.id==='v-'+v));
+  document.querySelectorAll('[data-go]').forEach(b=>{ if(b.classList.contains('nb')||b.closest('.bottom')) b.classList.toggle('active',b.dataset.go===v); });
+  history.replaceState(null,'','#'+v);
+  window.scrollTo(0,0);
+}
+document.addEventListener('click',e=>{ const b=e.target.closest('[data-go]'); if(b){ go(b.dataset.go); } });
+go(location.hash.slice(1)||'home');
+
+/* Toast */
+function toast(ok,msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.style.border='1px solid '+(ok?'var(--ok)':'var(--bad)'); t.style.color=ok?'var(--ok)':'var(--bad)';
+  t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3500);
+}
+
+async function post(url,body){
+  const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});
+  let data={}; try{ data=await res.json(); }catch{}
+  if(!res.ok) throw new Error(data.error||'Ralat berlaku');
+  return data;
+}
+
+/* Semua borang dengan data-api */
+document.querySelectorAll('form[data-api]').forEach(f=>{
+  f.addEventListener('submit',async e=>{
+    e.preventDefault();
+    const btn=f.querySelector('button[type=submit]'); btn.disabled=true;
+    try{
+      const d=await post(f.dataset.api,Object.fromEntries(new FormData(f)));
+      toast(true,d.message||'Berjaya!');
+      if(f.dataset.reload) setTimeout(()=>{ location.hash='trading'; location.reload(); },900); else f.reset();
+    }catch(err){ toast(false,err.message); }
+    btn.disabled=false;
+  });
+});
+
+/* Trading: tapis + tindakan */
+document.querySelectorAll('.chip').forEach(c=>c.addEventListener('click',()=>{
+  document.querySelectorAll('.chip').forEach(x=>x.classList.toggle('active',x===c));
+  document.querySelectorAll('#tradeGrid [data-type]').forEach(card=>{
+    card.style.display=(c.dataset.filter==='all'||card.dataset.type===c.dataset.filter)?'':'none';
+  });
+}));
+document.querySelectorAll('[data-trade]').forEach(b=>b.addEventListener('click',async()=>{
+  if(b.dataset.trade==='delete' && !confirm('Padam listing ini?')) return;
+  try{ const d=await post('/api/trade/'+b.dataset.id+'/'+b.dataset.trade); toast(true,d.message); setTimeout(()=>location.reload(),700); }
+  catch(err){ toast(false,err.message); }
+}));
+
+/* Carian wallet */
+const ws=document.getElementById('walletSearch');
+if(ws) ws.addEventListener('input',()=>{
+  const q=ws.value.trim().toLowerCase();
+  document.querySelectorAll('#walletTable tbody tr').forEach(tr=>{ tr.style.display=tr.textContent.toLowerCase().includes(q)?'':'none'; });
+});
+
+/* E-mel terus ke hello@platoteam.com */
+document.getElementById('mailForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  const subject='[PlatoMy] '+document.getElementById('mSubject').value;
+  const body=document.getElementById('mBody').value+'\n\n---\nDiscord: '+USER.username+' ('+USER.id+')';
+  location.href='mailto:'+SUPPORT+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+});
+</script>
+</body>
+</html>
