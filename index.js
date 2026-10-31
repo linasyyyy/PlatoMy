@@ -21,6 +21,7 @@ import passport from "passport";
 import { Strategy as DiscordStrategy } from "passport-discord";
 import path from "path";
 import { fileURLToPath } from "url";
+import { registerDashboardApi } from "./dashboard-api.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -71,10 +72,14 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Diambil dari env Railway atau fallback selamat
+// WAJIB set CLIENT_SECRET di Railway > Variables (jangan tulis rahsia dalam kod)
 const CLIENT_ID = process.env.CLIENT_ID || "1556578779437072546";
-const CLIENT_SECRET = process.env.CLIENT_SECRET || "XIfRq23FWQttp-5E9JSgRLfizc03Io_9";
+const CLIENT_SECRET = process.env.CLIENT_SECRET;
 const CALLBACK_URL = process.env.CALLBACK_URL || "https://platomy-production.up.railway.app/discord/callback";
+
+if (!CLIENT_SECRET) {
+  console.error("RALAT: CLIENT_SECRET tidak ditemui di Environment Variables! Login web tidak akan berfungsi.");
+}
 
 passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((obj, done) => done(null, obj));
@@ -83,7 +88,7 @@ passport.use(
   new DiscordStrategy(
     {
       clientID: CLIENT_ID,
-      clientSecret: CLIENT_SECRET,
+      clientSecret: CLIENT_SECRET || "missing",
       callbackURL: CALLBACK_URL,
       scope: ["identify", "guilds"],
     },
@@ -93,43 +98,15 @@ passport.use(
   )
 );
 
-function checkAuth(req, res, next) {
-  if (req.isAuthenticated()) return next();
-  res.redirect("/login");
-}
-
 app.get("/login", passport.authenticate("discord"));
 app.get("/discord/callback", passport.authenticate("discord", { failureRedirect: "/" }), (req, res) => { res.redirect("/"); });
 app.get("/logout", (req, res) => { req.logout(() => { res.redirect("/"); }); });
 
-app.get("/", checkAuth, (req, res) => {
-  const userWallet = getWallet(req.user.id);
-  const allWallets = [...wallets.entries()].map(([id, data]) => ({ id, ...data }));
+// Logo (fail di repo bernama "public:logo.jpg.jpg"; kalau dah betulkan kepada public/logo.jpg, baris ini boleh dipadam)
+app.get("/logo.jpg", (req, res) => res.sendFile(path.join(__dirname, "public:logo.jpg.jpg")));
 
-  res.render("dashboard", {
-    user: req.user,
-    wallet: userWallet,
-    allWallets: allWallets,
-    totalCoins: Array.from(wallets.values()).reduce((a, b) => a + b.coins, 0),
-    totalPips: Array.from(wallets.values()).reduce((a, b) => a + b.pips, 0),
-    botClient: client
-  });
-});
-
-app.post("/api/inject-assets", checkAuth, (req, res) => {
-  const { targetId, assetType, amount } = req.body;
-  if (!targetId || !amount) return res.status(400).json({ error: "Sila isi semua maklumat!" });
-
-  const cleanTargetId = targetId.replace(/[<@!>]/g, "").trim();
-  const targetWallet = getWallet(cleanTargetId);
-  const qty = parseInt(amount) || 0;
-
-  if (assetType.includes("Coins")) targetWallet.coins += qty;
-  else if (assetType.includes("Sponsor")) targetWallet.sponsorTotal += qty;
-  else targetWallet.pips += qty;
-
-  res.json({ success: true, message: `Berjaya menambah ${qty} ${assetType} kepada ${cleanTargetId}!` });
-});
+// Halaman dashboard + semua API (event, giveaway, rumble, embed, wallet, trading)
+registerDashboardApi({ app, client, wallets, getWallet, giveawaysMap, rumbleMap });
 
 app.listen(PORT, () => {
   console.log(`Web Dashboard PlatoMy (Y2K Theme) berjalan di port ${PORT}!`);
