@@ -22,6 +22,7 @@ import { Strategy as DiscordStrategy } from "passport-discord";
 import path from "path";
 import { fileURLToPath } from "url";
 import { registerDashboardApi } from "./dashboard-api.js";
+import { loadWallets, startAutosave } from "./db.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -50,6 +51,10 @@ function getWallet(id) {
   if (!wallets.has(id)) wallets.set(id, { coins: 0, pips: 0, exp: 0, sponsorTotal: 0 });
   return wallets.get(id);
 }
+
+// Muat data dari PostgreSQL dan autosave (perlu DATABASE_URL di Railway)
+await loadWallets(wallets);
+startAutosave(wallets);
 
 // --- INTEGRASI WEB DASHBOARD & PASSPORT ---
 const app = express();
