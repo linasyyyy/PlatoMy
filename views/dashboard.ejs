@@ -1,642 +1,357 @@
 <!DOCTYPE html>
 <html lang="ms">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PlatoMy</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg-dark: #050508;
-      --bg-card: #0d0814;
-      --pink-accent: #F996B1;
-      --pink-dark: #a84763;
-      --pink-glow: rgba(249, 150, 177, 0.4);
-      --pink-glow-sharp: rgba(249, 150, 177, 0.85);
-      --text-main: #f0e6f5;
-      --text-muted: #9e8aa8;
-      --grad-chrome: linear-gradient(135deg, #ffffff 0%, #F996B1 40%, #2b0b18 100%);
-      --grad-card: linear-gradient(145deg, rgba(20, 12, 28, 0.9) 0%, rgba(8, 5, 12, 0.95) 100%);
-      --sidebar-width: 260px;
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      background-color: var(--bg-dark);
-      color: var(--text-main);
-      font-family: 'Space Grotesk', sans-serif;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      overflow-x: hidden;
-      background-image: 
-        radial-gradient(circle at 10% 20%, rgba(249, 150, 177, 0.1) 0%, transparent 35%),
-        radial-gradient(circle at 90% 80%, rgba(249, 150, 177, 0.08) 0%, transparent 40%),
-        linear-gradient(rgba(249, 150, 177, 0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(249, 150, 177, 0.03) 1px, transparent 1px);
-      background-size: 100% 100%, 100% 100%, 32px 32px, 32px 32px;
-    }
-
-    /* Scanlines effect */
-    body::before {
-      content: "";
-      position: fixed;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
-      background-size: 100% 4px;
-      z-index: 999;
-      pointer-events: none;
-      opacity: 0.5;
-    }
-
-    /* Layout Wrapper for Mobile */
-    .app-wrapper {
-      display: flex;
-      width: 100%;
-      min-height: 100vh;
-    }
-
-    /* Sidebar */
-    .sidebar {
-      width: var(--sidebar-width);
-      background: rgba(8, 5, 12, 0.98);
-      border-right: 1px solid rgba(249, 150, 177, 0.2);
-      padding: 24px 18px;
-      display: flex;
-      flex-direction: column;
-      position: fixed;
-      height: 100vh;
-      z-index: 100;
-      backdrop-filter: blur(10px);
-      transition: transform 0.3s ease;
-    }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      font-family: 'Orbitron', sans-serif;
-      font-weight: 900;
-      font-size: 1.3rem;
-      color: #fff;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      margin-bottom: 20px;
-      padding-bottom: 15px;
-      border-bottom: 1px solid rgba(249, 150, 177, 0.2);
-    }
-
-    .brand-logo {
-      width: 38px;
-      height: 38px;
-      background: var(--grad-chrome);
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #000;
-      font-weight: 900;
-      box-shadow: 0 0 12px var(--pink-glow);
-    }
-
-    .brand span {
-      color: var(--pink-accent);
-      text-shadow: 0 0 8px var(--pink-glow-sharp);
-    }
-
-    .user-profile-widget {
-      background: rgba(0, 0, 0, 0.4);
-      border: 1px solid rgba(249, 150, 177, 0.2);
-      border-radius: 8px;
-      padding: 10px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 20px;
-    }
-
-    .user-avatar {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      border: 2px solid var(--pink-accent);
-    }
-
-    .user-info h4 { font-size: 0.85rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .user-info p { font-size: 0.7rem; color: var(--pink-accent); }
-
-    .nav-menu {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .nav-item a {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 10px 14px;
-      color: var(--text-muted);
-      text-decoration: none;
-      font-weight: 600;
-      font-size: 0.85rem;
-      border-radius: 6px;
-      transition: all 0.25s ease;
-      border: 1px solid transparent;
-    }
-
-    .nav-item a:hover, .nav-item a.active {
-      color: #fff;
-      background: rgba(249, 150, 177, 0.12);
-      border-color: rgba(249, 150, 177, 0.4);
-      text-shadow: 0 0 8px var(--pink-glow);
-    }
-
-    .nav-item a.active { border-left: 4px solid var(--pink-accent); }
-
-    .bot-status-widget {
-      margin-top: auto;
-      background: rgba(0, 0, 0, 0.5);
-      border: 1px solid rgba(249, 150, 177, 0.25);
-      border-radius: 8px;
-      padding: 12px;
-    }
-
-    .status-indicator {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 0.75rem;
-      font-weight: 700;
-      color: var(--pink-accent);
-      text-transform: uppercase;
-    }
-
-    .dot-online {
-      width: 7px;
-      height: 7px;
-      background-color: #50fa7b;
-      border-radius: 50%;
-      box-shadow: 0 0 8px #50fa7b;
-    }
-
-    /* Main Dashboard Area */
-    .main-content {
-      margin-left: var(--sidebar-width);
-      flex: 1;
-      padding: 25px;
-      min-height: 100vh;
-      width: calc(100% - var(--sidebar-width));
-    }
-
-    /* Mobile Menu Toggle Button */
-    .mobile-header {
-      display: none;
-      align-items: center;
-      justify-content: space-between;
-      padding: 15px 20px;
-      background: rgba(8, 5, 12, 0.95);
-      border-bottom: 1px solid rgba(249, 150, 177, 0.2);
-      position: sticky;
-      top: 0;
-      z-index: 99;
-    }
-
-    .menu-toggle-btn {
-      background: transparent;
-      border: 1px solid var(--pink-accent);
-      color: var(--pink-accent);
-      padding: 6px 10px;
-      border-radius: 4px;
-      font-size: 1.1rem;
-      cursor: pointer;
-    }
-
-    .top-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 25px;
-      padding-bottom: 15px;
-      border-bottom: 1px solid rgba(249, 150, 177, 0.15);
-      flex-wrap: wrap;
-      gap: 15px;
-    }
-
-    .page-title h1 {
-      font-family: 'Orbitron', sans-serif;
-      font-size: 1.5rem;
-      font-weight: 900;
-      text-transform: uppercase;
-      background: linear-gradient(180deg, #ffffff 0%, var(--pink-accent) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .page-title p { color: var(--text-muted); font-size: 0.8rem; }
-
-    .btn-cyber {
-      background: var(--pink-accent);
-      color: #050508;
-      font-family: 'Orbitron', sans-serif;
-      font-weight: 800;
-      padding: 10px 18px;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      font-size: 0.75rem;
-      box-shadow: 0 0 15px var(--pink-glow);
-      transition: all 0.2s ease;
-      text-decoration: none;
-      display: inline-block;
-      text-align: center;
-    }
-
-    .btn-cyber:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 0 25px var(--pink-accent);
-      background: #ffffff;
-      color: #a84763;
-    }
-
-    .btn-outline {
-      background: transparent;
-      border: 1px solid var(--pink-accent);
-      color: var(--pink-accent);
-      font-family: 'Orbitron', sans-serif;
-      font-weight: 700;
-      padding: 8px 14px;
-      border-radius: 4px;
-      cursor: pointer;
-      text-transform: uppercase;
-      font-size: 0.7rem;
-      transition: all 0.2s ease;
-      text-decoration: none;
-    }
-
-    /* Stats Cards Grid */
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-      gap: 15px;
-      margin-bottom: 25px;
-    }
-
-    .stat-card {
-      background: var(--grad-card);
-      border: 1px solid rgba(249, 150, 177, 0.2);
-      border-radius: 8px;
-      padding: 16px;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .stat-card::before {
-      content: "";
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 2px;
-      background: var(--grad-chrome);
-    }
-
-    .stat-label { color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
-    .stat-value { font-family: 'Orbitron', sans-serif; font-size: 1.5rem; font-weight: 900; color: #fff; text-shadow: 0 0 10px rgba(249, 150, 177, 0.3); }
-
-    /* Panels & Layout */
-    .dashboard-layout {
-      display: grid;
-      grid-template-columns: 2fr 1fr;
-      gap: 20px;
-    }
-
-    @media (max-width: 992px) {
-      .dashboard-layout { grid-template-columns: 1fr; }
-    }
-
-    .panel {
-      background: var(--grad-card);
-      border: 1px solid rgba(249, 150, 177, 0.2);
-      border-radius: 10px;
-      padding: 20px;
-      margin-bottom: 20px;
-    }
-
-    .panel-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 16px;
-      padding-bottom: 8px;
-      border-bottom: 1px solid rgba(249, 150, 177, 0.15);
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-
-    .panel-title {
-      font-family: 'Orbitron', sans-serif;
-      font-size: 1rem;
-      color: #fff;
-      text-transform: uppercase;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .panel-title span { color: var(--pink-accent); }
-
-    /* Tables & Responsive Scroll */
-    .table-responsive {
-      width: 100%;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-    }
-
-    .command-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.85rem;
-      white-space: nowrap;
-    }
-
-    .command-table th {
-      text-align: left;
-      padding: 10px;
-      color: var(--pink-accent);
-      font-family: 'Orbitron', sans-serif;
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      border-bottom: 1px solid rgba(249, 150, 177, 0.2);
-    }
-
-    .command-table td {
-      padding: 12px 10px;
-      border-bottom: 1px solid rgba(249, 150, 177, 0.08);
-      color: var(--text-main);
-    }
-
-    .command-code {
-      background: rgba(0,0,0,0.5);
-      border: 1px solid rgba(249, 150, 177, 0.3);
-      color: var(--pink-accent);
-      padding: 3px 6px;
-      border-radius: 4px;
-      font-family: monospace;
-      font-size: 0.8rem;
-    }
-
-    /* Form Inputs */
-    .cyber-form-group { margin-bottom: 14px; }
-    .cyber-form-group label { display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; }
-    .cyber-input, .cyber-select {
-      width: 100%;
-      background: rgba(0, 0, 0, 0.6);
-      border: 1px solid rgba(249, 150, 177, 0.3);
-      padding: 10px 12px;
-      border-radius: 4px;
-      color: #fff;
-      font-family: 'Space Grotesk', sans-serif;
-      outline: none;
-      font-size: 0.9rem;
-    }
-    .cyber-input:focus, .cyber-select:focus { border-color: var(--pink-accent); box-shadow: 0 0 10px var(--pink-glow); }
-
-    .alert-box { margin-top: 12px; padding: 10px; border-radius: 4px; font-size: 0.8rem; display: none; }
-
-    /* Mobile Responsive Breakpoints */
-    @media (max-width: 768px) {
-      .sidebar {
-        transform: translateX(-100%);
-      }
-      .sidebar.open {
-        transform: translateX(0);
-      }
-      .main-content {
-        margin-left: 0;
-        width: 100%;
-        padding: 15px;
-      }
-      .mobile-header {
-        display: flex;
-      }
-      .page-title h1 {
-        font-size: 1.2rem;
-      }
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#050508">
+<title>PlatoMy | Komuniti Plato Malaysia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#050508;--card:#0d0814;--pink:#F996B1;--pink-d:#a84763;--glow:rgba(249,150,177,.4);--text:#f0e6f5;--muted:#9e8aa8;--line:rgba(249,150,177,.2);--ok:#50fa7b;--bad:#ff5555;--sw:250px}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-serif;min-height:100vh;overflow-x:hidden;
+background-image:radial-gradient(circle at 10% 15%,rgba(249,150,177,.1),transparent 35%),radial-gradient(circle at 90% 85%,rgba(249,150,177,.08),transparent 40%)}
+a{color:inherit;text-decoration:none}
+.sidebar{position:fixed;inset:0 auto 0 0;width:var(--sw);background:rgba(8,5,12,.98);border-right:1px solid var(--line);padding:22px 16px;display:flex;flex-direction:column;z-index:100;transition:transform .3s}
+.brand{display:flex;align-items:center;gap:10px;font-family:'Orbitron';font-weight:900;font-size:1.2rem;letter-spacing:2px;padding-bottom:14px;margin-bottom:16px;border-bottom:1px solid var(--line)}
+.brand b{color:var(--pink)}
+.logo{width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,#fff,var(--pink) 45%,#2b0b18);color:#000;display:grid;place-items:center;font-weight:900;font-size:.8rem;box-shadow:0 0 12px var(--glow)}
+.me{display:flex;align-items:center;gap:10px;background:rgba(0,0,0,.4);border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:16px}
+.me img{width:36px;height:36px;border-radius:50%;border:2px solid var(--pink)}
+.me h4{font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.me p{font-size:.7rem;color:var(--pink)}
+.nav{list-style:none;display:flex;flex-direction:column;gap:4px;overflow-y:auto}
+.nav a{display:block;padding:10px 12px;border-radius:6px;font-size:.85rem;font-weight:600;color:var(--muted);border:1px solid transparent;transition:.2s}
+.nav a:hover,.nav a.active{color:#fff;background:rgba(249,150,177,.12);border-color:rgba(249,150,177,.4)}
+.status{margin-top:auto;background:rgba(0,0,0,.5);border:1px solid var(--line);border-radius:8px;padding:12px;font-size:.75rem}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);margin-right:6px}
+.mbar{display:none;position:sticky;top:0;z-index:99;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(8,5,12,.96);border-bottom:1px solid var(--line);backdrop-filter:blur(8px)}
+.mbar button{background:none;border:1px solid var(--pink);color:var(--pink);padding:6px 10px;border-radius:4px;font-size:1rem}
+main{margin-left:var(--sw);padding:26px;max-width:1200px}
+section{margin-bottom:34px}
+h1,h2,h3{font-family:'Orbitron',sans-serif;text-transform:uppercase}
+h2{font-size:1.05rem;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+h2 i{color:var(--pink);font-style:normal;margin-right:6px}
+.sub{color:var(--muted);font-size:.85rem;margin:-6px 0 14px}
+.hero{border:1px solid var(--line);border-radius:12px;padding:34px 24px;text-align:center;background:linear-gradient(145deg,rgba(40,14,28,.7),rgba(8,5,12,.95));position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;inset:auto -20% -60% -20%;height:80%;background:radial-gradient(ellipse,var(--glow),transparent 70%);pointer-events:none}
+.hero h1{font-size:clamp(1.8rem,6vw,3rem);font-weight:900;background:linear-gradient(180deg,#fff,var(--pink));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.hero p{color:var(--muted);margin:8px 0 18px;position:relative;z-index:1}
+.btn{display:inline-block;background:var(--pink);color:#050508;font-family:'Orbitron';font-weight:800;font-size:.72rem;letter-spacing:1px;text-transform:uppercase;padding:11px 18px;border:0;border-radius:4px;cursor:pointer;box-shadow:0 0 15px var(--glow);transition:.2s;position:relative;z-index:1}
+.btn:hover{background:#fff;color:var(--pink-d);transform:translateY(-2px)}
+.btn.line{background:transparent;color:var(--pink);border:1px solid var(--pink);box-shadow:none}
+.grid{display:grid;gap:14px}
+.g4{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.g2{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.card{background:linear-gradient(145deg,rgba(20,12,28,.9),rgba(8,5,12,.95));border:1px solid var(--line);border-radius:10px;padding:16px}
+.stat small{display:block;color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.stat b{font-family:'Orbitron';font-size:1.5rem;font-weight:900}
+.link-card{display:block;transition:.2s}
+.link-card:hover{border-color:var(--pink);box-shadow:0 0 14px var(--glow)}
+.link-card h3{font-size:.9rem;color:var(--pink);margin-bottom:6px}
+.link-card p,.card p.m{color:var(--muted);font-size:.82rem;line-height:1.5}
+.rules ul{list-style:none}
+.rules li{padding:8px 0 8px 22px;position:relative;font-size:.88rem;border-bottom:1px solid rgba(249,150,177,.08)}
+.rules li::before{content:"✦";position:absolute;left:0;color:var(--pink)}
+.rules h3{font-size:.85rem;color:var(--pink);margin-bottom:6px}
+.leader{display:flex;gap:12px;align-items:center}
+.leader img{width:44px;height:44px;border-radius:50%;border:2px solid var(--pink);background:#000}
+.leader h4{font-size:.9rem}.leader p{font-size:.75rem;color:var(--pink)}
+.empty{color:var(--muted);font-size:.85rem;text-align:center;padding:14px}
+label{display:block;font-size:.72rem;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:1px}
+.in{width:100%;background:rgba(0,0,0,.6);border:1px solid rgba(249,150,177,.3);padding:11px 12px;border-radius:4px;color:#fff;font:inherit;font-size:.9rem;outline:none;margin-bottom:12px}
+.in:focus{border-color:var(--pink);box-shadow:0 0 10px var(--glow)}
+.calc-out{font-family:'Orbitron';font-size:1.6rem;font-weight:900;color:var(--pink);margin-top:4px}
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:.85rem;white-space:nowrap}
+th{text-align:left;padding:10px;color:var(--pink);font-family:'Orbitron';font-size:.68rem;text-transform:uppercase;border-bottom:1px solid var(--line)}
+td{padding:11px 10px;border-bottom:1px solid rgba(249,150,177,.08)}
+code{background:rgba(0,0,0,.5);border:1px solid rgba(249,150,177,.3);color:var(--pink);padding:3px 6px;border-radius:4px;font-size:.8rem}
+.rank{font-family:'Orbitron';color:var(--pink);font-weight:800}
+.alert{display:none;margin-top:12px;padding:10px;border-radius:4px;font-size:.82rem}
+.tip{font-size:.95rem;line-height:1.6;border-left:3px solid var(--pink);padding-left:14px}
+footer{text-align:center;color:var(--muted);font-size:.75rem;padding:20px 0 90px}
+.bottom{display:none;position:fixed;inset:auto 0 0 0;z-index:98;background:rgba(8,5,12,.97);border-top:1px solid var(--line);padding:8px 6px calc(8px + env(safe-area-inset-bottom,0px));justify-content:space-around}
+.bottom a{flex:1;text-align:center;font-size:.68rem;font-weight:600;color:var(--muted);padding:4px}
+.bottom a span{display:block;font-size:1.15rem}
+.bottom a:hover{color:var(--pink)}
+@media(max-width:768px){.sidebar{transform:translateX(-100%)}.sidebar.open{transform:none}main{margin-left:0;padding:16px}.mbar{display:flex}.bottom{display:flex}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
 </head>
 <body>
 
-  <!-- Mobile Top Header -->
-  <div class="mobile-header">
-    <div style="display: flex; align-items: center; gap: 10px;">
-      <div class="brand-logo" style="width: 30px; height: 30px; font-size: 0.8rem;">PM</div>
-      <span style="font-family: 'Orbitron', sans-serif; font-weight: bold; color: #fff; font-size: 0.9rem;">Plato<span style="color:var(--pink-accent)">My</span></span>
+<div class="mbar">
+  <div class="brand" style="border:0;margin:0;padding:0;font-size:1rem"><div class="logo" style="width:30px;height:30px">PM</div>Plato<b>My</b></div>
+  <button onclick="toggleSidebar()" aria-label="Menu">☰</button>
+</div>
+
+<aside class="sidebar" id="sidebarNav">
+  <div class="brand"><div class="logo">PM</div>Plato<b>My</b></div>
+  <div class="me">
+    <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="Avatar" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
+    <div><h4><%= user.username %></h4><p>✦ Admin PlatoMy</p></div>
+  </div>
+  <ul class="nav">
+    <li><a href="#utama" class="active" onclick="toggleSidebar()">🏠 Utama</a></li>
+    <li><a href="#berita" onclick="toggleSidebar()">📰 Berita</a></li>
+    <li><a href="#peraturan" onclick="toggleSidebar()">📜 Peraturan</a></li>
+    <li><a href="#pemimpin" onclick="toggleSidebar()">👑 Leader</a></li>
+    <li><a href="#kalkulator" onclick="toggleSidebar()">🧮 Kalkulator</a></li>
+    <li><a href="#wallet-panel" onclick="toggleSidebar()">💳 Kawalan Wallet</a></li>
+    <li><a href="#database-panel" onclick="toggleSidebar()">📊 Semua Wallet</a></li>
+    <li><a href="#laporan" onclick="toggleSidebar()">🚨 Lapor Masalah</a></li>
+  </ul>
+  <div class="status">
+    <div style="font-weight:700;color:var(--pink)"><span class="dot"></span>BOT AKTIF</div>
+    <p style="color:var(--muted);margin-top:4px">Ping: <%= botClient.ws.ping %> ms</p>
+    <a href="/logout" class="btn line" style="width:100%;margin-top:10px;padding:8px">Log Keluar</a>
+  </div>
+</aside>
+
+<main>
+
+  <!-- HERO -->
+  <section id="utama">
+    <div class="hero">
+      <h1>PlatoMy Hub</h1>
+      <p>Berita • Sumber • Sokongan untuk komuniti Plato Malaysia</p>
+      <a class="btn" href="https://discord.gg/plato" target="_blank" rel="noopener">Sertai Discord</a>
     </div>
-    <button class="menu-toggle-btn" onclick="toggleSidebar()">☰ Menu</button>
-  </div>
+  </section>
 
-  <div class="app-wrapper">
-    <!-- Sidebar Nav -->
-    <aside class="sidebar" id="sidebarNav">
-      <div class="brand">
-        <div class="brand-logo">PM</div>
-        Plato<span>My</span>
-      </div>
+  <!-- STATS -->
+  <section>
+    <div class="grid g4">
+      <div class="card stat"><small>Jumlah Server</small><b><%= botClient.guilds.cache.size %></b></div>
+      <div class="card stat"><small>Jumlah Coins</small><b><%= totalCoins.toLocaleString() %></b></div>
+      <div class="card stat"><small>Jumlah Pips</small><b><%= totalPips.toLocaleString() %></b></div>
+      <div class="card stat"><small>Wallet Anda</small><b style="color:var(--pink)"><%= wallet.coins.toLocaleString() %></b></div>
+    </div>
+  </section>
 
-      <div class="user-profile-widget">
-        <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="Avatar" class="user-avatar" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
-        <div class="user-info">
-          <h4><%= user.username %></h4>
-          <p>✦ Admin Cyber</p>
-        </div>
-      </div>
+  <!-- NEWS -->
+  <section id="berita">
+    <h2><i>✦</i>Papan Berita Komuniti</h2>
+    <div class="grid g3">
+      <% const news = locals.news || []; %>
+      <% if (news.length === 0) { %>
+        <div class="card empty" style="grid-column:1/-1">Belum ada berita. Ikuti Discord untuk info terkini.</div>
+      <% } else { news.forEach(n => { %>
+        <div class="card"><h3 style="font-size:.9rem;color:var(--pink);margin-bottom:6px"><%= n.title %></h3><p class="m"><%= n.body %></p><p class="m" style="margin-top:8px;font-size:.7rem"><%= n.date %></p></div>
+      <% }) } %>
+    </div>
+  </section>
 
-      <ul class="nav-menu">
-        <li class="nav-item"><a href="#" class="active" onclick="toggleSidebar()">✦ Overview</a></li>
-        <li class="nav-item"><a href="#wallet-panel" onclick="toggleSidebar()">💳 Wallet Control</a></li>
-        <li class="nav-item"><a href="#database-panel" onclick="toggleSidebar()">📊 All Wallets</a></li>
+  <!-- RULES -->
+  <section id="peraturan" class="rules">
+    <h2><i>✦</i>Peraturan Komuniti</h2>
+    <div class="grid g2">
+      <div class="card"><h3>Panduan Komuniti</h3><ul>
+        <li>Dilarang mengeksploitasi app atau mengganggu pengalaman pengguna lain.</li>
+        <li>Dilarang tukar-menang (win trading) atau memanipulasi sistem ranking.</li>
+        <li>Dilarang guna perisian pihak ketiga untuk kelebihan tidak adil.</li>
+        <li>Dilarang jual atau beli akaun dengan wang sebenar.</li>
+      </ul></div>
+      <div class="card"><h3>Panduan Chat Bilik Awam</h3><ul>
+        <li>Dilarang kandungan lucah, seksual atau haram.</li>
+        <li>Dilarang kongsi maklumat peribadi pengguna lain.</li>
+        <li>Dilarang spam atau mengganggu perbualan.</li>
+        <li>Dilarang menggalakkan keganasan, bunuh diri atau kebencian.</li>
+        <li>Gunakan Bahasa Melayu / bahasa server yang dipilih sahaja.</li>
       </ul>
+      <p class="m" style="margin-top:10px">Pelanggaran boleh menyebabkan sekatan chat 4 jam atau tindakan lanjut termasuk ban kekal.</p></div>
+      <div class="card"><h3>Panduan Gambar Profil</h3><ul>
+        <li>Dilarang kandungan lucah atau seksual.</li>
+        <li>Dilarang imej darah atau keganasan melampau.</li>
+        <li>Dilarang simbol atau ucapan kebencian.</li>
+        <li>Dilarang gangguan, dedah maklumat peribadi atau menyamar orang lain.</li>
+      </ul></div>
+    </div>
+  </section>
 
-      <div class="bot-status-widget">
-        <div class="status-indicator">
-          <span class="dot-online"></span> Bot Status: Active
+  <!-- LEADERS -->
+  <section id="pemimpin">
+    <h2><i>✦</i>Leader Melayu</h2>
+    <p class="sub">Wakil rasmi komuniti yang menghubungkan pemain dengan pasukan pembangun.</p>
+    <div class="grid g3">
+      <% const leaders = locals.leaders || []; %>
+      <% if (leaders.length === 0) { %>
+        <div class="card empty" style="grid-column:1/-1">Senarai Leader akan dikemas kini.</div>
+      <% } else { leaders.forEach(l => { %>
+        <div class="card leader">
+          <img src="<%= l.avatar || 'https://cdn.discordapp.com/embed/avatars/0.png' %>" alt="">
+          <div><h4><%= l.name %></h4><p><%= l.role || 'Leader' %></p></div>
         </div>
-        <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 5px;">Ping: <%= botClient.ws.ping %> ms</p>
+      <% }) } %>
+    </div>
+  </section>
+
+  <!-- CALCULATOR -->
+  <section id="kalkulator">
+    <h2><i>✦</i>Kalkulator Pintar</h2>
+    <div class="card" style="max-width:480px">
+      <label>Tukar dari</label>
+      <select id="calcType" class="in" onchange="calc()">
+        <option value="coins">🪙 Coins → Pips</option>
+        <option value="pips">💠 Pips → Coins</option>
+      </select>
+      <label>Jumlah</label>
+      <input type="number" id="calcAmt" class="in" placeholder="Cth: 1000" oninput="calc()">
+      <label>Anggaran nilai adil</label>
+      <div class="calc-out" id="calcOut">0</div>
+    </div>
+  </section>
+
+  <!-- INJECT -->
+  <section id="wallet-panel">
+    <h2><i>✦</i>Kawalan Wallet (Admin)</h2>
+    <div class="grid g2">
+      <div class="card">
+        <form onsubmit="handleInject(event)">
+          <label>Discord ID Sasaran</label>
+          <input type="text" id="targetId" class="in" placeholder="Cth: 3829102938491" inputmode="numeric" required>
+          <label>Jenis Aset</label>
+          <select id="assetType" class="in">
+            <option value="Plato Coins">🪙 Plato Coins</option>
+            <option value="Pips">💠 Pips</option>
+            <option value="Total Sponsor">🌸 Total Sponsor</option>
+          </select>
+          <label>Jumlah</label>
+          <input type="number" id="amount" class="in" placeholder="Cth: 5000" required>
+          <button type="submit" class="btn" style="width:100%">⚡ Masukkan Aset</button>
+          <div id="alertBox" class="alert"></div>
+        </form>
       </div>
-    </aside>
-
-    <!-- Main Content Area -->
-    <main class="main-content">
-
-      <div class="top-bar">
-        <div class="page-title">
-          <h1>PlatoMy</h1>
-          <p>Pengurusan Bot & Sistem Ekonomi Komuniti</p>
-        </div>
-        <a href="/logout" class="btn-outline">🚪 Log Keluar</a>
-      </div>
-
-      <!-- Quick Stats Grid -->
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-label">Total Servers</div>
-          <div class="stat-value"><%= botClient.guilds.cache.size %></div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Total Coins</div>
-          <div class="stat-value"><%= totalCoins.toLocaleString() %></div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Total Pips</div>
-          <div class="stat-value"><%= totalPips.toLocaleString() %></div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Wallet Anda</div>
-          <div class="stat-value" style="color: var(--pink-accent);"><%= wallet.coins.toLocaleString() %></div>
-        </div>
-      </div>
-
-      <!-- Dashboard Main Layout -->
-      <div class="dashboard-layout">
-
-        <!-- Left Column: Admin Wallet Injector -->
-        <div class="left-col">
-          <div class="panel" id="wallet-panel">
-            <div class="panel-header">
-              <h2 class="panel-title"><span>✦</span> Inject Assets</h2>
-            </div>
-
-            <form id="injectForm" onsubmit="handleInject(event)">
-              <div class="cyber-form-group">
-                <label>Discord ID Target</label>
-                <input type="text" id="targetId" class="cyber-input" placeholder="Cth: 3829102938491" required>
-              </div>
-
-              <div class="cyber-form-group">
-                <label>Jenis Aset</label>
-                <select id="assetType" class="cyber-select">
-                  <option value="Plato Coins">🪙 Plato Coins</option>
-                  <option value="Pips">💠 Pips</option>
-                  <option value="Total Sponsor">🌸 Total Sponsor</option>
-                </select>
-              </div>
-
-              <div class="cyber-form-group">
-                <label>Jumlah (Amount)</label>
-                <input type="number" id="amount" class="cyber-input" placeholder="Cth: 5000" required>
-              </div>
-
-              <button type="submit" class="btn-cyber" style="width: 100%;">⚡ Masukkan Aset</button>
-              <div id="alertBox" class="alert-box"></div>
-            </form>
-          </div>
-        </div>
-
-        <!-- Right Column: My Profile Quick Info -->
-        <div class="right-col">
-          <div class="panel">
-            <div class="panel-header">
-              <h2 class="panel-title"><span>✦</span> Akaun Anda</h2>
-            </div>
-            <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 12px;">Maklumat akaun Discord semasa:</p>
-            <div style="background: rgba(0,0,0,0.5); padding: 12px; border-radius: 6px; border: 1px solid rgba(249,150,177,0.2); font-size: 0.9rem;">
-              <p>🪙 <b>Coins:</b> <%= wallet.coins.toLocaleString() %></p>
-              <p style="margin-top: 6px;">💠 <b>Pips:</b> <%= wallet.pips.toLocaleString() %></p>
-              <p style="margin-top: 6px;">🌸 <b>Sponsor:</b> <%= wallet.sponsorTotal.toLocaleString() %></p>
-              <p style="margin-top: 6px;">✨ <b>EXP:</b> <%= wallet.exp.toLocaleString() %></p>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- Bottom Full Width Panel: All Wallets Database -->
-      <div class="panel" id="database-panel">
-        <div class="panel-header">
-          <h2 class="panel-title"><span>✦</span> Senarai Wallet Ahli</h2>
-          <span style="font-size: 0.75rem; color: var(--pink-accent);"><%= allWallets.length %> Pengguna</span>
-        </div>
-
-        <div class="table-responsive">
-          <table class="command-table">
-            <thead>
-              <tr>
-                <th>Discord ID</th>
-                <th>Plato Coins</th>
-                <th>Pips</th>
-                <th>Total Sponsor</th>
-                <th>EXP</th>
-              </tr>
-            </thead>
-            <tbody>
-              <% if (allWallets.length === 0) { %>
-                <tr>
-                  <td colspan="5" style="text-align: center; color: var(--text-muted);">Tiada data wallet direkodkan lagi.</td>
-                </tr>
-              <% } else { %>
-                <% allWallets.forEach(w => { %>
-                  <tr>
-                    <td><span class="command-code"><%= w.id %></span></td>
-                    <td>🪙 <%= w.coins.toLocaleString() %></td>
-                    <td>💠 <%= w.pips.toLocaleString() %></td>
-                    <td>🌸 <%= w.sponsorTotal.toLocaleString() %></td>
-                    <td>✨ <%= w.exp.toLocaleString() %> EXP</td>
-                  </tr>
-                <% }) %>
-              <% } %>
-            </tbody>
-          </table>
+      <div class="card">
+        <h3 style="font-size:.9rem;margin-bottom:10px">Akaun Anda</h3>
+        <p class="m" style="margin-bottom:10px">Maklumat Discord semasa:</p>
+        <div style="background:rgba(0,0,0,.5);border:1px solid var(--line);border-radius:6px;padding:12px;font-size:.9rem;line-height:2">
+          🪙 <b>Coins:</b> <%= wallet.coins.toLocaleString() %><br>
+          💠 <b>Pips:</b> <%= wallet.pips.toLocaleString() %><br>
+          🌸 <b>Sponsor:</b> <%= wallet.sponsorTotal.toLocaleString() %><br>
+          ✨ <b>EXP:</b> <%= wallet.exp.toLocaleString() %>
         </div>
       </div>
+    </div>
+  </section>
 
-    </main>
-  </div>
+  <!-- ALL WALLETS -->
+  <section id="database-panel">
+    <h2><i>✦</i>Senarai Wallet Ahli <span style="float:right;font-size:.72rem;color:var(--pink);font-family:'Space Grotesk';text-transform:none"><%= allWallets.length %> pengguna</span></h2>
+    <input type="search" id="walletSearch" class="in" placeholder="Cari Discord ID..." oninput="filterWallets()">
+    <div class="card tw" style="padding:6px">
+      <table id="walletTable">
+        <thead><tr><th>#</th><th>Discord ID</th><th>Coins</th><th>Pips</th><th>Sponsor</th><th>EXP</th></tr></thead>
+        <tbody>
+          <% if (allWallets.length === 0) { %>
+            <tr><td colspan="6" class="empty">Tiada data wallet direkodkan lagi.</td></tr>
+          <% } else { allWallets.slice().sort((a,b)=>b.coins-a.coins).forEach((w,i) => { %>
+            <tr>
+              <td class="rank"><%= i+1 %></td>
+              <td><code><%= w.id %></code></td>
+              <td>🪙 <%= w.coins.toLocaleString() %></td>
+              <td>💠 <%= w.pips.toLocaleString() %></td>
+              <td>🌸 <%= w.sponsorTotal.toLocaleString() %></td>
+              <td>✨ <%= w.exp.toLocaleString() %></td>
+            </tr>
+          <% }) } %>
+        </tbody>
+      </table>
+    </div>
+  </section>
 
-  <script>
-    function toggleSidebar() {
-      const sidebar = document.getElementById('sidebarNav');
-      sidebar.classList.toggle('open');
-    }
+  <!-- REPORT + TIPS -->
+  <section id="laporan">
+    <h2><i>✦</i>Lapor Masalah</h2>
+    <div class="grid g2">
+      <div class="card">
+        <p class="m" style="margin-bottom:12px">Jumpa bug atau masalah teknikal? Hubungi kami dengan username dan penerangan masalah anda.</p>
+        <a class="btn" href="mailto:<%= locals.supportEmail || 'support@platomy.com' %>">Hantar E-mel</a>
+      </div>
+      <div class="card">
+        <h3 style="font-size:.9rem;color:var(--pink);margin-bottom:10px">Tip Hari Ini</h3>
+        <p class="tip" id="tip">Memuatkan tip...</p>
+      </div>
+    </div>
+  </section>
 
-    async function handleInject(event) {
-      event.preventDefault();
-      const targetId = document.getElementById('targetId').value;
-      const assetType = document.getElementById('assetType').value;
-      const amount = document.getElementById('amount').value;
-      const alertBox = document.getElementById('alertBox');
+  <section>
+    <h2><i>✦</i>Laman Berkaitan</h2>
+    <div class="grid g3">
+      <a class="card link-card" href="https://platoapp.com/en" target="_blank" rel="noopener"><h3>Plato Web</h3><p>Laman rasmi permainan Plato.</p></a>
+      <a class="card link-card" href="https://platopedia.com/profilebuilder" target="_blank" rel="noopener"><h3>Platopedia</h3><p>Ensiklopedia item dan penyesuaian profil.</p></a>
+      <a class="card link-card" href="https://werepedia.com/en" target="_blank" rel="noopener"><h3>Werepedia</h3><p>Panduan kad, peranan dan strategi permainan Werewolf.</p></a>
+    </div>
+  </section>
 
-      try {
-        const response = await fetch('/api/inject-assets', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ targetId, assetType, amount })
-        });
-        const data = await response.json();
+  <footer>© PlatoMy • Komuniti Plato Malaysia 🇲🇾</footer>
+</main>
 
-        if (response.ok) {
-          alertBox.style.display = 'block';
-          alertBox.style.background = 'rgba(80, 250, 123, 0.15)';
-          alertBox.style.border = '1px solid #50fa7b';
-          alertBox.style.color = '#50fa7b';
-          alertBox.textContent = data.message;
-          setTimeout(() => location.reload(), 1500);
-        } else {
-          throw new Error(data.error || 'Ralat berlaku');
-        }
-      } catch (err) {
-        alertBox.style.display = 'block';
-        alertBox.style.background = 'rgba(255, 85, 85, 0.15)';
-        alertBox.style.border = '1px solid #ff5555';
-        alertBox.style.color = '#ff5555';
-        alertBox.textContent = err.message;
-      }
-    }
-  </script>
+<nav class="bottom">
+  <a href="#utama"><span>🏠</span>Utama</a>
+  <a href="#pemimpin"><span>👑</span>Leader</a>
+  <a href="#kalkulator"><span>🧮</span>Kira</a>
+  <a href="#database-panel"><span>📊</span>Wallet</a>
+</nav>
+
+<script>
+function toggleSidebar(){document.getElementById('sidebarNav').classList.toggle('open')}
+
+// Tukar nilai: UBAH kadar ini ikut nilai sebenar Plato
+const COINS_PER_PIP = 10;
+function calc(){
+  const t=document.getElementById('calcType').value;
+  const a=parseFloat(document.getElementById('calcAmt').value)||0;
+  const r=t==='coins'?a/COINS_PER_PIP:a*COINS_PER_PIP;
+  document.getElementById('calcOut').textContent=Math.round(r).toLocaleString()+(t==='coins'?' PIPS':' COINS');
+}
+
+function filterWallets(){
+  const q=document.getElementById('walletSearch').value.trim();
+  document.querySelectorAll('#walletTable tbody tr').forEach(tr=>{
+    tr.style.display=tr.textContent.includes(q)?'':'none';
+  });
+}
+
+const tips=[
+  'Main setiap hari untuk kekalkan streak dan kumpul EXP.',
+  'Jangan kongsi maklumat akaun anda dengan sesiapa.',
+  'Sertai Discord untuk berita dan acara terkini.',
+  'Hormati pemain lain, chat yang bersih buat game lebih seronok.',
+  'Jumpa bug? Terus lapor kepada Leader atau e-mel sokongan.'
+];
+document.getElementById('tip').textContent=tips[new Date().getDate()%tips.length];
+
+async function handleInject(e){
+  e.preventDefault();
+  const box=document.getElementById('alertBox');
+  const show=(ok,msg)=>{
+    box.style.display='block';
+    box.style.background=ok?'rgba(80,250,123,.15)':'rgba(255,85,85,.15)';
+    box.style.border='1px solid '+(ok?'var(--ok)':'var(--bad)');
+    box.style.color=ok?'var(--ok)':'var(--bad)';
+    box.textContent=msg;
+  };
+  try{
+    const res=await fetch('/api/inject-assets',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        targetId:document.getElementById('targetId').value.trim(),
+        assetType:document.getElementById('assetType').value,
+        amount:document.getElementById('amount').value
+      })
+    });
+    const data=await res.json();
+    if(!res.ok) throw new Error(data.error||'Ralat berlaku');
+    show(true,data.message);
+    setTimeout(()=>location.reload(),1500);
+  }catch(err){show(false,err.message)}
+}
+</script>
 </body>
 </html>
