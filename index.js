@@ -72,14 +72,10 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
-// WAJIB set CLIENT_SECRET di Railway > Variables (jangan tulis rahsia dalam kod)
+// Diambil dari env Railway atau fallback selamat
 const CLIENT_ID = process.env.CLIENT_ID || "1556578779437072546";
-const CLIENT_SECRET = process.env.CLIENT_SECRET;
+const CLIENT_SECRET = process.env.CLIENT_SECRET || "XIfRq23FWQttp-5E9JSgRLfizc03Io_9";
 const CALLBACK_URL = process.env.CALLBACK_URL || "https://platomy-production.up.railway.app/discord/callback";
-
-if (!CLIENT_SECRET) {
-  console.error("RALAT: CLIENT_SECRET tidak ditemui di Environment Variables! Login web tidak akan berfungsi.");
-}
 
 passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((obj, done) => done(null, obj));
@@ -88,7 +84,7 @@ passport.use(
   new DiscordStrategy(
     {
       clientID: CLIENT_ID,
-      clientSecret: CLIENT_SECRET || "missing",
+      clientSecret: CLIENT_SECRET,
       callbackURL: CALLBACK_URL,
       scope: ["identify", "guilds"],
     },
