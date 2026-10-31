@@ -1,357 +1,246 @@
-<!DOCTYPE html>
-<html lang="ms">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#050508">
-<title>PlatoMy | Komuniti Plato Malaysia</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
-<style>
-:root{--bg:#050508;--card:#0d0814;--pink:#F996B1;--pink-d:#a84763;--glow:rgba(249,150,177,.4);--text:#f0e6f5;--muted:#9e8aa8;--line:rgba(249,150,177,.2);--ok:#50fa7b;--bad:#ff5555;--sw:250px}
-*{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth;scroll-padding-top:70px}
-body{background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-serif;min-height:100vh;overflow-x:hidden;
-background-image:radial-gradient(circle at 10% 15%,rgba(249,150,177,.1),transparent 35%),radial-gradient(circle at 90% 85%,rgba(249,150,177,.08),transparent 40%)}
-a{color:inherit;text-decoration:none}
-.sidebar{position:fixed;inset:0 auto 0 0;width:var(--sw);background:rgba(8,5,12,.98);border-right:1px solid var(--line);padding:22px 16px;display:flex;flex-direction:column;z-index:100;transition:transform .3s}
-.brand{display:flex;align-items:center;gap:10px;font-family:'Orbitron';font-weight:900;font-size:1.2rem;letter-spacing:2px;padding-bottom:14px;margin-bottom:16px;border-bottom:1px solid var(--line)}
-.brand b{color:var(--pink)}
-.logo{width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,#fff,var(--pink) 45%,#2b0b18);color:#000;display:grid;place-items:center;font-weight:900;font-size:.8rem;box-shadow:0 0 12px var(--glow)}
-.me{display:flex;align-items:center;gap:10px;background:rgba(0,0,0,.4);border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:16px}
-.me img{width:36px;height:36px;border-radius:50%;border:2px solid var(--pink)}
-.me h4{font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.me p{font-size:.7rem;color:var(--pink)}
-.nav{list-style:none;display:flex;flex-direction:column;gap:4px;overflow-y:auto}
-.nav a{display:block;padding:10px 12px;border-radius:6px;font-size:.85rem;font-weight:600;color:var(--muted);border:1px solid transparent;transition:.2s}
-.nav a:hover,.nav a.active{color:#fff;background:rgba(249,150,177,.12);border-color:rgba(249,150,177,.4)}
-.status{margin-top:auto;background:rgba(0,0,0,.5);border:1px solid var(--line);border-radius:8px;padding:12px;font-size:.75rem}
-.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);margin-right:6px}
-.mbar{display:none;position:sticky;top:0;z-index:99;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(8,5,12,.96);border-bottom:1px solid var(--line);backdrop-filter:blur(8px)}
-.mbar button{background:none;border:1px solid var(--pink);color:var(--pink);padding:6px 10px;border-radius:4px;font-size:1rem}
-main{margin-left:var(--sw);padding:26px;max-width:1200px}
-section{margin-bottom:34px}
-h1,h2,h3{font-family:'Orbitron',sans-serif;text-transform:uppercase}
-h2{font-size:1.05rem;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--line)}
-h2 i{color:var(--pink);font-style:normal;margin-right:6px}
-.sub{color:var(--muted);font-size:.85rem;margin:-6px 0 14px}
-.hero{border:1px solid var(--line);border-radius:12px;padding:34px 24px;text-align:center;background:linear-gradient(145deg,rgba(40,14,28,.7),rgba(8,5,12,.95));position:relative;overflow:hidden}
-.hero::after{content:"";position:absolute;inset:auto -20% -60% -20%;height:80%;background:radial-gradient(ellipse,var(--glow),transparent 70%);pointer-events:none}
-.hero h1{font-size:clamp(1.8rem,6vw,3rem);font-weight:900;background:linear-gradient(180deg,#fff,var(--pink));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-.hero p{color:var(--muted);margin:8px 0 18px;position:relative;z-index:1}
-.btn{display:inline-block;background:var(--pink);color:#050508;font-family:'Orbitron';font-weight:800;font-size:.72rem;letter-spacing:1px;text-transform:uppercase;padding:11px 18px;border:0;border-radius:4px;cursor:pointer;box-shadow:0 0 15px var(--glow);transition:.2s;position:relative;z-index:1}
-.btn:hover{background:#fff;color:var(--pink-d);transform:translateY(-2px)}
-.btn.line{background:transparent;color:var(--pink);border:1px solid var(--pink);box-shadow:none}
-.grid{display:grid;gap:14px}
-.g4{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
-.g3{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
-.g2{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
-.card{background:linear-gradient(145deg,rgba(20,12,28,.9),rgba(8,5,12,.95));border:1px solid var(--line);border-radius:10px;padding:16px}
-.stat small{display:block;color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
-.stat b{font-family:'Orbitron';font-size:1.5rem;font-weight:900}
-.link-card{display:block;transition:.2s}
-.link-card:hover{border-color:var(--pink);box-shadow:0 0 14px var(--glow)}
-.link-card h3{font-size:.9rem;color:var(--pink);margin-bottom:6px}
-.link-card p,.card p.m{color:var(--muted);font-size:.82rem;line-height:1.5}
-.rules ul{list-style:none}
-.rules li{padding:8px 0 8px 22px;position:relative;font-size:.88rem;border-bottom:1px solid rgba(249,150,177,.08)}
-.rules li::before{content:"✦";position:absolute;left:0;color:var(--pink)}
-.rules h3{font-size:.85rem;color:var(--pink);margin-bottom:6px}
-.leader{display:flex;gap:12px;align-items:center}
-.leader img{width:44px;height:44px;border-radius:50%;border:2px solid var(--pink);background:#000}
-.leader h4{font-size:.9rem}.leader p{font-size:.75rem;color:var(--pink)}
-.empty{color:var(--muted);font-size:.85rem;text-align:center;padding:14px}
-label{display:block;font-size:.72rem;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:1px}
-.in{width:100%;background:rgba(0,0,0,.6);border:1px solid rgba(249,150,177,.3);padding:11px 12px;border-radius:4px;color:#fff;font:inherit;font-size:.9rem;outline:none;margin-bottom:12px}
-.in:focus{border-color:var(--pink);box-shadow:0 0 10px var(--glow)}
-.calc-out{font-family:'Orbitron';font-size:1.6rem;font-weight:900;color:var(--pink);margin-top:4px}
-.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
-table{width:100%;border-collapse:collapse;font-size:.85rem;white-space:nowrap}
-th{text-align:left;padding:10px;color:var(--pink);font-family:'Orbitron';font-size:.68rem;text-transform:uppercase;border-bottom:1px solid var(--line)}
-td{padding:11px 10px;border-bottom:1px solid rgba(249,150,177,.08)}
-code{background:rgba(0,0,0,.5);border:1px solid rgba(249,150,177,.3);color:var(--pink);padding:3px 6px;border-radius:4px;font-size:.8rem}
-.rank{font-family:'Orbitron';color:var(--pink);font-weight:800}
-.alert{display:none;margin-top:12px;padding:10px;border-radius:4px;font-size:.82rem}
-.tip{font-size:.95rem;line-height:1.6;border-left:3px solid var(--pink);padding-left:14px}
-footer{text-align:center;color:var(--muted);font-size:.75rem;padding:20px 0 90px}
-.bottom{display:none;position:fixed;inset:auto 0 0 0;z-index:98;background:rgba(8,5,12,.97);border-top:1px solid var(--line);padding:8px 6px calc(8px + env(safe-area-inset-bottom,0px));justify-content:space-around}
-.bottom a{flex:1;text-align:center;font-size:.68rem;font-weight:600;color:var(--muted);padding:4px}
-.bottom a span{display:block;font-size:1.15rem}
-.bottom a:hover{color:var(--pink)}
-@media(max-width:768px){.sidebar{transform:translateX(-100%)}.sidebar.open{transform:none}main{margin-left:0;padding:16px}.mbar{display:flex}.bottom{display:flex}}
-@media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
-</style>
-</head>
-<body>
+import { EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, ChannelType, PermissionFlagsBits } from "discord.js";
 
-<div class="mbar">
-  <div class="brand" style="border:0;margin:0;padding:0;font-size:1rem"><div class="logo" style="width:30px;height:30px">PM</div>Plato<b>My</b></div>
-  <button onclick="toggleSidebar()" aria-label="Menu">☰</button>
-</div>
+const PINK = "#ff69b4";
+const SUPPORT_EMAIL = "hello@platoteam.com";
 
-<aside class="sidebar" id="sidebarNav">
-  <div class="brand"><div class="logo">PM</div>Plato<b>My</b></div>
-  <div class="me">
-    <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="Avatar" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
-    <div><h4><%= user.username %></h4><p>✦ Admin PlatoMy</p></div>
-  </div>
-  <ul class="nav">
-    <li><a href="#utama" class="active" onclick="toggleSidebar()">🏠 Utama</a></li>
-    <li><a href="#berita" onclick="toggleSidebar()">📰 Berita</a></li>
-    <li><a href="#peraturan" onclick="toggleSidebar()">📜 Peraturan</a></li>
-    <li><a href="#pemimpin" onclick="toggleSidebar()">👑 Leader</a></li>
-    <li><a href="#kalkulator" onclick="toggleSidebar()">🧮 Kalkulator</a></li>
-    <li><a href="#wallet-panel" onclick="toggleSidebar()">💳 Kawalan Wallet</a></li>
-    <li><a href="#database-panel" onclick="toggleSidebar()">📊 Semua Wallet</a></li>
-    <li><a href="#laporan" onclick="toggleSidebar()">🚨 Lapor Masalah</a></li>
-  </ul>
-  <div class="status">
-    <div style="font-weight:700;color:var(--pink)"><span class="dot"></span>BOT AKTIF</div>
-    <p style="color:var(--muted);margin-top:4px">Ping: <%= botClient.ws.ping %> ms</p>
-    <a href="/logout" class="btn line" style="width:100%;margin-top:10px;padding:8px">Log Keluar</a>
-  </div>
-</aside>
+export function registerDashboardApi({ app, client, wallets, getWallet, giveawaysMap, rumbleMap }) {
+  // Admin tambahan (pilihan): ADMIN_IDS=123,456 di Railway. Selain itu, sesiapa yang
+  // ada permission Administrator di mana-mana server bot ini dikira admin.
+  const ADMIN_IDS = (process.env.ADMIN_IDS || "").split(",").map(s => s.trim()).filter(Boolean);
+  const listings = [];
+  let listingSeq = 1;
 
-<main>
-
-  <!-- HERO -->
-  <section id="utama">
-    <div class="hero">
-      <h1>PlatoMy Hub</h1>
-      <p>Berita • Sumber • Sokongan untuk komuniti Plato Malaysia</p>
-      <a class="btn" href="https://discord.gg/plato" target="_blank" rel="noopener">Sertai Discord</a>
-    </div>
-  </section>
-
-  <!-- STATS -->
-  <section>
-    <div class="grid g4">
-      <div class="card stat"><small>Jumlah Server</small><b><%= botClient.guilds.cache.size %></b></div>
-      <div class="card stat"><small>Jumlah Coins</small><b><%= totalCoins.toLocaleString() %></b></div>
-      <div class="card stat"><small>Jumlah Pips</small><b><%= totalPips.toLocaleString() %></b></div>
-      <div class="card stat"><small>Wallet Anda</small><b style="color:var(--pink)"><%= wallet.coins.toLocaleString() %></b></div>
-    </div>
-  </section>
-
-  <!-- NEWS -->
-  <section id="berita">
-    <h2><i>✦</i>Papan Berita Komuniti</h2>
-    <div class="grid g3">
-      <% const news = locals.news || []; %>
-      <% if (news.length === 0) { %>
-        <div class="card empty" style="grid-column:1/-1">Belum ada berita. Ikuti Discord untuk info terkini.</div>
-      <% } else { news.forEach(n => { %>
-        <div class="card"><h3 style="font-size:.9rem;color:var(--pink);margin-bottom:6px"><%= n.title %></h3><p class="m"><%= n.body %></p><p class="m" style="margin-top:8px;font-size:.7rem"><%= n.date %></p></div>
-      <% }) } %>
-    </div>
-  </section>
-
-  <!-- RULES -->
-  <section id="peraturan" class="rules">
-    <h2><i>✦</i>Peraturan Komuniti</h2>
-    <div class="grid g2">
-      <div class="card"><h3>Panduan Komuniti</h3><ul>
-        <li>Dilarang mengeksploitasi app atau mengganggu pengalaman pengguna lain.</li>
-        <li>Dilarang tukar-menang (win trading) atau memanipulasi sistem ranking.</li>
-        <li>Dilarang guna perisian pihak ketiga untuk kelebihan tidak adil.</li>
-        <li>Dilarang jual atau beli akaun dengan wang sebenar.</li>
-      </ul></div>
-      <div class="card"><h3>Panduan Chat Bilik Awam</h3><ul>
-        <li>Dilarang kandungan lucah, seksual atau haram.</li>
-        <li>Dilarang kongsi maklumat peribadi pengguna lain.</li>
-        <li>Dilarang spam atau mengganggu perbualan.</li>
-        <li>Dilarang menggalakkan keganasan, bunuh diri atau kebencian.</li>
-        <li>Gunakan Bahasa Melayu / bahasa server yang dipilih sahaja.</li>
-      </ul>
-      <p class="m" style="margin-top:10px">Pelanggaran boleh menyebabkan sekatan chat 4 jam atau tindakan lanjut termasuk ban kekal.</p></div>
-      <div class="card"><h3>Panduan Gambar Profil</h3><ul>
-        <li>Dilarang kandungan lucah atau seksual.</li>
-        <li>Dilarang imej darah atau keganasan melampau.</li>
-        <li>Dilarang simbol atau ucapan kebencian.</li>
-        <li>Dilarang gangguan, dedah maklumat peribadi atau menyamar orang lain.</li>
-      </ul></div>
-    </div>
-  </section>
-
-  <!-- LEADERS -->
-  <section id="pemimpin">
-    <h2><i>✦</i>Leader Melayu</h2>
-    <p class="sub">Wakil rasmi komuniti yang menghubungkan pemain dengan pasukan pembangun.</p>
-    <div class="grid g3">
-      <% const leaders = locals.leaders || []; %>
-      <% if (leaders.length === 0) { %>
-        <div class="card empty" style="grid-column:1/-1">Senarai Leader akan dikemas kini.</div>
-      <% } else { leaders.forEach(l => { %>
-        <div class="card leader">
-          <img src="<%= l.avatar || 'https://cdn.discordapp.com/embed/avatars/0.png' %>" alt="">
-          <div><h4><%= l.name %></h4><p><%= l.role || 'Leader' %></p></div>
-        </div>
-      <% }) } %>
-    </div>
-  </section>
-
-  <!-- CALCULATOR -->
-  <section id="kalkulator">
-    <h2><i>✦</i>Kalkulator Pintar</h2>
-    <div class="card" style="max-width:480px">
-      <label>Tukar dari</label>
-      <select id="calcType" class="in" onchange="calc()">
-        <option value="coins">🪙 Coins → Pips</option>
-        <option value="pips">💠 Pips → Coins</option>
-      </select>
-      <label>Jumlah</label>
-      <input type="number" id="calcAmt" class="in" placeholder="Cth: 1000" oninput="calc()">
-      <label>Anggaran nilai adil</label>
-      <div class="calc-out" id="calcOut">0</div>
-    </div>
-  </section>
-
-  <!-- INJECT -->
-  <section id="wallet-panel">
-    <h2><i>✦</i>Kawalan Wallet (Admin)</h2>
-    <div class="grid g2">
-      <div class="card">
-        <form onsubmit="handleInject(event)">
-          <label>Discord ID Sasaran</label>
-          <input type="text" id="targetId" class="in" placeholder="Cth: 3829102938491" inputmode="numeric" required>
-          <label>Jenis Aset</label>
-          <select id="assetType" class="in">
-            <option value="Plato Coins">🪙 Plato Coins</option>
-            <option value="Pips">💠 Pips</option>
-            <option value="Total Sponsor">🌸 Total Sponsor</option>
-          </select>
-          <label>Jumlah</label>
-          <input type="number" id="amount" class="in" placeholder="Cth: 5000" required>
-          <button type="submit" class="btn" style="width:100%">⚡ Masukkan Aset</button>
-          <div id="alertBox" class="alert"></div>
-        </form>
-      </div>
-      <div class="card">
-        <h3 style="font-size:.9rem;margin-bottom:10px">Akaun Anda</h3>
-        <p class="m" style="margin-bottom:10px">Maklumat Discord semasa:</p>
-        <div style="background:rgba(0,0,0,.5);border:1px solid var(--line);border-radius:6px;padding:12px;font-size:.9rem;line-height:2">
-          🪙 <b>Coins:</b> <%= wallet.coins.toLocaleString() %><br>
-          💠 <b>Pips:</b> <%= wallet.pips.toLocaleString() %><br>
-          🌸 <b>Sponsor:</b> <%= wallet.sponsorTotal.toLocaleString() %><br>
-          ✨ <b>EXP:</b> <%= wallet.exp.toLocaleString() %>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ALL WALLETS -->
-  <section id="database-panel">
-    <h2><i>✦</i>Senarai Wallet Ahli <span style="float:right;font-size:.72rem;color:var(--pink);font-family:'Space Grotesk';text-transform:none"><%= allWallets.length %> pengguna</span></h2>
-    <input type="search" id="walletSearch" class="in" placeholder="Cari Discord ID..." oninput="filterWallets()">
-    <div class="card tw" style="padding:6px">
-      <table id="walletTable">
-        <thead><tr><th>#</th><th>Discord ID</th><th>Coins</th><th>Pips</th><th>Sponsor</th><th>EXP</th></tr></thead>
-        <tbody>
-          <% if (allWallets.length === 0) { %>
-            <tr><td colspan="6" class="empty">Tiada data wallet direkodkan lagi.</td></tr>
-          <% } else { allWallets.slice().sort((a,b)=>b.coins-a.coins).forEach((w,i) => { %>
-            <tr>
-              <td class="rank"><%= i+1 %></td>
-              <td><code><%= w.id %></code></td>
-              <td>🪙 <%= w.coins.toLocaleString() %></td>
-              <td>💠 <%= w.pips.toLocaleString() %></td>
-              <td>🌸 <%= w.sponsorTotal.toLocaleString() %></td>
-              <td>✨ <%= w.exp.toLocaleString() %></td>
-            </tr>
-          <% }) } %>
-        </tbody>
-      </table>
-    </div>
-  </section>
-
-  <!-- REPORT + TIPS -->
-  <section id="laporan">
-    <h2><i>✦</i>Lapor Masalah</h2>
-    <div class="grid g2">
-      <div class="card">
-        <p class="m" style="margin-bottom:12px">Jumpa bug atau masalah teknikal? Hubungi kami dengan username dan penerangan masalah anda.</p>
-        <a class="btn" href="mailto:<%= locals.supportEmail || 'support@platomy.com' %>">Hantar E-mel</a>
-      </div>
-      <div class="card">
-        <h3 style="font-size:.9rem;color:var(--pink);margin-bottom:10px">Tip Hari Ini</h3>
-        <p class="tip" id="tip">Memuatkan tip...</p>
-      </div>
-    </div>
-  </section>
-
-  <section>
-    <h2><i>✦</i>Laman Berkaitan</h2>
-    <div class="grid g3">
-      <a class="card link-card" href="https://platoapp.com/en" target="_blank" rel="noopener"><h3>Plato Web</h3><p>Laman rasmi permainan Plato.</p></a>
-      <a class="card link-card" href="https://platopedia.com/profilebuilder" target="_blank" rel="noopener"><h3>Platopedia</h3><p>Ensiklopedia item dan penyesuaian profil.</p></a>
-      <a class="card link-card" href="https://werepedia.com/en" target="_blank" rel="noopener"><h3>Werepedia</h3><p>Panduan kad, peranan dan strategi permainan Werewolf.</p></a>
-    </div>
-  </section>
-
-  <footer>© PlatoMy • Komuniti Plato Malaysia 🇲🇾</footer>
-</main>
-
-<nav class="bottom">
-  <a href="#utama"><span>🏠</span>Utama</a>
-  <a href="#pemimpin"><span>👑</span>Leader</a>
-  <a href="#kalkulator"><span>🧮</span>Kira</a>
-  <a href="#database-panel"><span>📊</span>Wallet</a>
-</nav>
-
-<script>
-function toggleSidebar(){document.getElementById('sidebarNav').classList.toggle('open')}
-
-// Tukar nilai: UBAH kadar ini ikut nilai sebenar Plato
-const COINS_PER_PIP = 10;
-function calc(){
-  const t=document.getElementById('calcType').value;
-  const a=parseFloat(document.getElementById('calcAmt').value)||0;
-  const r=t==='coins'?a/COINS_PER_PIP:a*COINS_PER_PIP;
-  document.getElementById('calcOut').textContent=Math.round(r).toLocaleString()+(t==='coins'?' PIPS':' COINS');
-}
-
-function filterWallets(){
-  const q=document.getElementById('walletSearch').value.trim();
-  document.querySelectorAll('#walletTable tbody tr').forEach(tr=>{
-    tr.style.display=tr.textContent.includes(q)?'':'none';
-  });
-}
-
-const tips=[
-  'Main setiap hari untuk kekalkan streak dan kumpul EXP.',
-  'Jangan kongsi maklumat akaun anda dengan sesiapa.',
-  'Sertai Discord untuk berita dan acara terkini.',
-  'Hormati pemain lain, chat yang bersih buat game lebih seronok.',
-  'Jumpa bug? Terus lapor kepada Leader atau e-mel sokongan.'
-];
-document.getElementById('tip').textContent=tips[new Date().getDate()%tips.length];
-
-async function handleInject(e){
-  e.preventDefault();
-  const box=document.getElementById('alertBox');
-  const show=(ok,msg)=>{
-    box.style.display='block';
-    box.style.background=ok?'rgba(80,250,123,.15)':'rgba(255,85,85,.15)';
-    box.style.border='1px solid '+(ok?'var(--ok)':'var(--bad)');
-    box.style.color=ok?'var(--ok)':'var(--bad)';
-    box.textContent=msg;
+  // ---------- Helpers ----------
+  const clean = (s, max) => String(s ?? "").trim().slice(0, max);
+  const int = (v, min, max) => { const n = parseInt(v, 10); return Number.isFinite(n) && n >= min && n <= max ? n : null; };
+  const handle = fn => async (req, res) => {
+    try { await fn(req, res); }
+    catch (e) { console.error(e); res.status(500).json({ error: "Ralat pelayan: " + e.message }); }
   };
-  try{
-    const res=await fetch('/api/inject-assets',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        targetId:document.getElementById('targetId').value.trim(),
-        assetType:document.getElementById('assetType').value,
-        amount:document.getElementById('amount').value
-      })
+
+  const pageAuth = (req, res, next) => (req.isAuthenticated() ? next() : res.redirect("/login"));
+  const apiAuth = (req, res, next) => (req.isAuthenticated() ? next() : res.status(401).json({ error: "Sila log masuk semula." }));
+
+  async function isAdmin(userId) {
+    if (ADMIN_IDS.includes(userId)) return true;
+    for (const g of client.guilds.cache.values()) {
+      try {
+        const m = await g.members.fetch(userId);
+        if (m.permissions.has(PermissionFlagsBits.Administrator)) return true;
+      } catch {}
+    }
+    return false;
+  }
+  const requireAdmin = async (req, res, next) =>
+    (await isAdmin(req.user.id)) ? next() : res.status(403).json({ error: "Admin sahaja." });
+
+  function getChannels() {
+    const out = [];
+    client.guilds.cache.forEach(g => g.channels.cache.forEach(c => {
+      if (c.type === ChannelType.GuildText) out.push({ id: c.id, name: c.name, guild: g.name });
+    }));
+    return out;
+  }
+  const getTextChannel = id => {
+    const c = client.channels.cache.get(String(id));
+    return c && c.type === ChannelType.GuildText ? c : null;
+  };
+  const findLogAny = name => {
+    for (const g of client.guilds.cache.values()) {
+      const c = g.channels.cache.find(ch => ch.name.toLowerCase().includes(name) && ch.isTextBased());
+      if (c) return c;
+    }
+    return null;
+  };
+  const pickWinners = (list, n) => {
+    const pool = [...list], out = [];
+    while (out.length < n && pool.length) out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+    return out;
+  };
+  const footer = req => ({ text: `PlatoMy Dashboard • ${req.user.username}` });
+
+  // ---------- Tamat Giveaway / Rumble ----------
+  async function endGiveaway(channel, msgId) {
+    const gw = giveawaysMap.get(msgId);
+    if (!gw || gw.ended) return;
+    gw.ended = true;
+    const winners = pickWinners(gw.participants, gw.winnersCount);
+    const tag = winners.map(id => `<@${id}>`).join(", ");
+    const msg = await channel.messages.fetch(msgId).catch(() => null);
+    if (msg?.embeds[0]) {
+      const e = EmbedBuilder.from(msg.embeds[0]).setTitle("🎉 GIVEAWAY TAMAT")
+        .setDescription(`🎁 **Prize:** ${gw.prize}\n👑 **Pemenang:** ${tag || "Tiada penyertaan"}\n\n👥 **Entries:** ${gw.participants.length}`);
+      await msg.edit({ embeds: [e], components: [] }).catch(() => {});
+    }
+    await channel.send(winners.length
+      ? `🎊 Tahniah ${tag}! Anda memenangi **${gw.prize}**!`
+      : `😢 Giveaway **${gw.prize}** tamat tanpa penyertaan.`).catch(() => {});
+  }
+
+  async function endRumble(channel, msgId) {
+    const game = rumbleMap.get(msgId);
+    if (!game || game.ended) return;
+    game.ended = true;
+    const [winner] = pickWinners(game.participants, 1);
+    const label = game.currencyType === "coins" ? "🪙 Plato Coins" : "💠 Pips";
+    if (winner) {
+      const w = getWallet(winner);
+      if (game.currencyType === "coins") w.coins += game.totalPrize; else w.pips += game.totalPrize;
+    }
+    const msg = await channel.messages.fetch(msgId).catch(() => null);
+    if (msg?.embeds[0]) {
+      const e = EmbedBuilder.from(msg.embeds[0]).setTitle("🌸・Rumble Tamat")
+        .setDescription(`🎁 **Hadiah:** ${game.totalPrize.toLocaleString()} ${label}\n🏆 **Pemenang:** ${winner ? `<@${winner}>` : "Tiada penyertaan"}\n\n👥 **Penyertaan:** ${game.participants.length} pemain`);
+      await msg.edit({ embeds: [e], components: [] }).catch(() => {});
+    }
+    await channel.send(winner
+      ? `🏆 <@${winner}> menang **${game.totalPrize.toLocaleString()} ${label}** dalam PlatoMy Rumble!`
+      : "😢 Rumble tamat tanpa penyertaan.").catch(() => {});
+  }
+
+  // ---------- Halaman utama ----------
+  app.get("/", pageAuth, handle(async (req, res) => {
+    const admin = await isAdmin(req.user.id);
+    const all = [...wallets.entries()].map(([id, d]) => ({
+      id, name: client.users.cache.get(id)?.username || id, ...d,
+    }));
+    res.render("dashboard", {
+      user: req.user,
+      wallet: getWallet(req.user.id),
+      allWallets: all,
+      totalCoins: all.reduce((a, b) => a + b.coins, 0),
+      totalPips: all.reduce((a, b) => a + b.pips, 0),
+      botClient: client,
+      isAdmin: admin,
+      channels: admin ? getChannels() : [],
+      listings: listings.filter(l => l.status === "open").slice().reverse(),
+      supportEmail: SUPPORT_EMAIL,
     });
-    const data=await res.json();
-    if(!res.ok) throw new Error(data.error||'Ralat berlaku');
-    show(true,data.message);
-    setTimeout(()=>location.reload(),1500);
-  }catch(err){show(false,err.message)}
+  }));
+
+  // ---------- Kawalan Bot (Admin) ----------
+  app.post("/api/bot/event", apiAuth, requireAdmin, handle(async (req, res) => {
+    const ch = getTextChannel(req.body.channelId);
+    const title = clean(req.body.title, 100), desc = clean(req.body.description, 1500);
+    if (!ch) return res.status(400).json({ error: "Channel tidak sah." });
+    if (!title || !desc) return res.status(400).json({ error: "Sila isi tajuk dan butiran." });
+
+    const embed = new EmbedBuilder().setColor(PINK).setTitle(`🎉・${title}`)
+      .setDescription(`${desc}\n\n🎀 Dianjurkan oleh: ${req.user.username}`)
+      .setThumbnail(client.user.displayAvatarURL()).setTimestamp();
+    await ch.send({ content: "✨ **Pengumuman Event Baharu!**", embeds: [embed] });
+
+    const log = ch.guild.channels.cache.find(c => c.name.toLowerCase().includes("event-log") && c.isTextBased());
+    if (log) await log.send({ embeds: [new EmbedBuilder().setColor(PINK).setTitle("🛡️・Event Log: New Event Created")
+      .setDescription(`📌 **Tajuk:** ${title}\n📝 **Butiran:** ${desc}\n👤 **Admin (web):** <@${req.user.id}>`).setTimestamp()] }).catch(() => {});
+
+    res.json({ message: `Event "${title}" dihantar ke #${ch.name}!` });
+  }));
+
+  app.post("/api/bot/giveaway", apiAuth, requireAdmin, handle(async (req, res) => {
+    const ch = getTextChannel(req.body.channelId);
+    const prize = clean(req.body.prize, 200), reqmt = clean(req.body.requirement, 200), image = clean(req.body.image, 500);
+    const mins = int(req.body.duration, 1, 10080), winners = int(req.body.winners, 1, 20);
+    if (!ch) return res.status(400).json({ error: "Channel tidak sah." });
+    if (!prize || !mins || !winners) return res.status(400).json({ error: "Hadiah, tempoh (1-10080 min) dan pemenang (1-20) diperlukan." });
+
+    const endSec = Math.floor((Date.now() + mins * 60000) / 1000);
+    const embed = new EmbedBuilder().setColor(PINK).setTitle("🎉 GIVEAWAY")
+      .setDescription(`🎁 **Prize:** ${prize}\n👑 **Winners:** ${winners}\n⏳ **Ends In:** <t:${endSec}:R>${reqmt ? `\n📌 **Syarat:** ${reqmt}` : ""}\n\n👥 **Entries:** 0`)
+      .setFooter(footer(req));
+    if (/^https?:\/\//.test(image)) embed.setImage(image);
+
+    const btn = new ButtonBuilder().setCustomId("join_giveaway").setLabel("🎉 Join Giveaway").setStyle(ButtonStyle.Success);
+    const msg = await ch.send({ embeds: [embed], components: [new ActionRowBuilder().addComponents(btn)] });
+    giveawaysMap.set(msg.id, { prize, winnersCount: winners, participants: [], ended: false });
+    setTimeout(() => endGiveaway(ch, msg.id), mins * 60000);
+
+    res.json({ message: `Giveaway "${prize}" bermula di #${ch.name}!` });
+  }));
+
+  app.post("/api/bot/rumble", apiAuth, requireAdmin, handle(async (req, res) => {
+    const ch = getTextChannel(req.body.channelId);
+    const currency = req.body.currency === "pips" ? "pips" : "coins";
+    const prize = int(req.body.prize, 1, 1e9), mins = int(req.body.duration, 1, 10080);
+    if (!ch) return res.status(400).json({ error: "Channel tidak sah." });
+    if (!prize || !mins) return res.status(400).json({ error: "Hadiah dan tempoh diperlukan." });
+
+    const label = currency === "coins" ? "🪙 Plato Coins" : "💠 Pips";
+    const endSec = Math.floor((Date.now() + mins * 60000) / 1000);
+    const embed = new EmbedBuilder().setColor(PINK).setTitle("🌸・PlatoMy Rumble Arena")
+      .setDescription(`🎁 **Total Prize:** ${prize.toLocaleString()} ${label}\n⏳ **Berakhir Pada:** <t:${endSec}:R>\n\n👥 **Penyertaan:** 0 pemain`);
+    const btn = new ButtonBuilder().setCustomId(`join_rumble_${currency}_${prize}`).setLabel("🎟️ Enter Free Rumble").setStyle(ButtonStyle.Success);
+    const msg = await ch.send({ embeds: [embed], components: [new ActionRowBuilder().addComponents(btn)] });
+    rumbleMap.set(msg.id, { currencyType: currency, totalPrize: prize, participants: [], ended: false });
+    setTimeout(() => endRumble(ch, msg.id), mins * 60000);
+
+    res.json({ message: `Rumble ${prize.toLocaleString()} ${label} bermula di #${ch.name}!` });
+  }));
+
+  app.post("/api/bot/announce", apiAuth, requireAdmin, handle(async (req, res) => {
+    const ch = getTextChannel(req.body.channelId);
+    const title = clean(req.body.title, 200), message = clean(req.body.message, 3000), image = clean(req.body.image, 500);
+    let color = clean(req.body.color, 7);
+    if (!/^#[0-9a-fA-F]{6}$/.test(color)) color = PINK;
+    if (!ch) return res.status(400).json({ error: "Channel tidak sah." });
+    if (!title && !message && !image) return res.status(400).json({ error: "Isi sekurang-kurangnya satu medan." });
+
+    const embed = new EmbedBuilder().setColor(color);
+    if (title) embed.setTitle(title);
+    if (message) embed.setDescription(message);
+    if (/^https?:\/\//.test(image)) embed.setImage(image);
+    await ch.send({ embeds: [embed] });
+    res.json({ message: `Embed dihantar ke #${ch.name}!` });
+  }));
+
+  app.post("/api/wallet/adjust", apiAuth, requireAdmin, handle(async (req, res) => {
+    const targetId = clean(req.body.targetId, 40).replace(/[<@!>]/g, "");
+    const amount = int(req.body.amount, 1, 1e9), reason = clean(req.body.reason, 200) || "Tiada sebab dinyatakan";
+    const type = ["coins", "pips", "sponsor"].includes(req.body.assetType) ? req.body.assetType : null;
+    const deduct = req.body.action === "deduct";
+    if (!/^\d{5,25}$/.test(targetId) || !amount || !type) return res.status(400).json({ error: "Discord ID, jenis aset dan jumlah tidak sah." });
+
+    const w = getWallet(targetId);
+    const key = type === "sponsor" ? "sponsorTotal" : type;
+    w[key] = Math.max(0, w[key] + (deduct ? -amount : amount));
+
+    const log = findLogAny("wallet-log");
+    if (log) await log.send({ embeds: [new EmbedBuilder().setColor(PINK).setTitle(`💳・Wallet Log (Web): ${deduct ? "Deduct" : "Add"} ${type}`)
+      .setDescription(`👤 **Target:** <@${targetId}> (\`${targetId}\`)\n🛡️ **Admin:** <@${req.user.id}>\n📝 **Jumlah:** ${amount.toLocaleString()}\n📌 **Reason:** ${reason}\n\n🪙 \`${w.coins.toLocaleString()}\` • 💠 \`${w.pips.toLocaleString()}\` • 🌸 \`${w.sponsorTotal.toLocaleString()}\``).setTimestamp()] }).catch(() => {});
+
+    res.json({ message: `${deduct ? "Menolak" : "Menambah"} ${amount.toLocaleString()} ${type} ${deduct ? "daripada" : "kepada"} ${targetId}!` });
+  }));
+
+  // ---------- Trading Plato Item ----------
+  const TYPES = { jual: "💰 Jual", beli: "🛒 Beli", tukar: "🔄 Tukar" };
+
+  app.post("/api/trade", apiAuth, handle(async (req, res) => {
+    const item = clean(req.body.item, 80), notes = clean(req.body.notes, 300);
+    const type = TYPES[req.body.type] ? req.body.type : null;
+    const price = clean(req.body.price, 40);
+    const currency = ["Coins", "Pips", "RM", "Tukar item"].includes(req.body.currency) ? req.body.currency : "Coins";
+    if (!item || !type) return res.status(400).json({ error: "Nama item dan jenis diperlukan." });
+    if (listings.filter(l => l.userId === req.user.id && l.status === "open").length >= 5)
+      return res.status(400).json({ error: "Maksimum 5 listing aktif. Tutup listing lama dahulu." });
+
+    const l = { id: listingSeq++, userId: req.user.id, username: req.user.username, item, type, price, currency, notes, status: "open", createdAt: Date.now() };
+    listings.push(l);
+
+    const log = findLogAny("trading-log");
+    if (log) await log.send({ embeds: [new EmbedBuilder().setColor(PINK).setTitle(`📦 Trading #${l.id}: ${TYPES[type]}`)
+      .setDescription(`🎁 **Item:** ${item}\n💎 **Harga:** ${price ? `${price} ${currency}` : "Runding"}\n📝 **Nota:** ${notes || "-"}\n👤 **Penjual/Pembeli:** <@${l.userId}>`)
+      .setFooter({ text: "PlatoMy Trading • via Web Dashboard" }).setTimestamp()] }).catch(() => {});
+
+    res.json({ message: "Listing berjaya dipaparkan!" });
+  }));
+
+  const tradeAction = status => handle(async (req, res) => {
+    const l = listings.find(x => x.id === parseInt(req.params.id, 10));
+    if (!l) return res.status(404).json({ error: "Listing tidak dijumpai." });
+    if (l.userId !== req.user.id && !(await isAdmin(req.user.id))) return res.status(403).json({ error: "Bukan listing anda." });
+    l.status = status;
+    res.json({ message: status === "sold" ? "Ditanda selesai." : "Listing dipadam." });
+  });
+  app.post("/api/trade/:id/close", apiAuth, tradeAction("sold"));
+  app.post("/api/trade/:id/delete", apiAuth, tradeAction("deleted"));
 }
-</script>
-</body>
-</html>
