@@ -1,9 +1,9 @@
-import { EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, ChannelType, PermissionFlagsBits } from "discord.js";
+import { EmbedBuilder, ChannelType, PermissionFlagsBits } from "discord.js";
 
 const PINK = "#ff69b4";
 const SUPPORT_EMAIL = "hello@platoteam.com";
 
-export function registerDashboardApi({ app, client, wallets, getWallet, giveawaysMap, rumbleMap }) {
+export function registerDashboardApi({ app, client, wallets, getWallet, createRumble }) {
   // Admin tambahan (pilihan): ADMIN_IDS=123,456 di Railway. Selain itu, sesiapa yang
   // ada permission Administrator di mana-mana server bot ini dikira admin.
   const ADMIN_IDS = (process.env.ADMIN_IDS || "").split(",").map(s => s.trim()).filter(Boolean);
@@ -52,51 +52,6 @@ export function registerDashboardApi({ app, client, wallets, getWallet, giveaway
     }
     return null;
   };
-  const pickWinners = (list, n) => {
-    const pool = [...list], out = [];
-    while (out.length < n && pool.length) out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
-    return out;
-  };
-  const footer = req => ({ text: `PlatoMy Dashboard • ${req.user.username}` });
-
-  // ---------- Tamat Giveaway / Rumble ----------
-  async function endGiveaway(channel, msgId) {
-    const gw = giveawaysMap.get(msgId);
-    if (!gw || gw.ended) return;
-    gw.ended = true;
-    const winners = pickWinners(gw.participants, gw.winnersCount);
-    const tag = winners.map(id => `<@${id}>`).join(", ");
-    const msg = await channel.messages.fetch(msgId).catch(() => null);
-    if (msg?.embeds[0]) {
-      const e = EmbedBuilder.from(msg.embeds[0]).setTitle("🎉 GIVEAWAY TAMAT")
-        .setDescription(`🎁 **Prize:** ${gw.prize}\n👑 **Pemenang:** ${tag || "Tiada penyertaan"}\n\n👥 **Entries:** ${gw.participants.length}`);
-      await msg.edit({ embeds: [e], components: [] }).catch(() => {});
-    }
-    await channel.send(winners.length
-      ? `🎊 Tahniah ${tag}! Anda memenangi **${gw.prize}**!`
-      : `😢 Giveaway **${gw.prize}** tamat tanpa penyertaan.`).catch(() => {});
-  }
-
-  async function endRumble(channel, msgId) {
-    const game = rumbleMap.get(msgId);
-    if (!game || game.ended) return;
-    game.ended = true;
-    const [winner] = pickWinners(game.participants, 1);
-    const label = game.currencyType === "coins" ? "🪙 Plato Coins" : "💠 Pips";
-    if (winner) {
-      const w = getWallet(winner);
-      if (game.currencyType === "coins") w.coins += game.totalPrize; else w.pips += game.totalPrize;
-    }
-    const msg = await channel.messages.fetch(msgId).catch(() => null);
-    if (msg?.embeds[0]) {
-      const e = EmbedBuilder.from(msg.embeds[0]).setTitle("🌸・Rumble Tamat")
-        .setDescription(`🎁 **Hadiah:** ${game.totalPrize.toLocaleString()} ${label}\n🏆 **Pemenang:** ${winner ? `<@${winner}>` : "Tiada penyertaan"}\n\n👥 **Penyertaan:** ${game.participants.length} pemain`);
-      await msg.edit({ embeds: [e], components: [] }).catch(() => {});
-    }
-    await channel.send(winner
-      ? `🏆 <@${winner}> menang **${game.totalPrize.toLocaleString()} ${label}** dalam PlatoMy Rumble!`
-      : "😢 Rumble tamat tanpa penyertaan.").catch(() => {});
-  }
 
   // ---------- Halaman utama ----------
   app.get("/", pageAuth, handle(async (req, res) => {
@@ -125,7 +80,7 @@ export function registerDashboardApi({ app, client, wallets, getWallet, giveaway
     if (!ch) return res.status(400).json({ error: "Channel tidak sah." });
     if (!title || !desc) return res.status(400).json({ error: "Sila isi tajuk dan butiran." });
 
-    const embed = new EmbedBuilder().setColor(PINK).setTitle(`🎉・${title}`)
+    const embed = new EmbedBuilder().setColor(PINK).setTitle(title)
       .setDescription(`${desc}\n\n🎀 Dianjurkan oleh: ${req.user.username}`)
       .setThumbnail(client.user.displayAvatarURL()).setTimestamp();
     await ch.send({ content: "✨ **Pengumuman Event Baharu!**", embeds: [embed] });
@@ -137,27 +92,6 @@ export function registerDashboardApi({ app, client, wallets, getWallet, giveaway
     res.json({ message: `Event "${title}" dihantar ke #${ch.name}!` });
   }));
 
-  app.post("/api/bot/giveaway", apiAuth, requireAdmin, handle(async (req, res) => {
-    const ch = getTextChannel(req.body.channelId);
-    const prize = clean(req.body.prize, 200), reqmt = clean(req.body.requirement, 200), image = clean(req.body.image, 500);
-    const mins = int(req.body.duration, 1, 10080), winners = int(req.body.winners, 1, 20);
-    if (!ch) return res.status(400).json({ error: "Channel tidak sah." });
-    if (!prize || !mins || !winners) return res.status(400).json({ error: "Hadiah, tempoh (1-10080 min) dan pemenang (1-20) diperlukan." });
-
-    const endSec = Math.floor((Date.now() + mins * 60000) / 1000);
-    const embed = new EmbedBuilder().setColor(PINK).setTitle("🎉 GIVEAWAY")
-      .setDescription(`🎁 **Prize:** ${prize}\n👑 **Winners:** ${winners}\n⏳ **Ends In:** <t:${endSec}:R>${reqmt ? `\n📌 **Syarat:** ${reqmt}` : ""}\n\n👥 **Entries:** 0`)
-      .setFooter(footer(req));
-    if (/^https?:\/\//.test(image)) embed.setImage(image);
-
-    const btn = new ButtonBuilder().setCustomId("join_giveaway").setLabel("🎉 Join Giveaway").setStyle(ButtonStyle.Success);
-    const msg = await ch.send({ embeds: [embed], components: [new ActionRowBuilder().addComponents(btn)] });
-    giveawaysMap.set(msg.id, { prize, winnersCount: winners, participants: [], ended: false });
-    setTimeout(() => endGiveaway(ch, msg.id), mins * 60000);
-
-    res.json({ message: `Giveaway "${prize}" bermula di #${ch.name}!` });
-  }));
-
   app.post("/api/bot/rumble", apiAuth, requireAdmin, handle(async (req, res) => {
     const ch = getTextChannel(req.body.channelId);
     const currency = req.body.currency === "pips" ? "pips" : "coins";
@@ -165,16 +99,8 @@ export function registerDashboardApi({ app, client, wallets, getWallet, giveaway
     if (!ch) return res.status(400).json({ error: "Channel tidak sah." });
     if (!prize || !mins) return res.status(400).json({ error: "Hadiah dan tempoh diperlukan." });
 
-    const label = currency === "coins" ? "🪙 Plato Coins" : "💠 Pips";
-    const endSec = Math.floor((Date.now() + mins * 60000) / 1000);
-    const embed = new EmbedBuilder().setColor(PINK).setTitle("🌸・PlatoMy Rumble Arena")
-      .setDescription(`🎁 **Total Prize:** ${prize.toLocaleString()} ${label}\n⏳ **Berakhir Pada:** <t:${endSec}:R>\n\n👥 **Penyertaan:** 0 pemain`);
-    const btn = new ButtonBuilder().setCustomId(`join_rumble_${currency}_${prize}`).setLabel("🎟️ Enter Free Rumble").setStyle(ButtonStyle.Success);
-    const msg = await ch.send({ embeds: [embed], components: [new ActionRowBuilder().addComponents(btn)] });
-    rumbleMap.set(msg.id, { currencyType: currency, totalPrize: prize, participants: [], ended: false });
-    setTimeout(() => endRumble(ch, msg.id), mins * 60000);
-
-    res.json({ message: `Rumble ${prize.toLocaleString()} ${label} bermula di #${ch.name}!` });
+    await createRumble(ch, currency, prize, mins);
+    res.json({ message: `Rumble ${prize.toLocaleString()} ${currency} bermula di #${ch.name}!` });
   }));
 
   app.post("/api/bot/announce", apiAuth, requireAdmin, handle(async (req, res) => {
@@ -211,7 +137,7 @@ export function registerDashboardApi({ app, client, wallets, getWallet, giveaway
     res.json({ message: `${deduct ? "Menolak" : "Menambah"} ${amount.toLocaleString()} ${type} ${deduct ? "daripada" : "kepada"} ${targetId}!` });
   }));
 
-  // ---------- Trading Plato Item ----------
+  // ---------- Trading Plato Item (papan di website) ----------
   const TYPES = { jual: "💰 Jual", beli: "🛒 Beli", tukar: "🔄 Tukar" };
 
   app.post("/api/trade", apiAuth, handle(async (req, res) => {
