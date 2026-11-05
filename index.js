@@ -167,7 +167,7 @@ function buildTradeList({ requesterId, details, accepterId = null }) {
     .addSeparatorComponents(sep());
 
   if (accepted) {
-    box.addTextDisplayComponents(txt(`✅ **Diterima oleh:** <@${accepterId}>`));
+    box.addTextDisplayComponents(txt(`✅ **Accepted by:** <@${accepterId}>`));
   } else {
     box.addTextDisplayComponents(
       txt("╰┈➤ Click **Accept Trade** if you are interested in trading with the requester.")
@@ -507,7 +507,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           components: [buildTradePanel(listRef)],
           flags: V2,
         });
-        await interaction.reply({ content: "✅ Panel Trading berjaya dihantar!", ephemeral: true });
+        await interaction.reply({ content: "✅ Trading panel sent!", ephemeral: true });
         return;
       }
 
@@ -644,7 +644,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const modal = new ModalBuilder().setCustomId("trading_modal").setTitle("🛍️ PlatoMy Trading");
         const itemInput = new TextInputBuilder()
           .setCustomId("trading_text")
-          .setLabel("Butiran item yang dimahukan")
+          .setLabel("Item details")
           .setStyle(TextInputStyle.Paragraph)
           .setRequired(true)
           .setMaxLength(1000);
@@ -659,13 +659,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const hasTradeRole = interaction.member?.roles?.cache?.some(r => r.name.toLowerCase().includes(TRADE_ROLE_NAME));
 
         if (!hasTradeRole) {
-          return interaction.reply({ content: "❌ Anda memerlukan role Trade untuk menerima trade.", ephemeral: true });
+          return interaction.reply({ content: "❌ You need the Trade role to accept trades.", ephemeral: true });
         }
         if (interaction.user.id === requesterId) {
-          return interaction.reply({ content: "⚠️ Anda tidak boleh menerima trade sendiri.", ephemeral: true });
+          return interaction.reply({ content: "⚠️ You can't accept your own trade.", ephemeral: true });
         }
         if (acceptedTrades.has(interaction.message.id)) {
-          return interaction.reply({ content: "❌ Trade ini sudah diterima.", ephemeral: true });
+          return interaction.reply({ content: "❌ This trade has already been accepted.", ephemeral: true });
         }
         acceptedTrades.add(interaction.message.id);
 
@@ -681,7 +681,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         });
 
         await interaction.channel.send(
-          `🤝 <@${requesterId}>, trade anda diterima oleh ${interaction.user}. Sila berhubung untuk selesaikan trade!`
+          `🤝 <@${requesterId}>, your trade was accepted by ${interaction.user}. Please contact each other to complete the trade!`
         ).catch(() => {});
 
         const logChannel = findChannel(interaction.guild, TRADING_LOG_CHANNEL_NAME);
@@ -710,12 +710,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (interaction.customId === "trading_modal") {
         const details = interaction.fields.getTextInputValue("trading_text").trim();
         if (!details) {
-          return interaction.reply({ content: "❌ Sila isi butiran item.", ephemeral: true });
+          return interaction.reply({ content: "❌ Please fill in the item details.", ephemeral: true });
         }
 
         const listChannel = findChannel(interaction.guild, TRADING_LIST_CHANNEL_NAME);
         if (!listChannel) {
-          return interaction.reply({ content: "❌ Channel trading-list tidak dijumpai.", ephemeral: true });
+          return interaction.reply({ content: "❌ The trading-list channel was not found.", ephemeral: true });
         }
 
         const sent = await listChannel.send({
@@ -724,10 +724,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
           allowedMentions: NO_PING,
         }).catch(() => null);
         if (!sent) {
-          return interaction.reply({ content: "❌ Bot tidak dapat menghantar ke channel trading-list. Semak permission bot.", ephemeral: true });
+          return interaction.reply({ content: "❌ The bot can't send to the trading-list channel. Please check the bot's permissions.", ephemeral: true });
         }
 
-        await interaction.reply({ content: "✅ Maklumat item anda telah dihantar!", ephemeral: true });
+        await interaction.reply({ content: "✅ Your item details have been sent!", ephemeral: true });
 
         const logChannel = findChannel(interaction.guild, TRADING_LOG_CHANNEL_NAME);
         if (logChannel) {
