@@ -1,6 +1,5 @@
 import {
   Client,
-  EmbedBuilder,
   Events,
   GatewayIntentBits,
   REST,
@@ -13,6 +12,15 @@ import {
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
+  ContainerBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  SectionBuilder,
+  ThumbnailBuilder,
+  MediaGalleryBuilder,
+  MediaGalleryItemBuilder,
+  MessageFlags,
 } from "discord.js";
 import express from "express";
 import session from "express-session";
@@ -61,18 +69,19 @@ const TRADING_LIST_CHANNEL_NAME = "trading-list"; // channel permintaan item (pr
 const TRADING_LOG_CHANNEL_NAME = "trading-log";   // log: requester + accepter
 const TRADE_ROLE_NAME = "trade";                  // nama role mengandungi perkataan ini
 const LOGO_URL = "https://cdn.discordapp.com/attachments/1549051773438787724/1549403998686281808/IMG_5614.png";
-const PINK = "#ff69b4";
 
 const isAdmin = (i) => i.member?.permissions?.has(PermissionFlagsBits.Administrator);
-const safeColor = (c) => {
-  const v = String(c || "").trim().replace("#", "");
-  return /^[0-9a-fA-F]{6}$/.test(v) ? `#${v}` : PINK;
-};
 const isUrl = (u) => /^https?:\/\/\S+$/i.test(String(u || "").trim());
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const findChannel = (guild, part) =>
   guild.channels.cache.find((c) => c.name.toLowerCase().includes(part) && c.isTextBased());
+
+// Tukar kod hex jadi nombor warna. Kalau kosong/tak sah, bagi null (container tanpa warna)
+const accent = (c) => {
+  const v = String(c || "").trim().replace("#", "");
+  return /^[0-9a-fA-F]{6}$/.test(v) ? parseInt(v, 16) : null;
+};
 
 function getMalaysiaTime() {
   return new Date().toLocaleTimeString("en-US", {
@@ -83,12 +92,88 @@ function getMalaysiaTime() {
   });
 }
 
-function walletEmbed(w) {
-  return new EmbedBuilder()
-    .setColor(PINK)
-    .setTitle("💳 PlatoMy • Wallet")
-    .setDescription(`🪙 **Plato Coins:** ${w.coins.toLocaleString()}\n💠 **Pips:** ${w.pips.toLocaleString()}\n🌸 **Total Sponsor:** ${w.sponsorTotal.toLocaleString()}`)
-    .setFooter({ text: `PlatoMy Bank • Today at ${getMalaysiaTime()}` });
+// ================= CONTAINER (Components V2) =================
+const V2 = MessageFlags.IsComponentsV2;
+const V2_EPHEMERAL = MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral;
+const NO_PING = { parse: [] }; // mention nampak tapi tak ping
+const sep = () => new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small);
+const txt = (content) => new TextDisplayBuilder().setContent(content);
+
+// Container umum: tajuk + garisan + isi + footer kecil (tanpa warna)
+function info(title, body, footer = null) {
+  const box = new ContainerBuilder()
+    .addTextDisplayComponents(txt(`## ${title}`))
+    .addSeparatorComponents(sep())
+    .addTextDisplayComponents(txt(body));
+  if (footer) box.addTextDisplayComponents(txt(`-# ${footer}`));
+  return box;
+}
+
+// Kumpul semua teks dalam mesej container (untuk baca butiran item semasa Accept)
+function collectText(components, out = []) {
+  for (const c of components || []) {
+    const t = c.content ?? c.data?.content;
+    if (typeof t === "string") out.push(t);
+    if (c.components) collectText(c.components, out);
+  }
+  return out;
+}
+
+// ================= WALLET =================
+function walletBox(w) {
+  return info(
+    "💳 PlatoMy • Wallet",
+    `🪙 **Plato Coins:** ${w.coins.toLocaleString()}\n💠 **Pips:** ${w.pips.toLocaleString()}\n🌸 **Total Sponsor:** ${w.sponsorTotal.toLocaleString()}`,
+    `PlatoMy Bank • Today at ${getMalaysiaTime()}`
+  );
+}
+
+// ================= TRADING =================
+// Panel trading (dihantar oleh /setup-trading)
+function buildTradePanel(listRef) {
+  const btn = new ButtonBuilder()
+    .setCustomId("open_trading_modal")
+    .setLabel("Trading Ticket")
+    .setEmoji("🤝")
+    .setStyle(ButtonStyle.Secondary); // kelabu
+
+  return new ContainerBuilder()
+    .addTextDisplayComponents(txt("# ˚₊‧꒰ა 🛍️ 𝑃𝐿𝐴𝑇𝑂𝑀𝑌 𝑇𝑅𝐴𝐷𝐼𝑁𝐺 ໒꒱‧₊˚"))
+    .addSeparatorComponents(sep())
+    .addTextDisplayComponents(
+      txt(
+        "╰┈➤ Click the **Trading Ticket** button below to look for or trade your Plato items.\n" +
+        `╰┈➤ Your trade request will be posted automatically in ${listRef}.`
+      )
+    )
+    .addActionRowComponents(new ActionRowBuilder().addComponents(btn));
+}
+
+// Mesej permintaan dalam trading-list (accepterId diisi bila dah diterima)
+function buildTradeList({ requesterId, details, accepterId = null }) {
+  const accepted = Boolean(accepterId);
+  const btn = new ButtonBuilder()
+    .setCustomId(`accept_trade:${requesterId}`)
+    .setLabel(accepted ? "Trade Accepted" : "Accept Trade")
+    .setStyle(ButtonStyle.Secondary) // kelabu
+    .setDisabled(accepted);
+
+  const box = new ContainerBuilder()
+    .addTextDisplayComponents(txt("# ˚₊‧꒰ა 📋 𝑇𝑅𝐴𝐷𝐼𝑁𝐺 𝐿𝐼𝑆𝑇 ໒꒱‧₊˚"))
+    .addSeparatorComponents(sep())
+    .addTextDisplayComponents(
+      txt(`╰┈➤ **Requester:** <@${requesterId}>\n╰┈➤ **Item Details:** ${details}`)
+    )
+    .addSeparatorComponents(sep());
+
+  if (accepted) {
+    box.addTextDisplayComponents(txt(`✅ **Diterima oleh:** <@${accepterId}>`));
+  } else {
+    box.addTextDisplayComponents(
+      txt("╰┈➤ Click **Accept Trade** if you are interested in trading with the requester.")
+    );
+  }
+  return box.addActionRowComponents(new ActionRowBuilder().addComponents(btn));
 }
 
 // ================= RUMBLE (battle royale) =================
@@ -119,25 +204,32 @@ function rumbleLabel(currencyType) {
   return currencyType === "coins" ? "🪙 Plato Coins" : "💠 Pips";
 }
 
-async function createRumble(channel, currencyType, totalPrize, durationMins) {
-  const endTimeSeconds = Math.floor((Date.now() + durationMins * 60 * 1000) / 1000);
-
-  const embed = new EmbedBuilder()
-    .setColor(PINK)
-    .setTitle("🌸・PlatoMy Rumble Arena")
-    .setDescription(
-      `🎁 **Total Prize:** ${totalPrize.toLocaleString()} ${rumbleLabel(currencyType)}\n` +
-      `⏳ **Ends:** <t:${endTimeSeconds}:R>\n\n` +
-      `👥 **Players:** 0`
-    );
-
+// Container rumble yang masih terbuka (ada butang Join)
+function rumbleOpenBox(game) {
   const joinBtn = new ButtonBuilder()
-    .setCustomId(`join_rumble_${currencyType}_${totalPrize}`)
+    .setCustomId(`join_rumble_${game.currencyType}_${game.totalPrize}`)
     .setLabel("🎟️ Join Rumble")
     .setStyle(ButtonStyle.Success);
 
-  const msg = await channel.send({ embeds: [embed], components: [new ActionRowBuilder().addComponents(joinBtn)] });
-  rumbleMap.set(msg.id, { currencyType, totalPrize, participants: [], ended: false });
+  return info(
+    "🌸・PlatoMy Rumble Arena",
+    `🎁 **Total Prize:** ${game.totalPrize.toLocaleString()} ${rumbleLabel(game.currencyType)}\n` +
+    `⏳ **Ends:** <t:${game.endTimeSeconds}:R>\n\n` +
+    `👥 **Players:** ${game.participants.length}`
+  ).addActionRowComponents(new ActionRowBuilder().addComponents(joinBtn));
+}
+
+async function createRumble(channel, currencyType, totalPrize, durationMins) {
+  const game = {
+    currencyType,
+    totalPrize,
+    participants: [],
+    ended: false,
+    endTimeSeconds: Math.floor((Date.now() + durationMins * 60 * 1000) / 1000),
+  };
+
+  const msg = await channel.send({ components: [rumbleOpenBox(game)], flags: V2 });
+  rumbleMap.set(msg.id, game);
   setTimeout(() => runRumbleBattle(channel, msg.id), durationMins * 60 * 1000);
   return msg;
 }
@@ -150,14 +242,13 @@ async function runRumbleBattle(channel, msgId) {
   const label = rumbleLabel(game.currencyType);
   const prizeText = `${game.totalPrize.toLocaleString()} ${label}`;
   const msg = await channel.messages.fetch(msgId).catch(() => null);
-  const edit = (embed) => (msg ? msg.edit({ embeds: [embed], components: [] }).catch(() => {}) : null);
+  const edit = (box) => (msg ? msg.edit({ components: [box], flags: V2 }).catch(() => {}) : null);
 
   const players = [...game.participants];
 
   if (players.length === 0) {
     await edit(
-      new EmbedBuilder().setColor(PINK).setTitle("🌸・Rumble Ended")
-        .setDescription(`🎁 **Prize:** ${prizeText}\n🏆 **Winner:** No participants\n\n👥 **Players:** 0`)
+      info("🌸・Rumble Ended", `🎁 **Prize:** ${prizeText}\n🏆 **Winner:** No participants\n\n👥 **Players:** 0`)
     );
     await channel.send("😢 Rumble ended with no participants.").catch(() => {});
     return;
@@ -167,8 +258,7 @@ async function runRumbleBattle(channel, msgId) {
 
   if (alive.length > 1) {
     await edit(
-      new EmbedBuilder().setColor(PINK).setTitle("🌸・PlatoMy Rumble Arena")
-        .setDescription(`🔥 **The battle begins!**\n${players.length} players have entered the arena...`)
+      info("🌸・PlatoMy Rumble Arena", `🔥 **The battle begins!**\n${players.length} players have entered the arena...`)
     );
     await sleep(5000);
 
@@ -193,8 +283,7 @@ async function runRumbleBattle(channel, msgId) {
       if (lines.length > shown.length) shown.push(`...and ${lines.length - shown.length} more fell in the chaos.`);
 
       await edit(
-        new EmbedBuilder().setColor(PINK).setTitle("🌸・PlatoMy Rumble Arena")
-          .setDescription(`⚔️ **Round ${round}**\n\n${shown.join("\n")}\n\n👥 **Players left:** ${alive.length}`)
+        info("🌸・PlatoMy Rumble Arena", `⚔️ **Round ${round}**\n\n${shown.join("\n")}\n\n👥 **Players left:** ${alive.length}`)
       );
       if (alive.length > 1) await sleep(5000);
     }
@@ -207,8 +296,7 @@ async function runRumbleBattle(channel, msgId) {
   else w.pips += game.totalPrize;
 
   await edit(
-    new EmbedBuilder().setColor(PINK).setTitle("🌸・Rumble Ended")
-      .setDescription(`🎁 **Prize:** ${prizeText}\n🏆 **Winner:** <@${winnerId}>\n\n👥 **Players:** ${players.length}`)
+    info("🌸・Rumble Ended", `🎁 **Prize:** ${prizeText}\n🏆 **Winner:** <@${winnerId}>\n\n👥 **Players:** ${players.length}`)
   );
   await channel.send(`🏆 <@${winnerId}> won **${prizeText}** in PlatoMy Rumble!`).catch(() => {});
 }
@@ -286,9 +374,9 @@ const commands = [
     .addIntegerOption(opt => opt.setName("amount").setDescription("Jumlah").setRequired(true))
     .addStringOption(opt => opt.setName("reason").setDescription("Sebab / Nota").setRequired(false)),
 
-  new SlashCommandBuilder().setName("setup-trading").setDescription("Hantar panel PlatoMy BlackMarket (Admin sahaja)"),
+  new SlashCommandBuilder().setName("setup-trading").setDescription("Hantar panel PlatoMy Trading (Admin sahaja)"),
 
-  new SlashCommandBuilder().setName("embed-builder").setDescription("Cipta custom embed interaktif (Admin sahaja)")
+  new SlashCommandBuilder().setName("embed-builder").setDescription("Cipta custom container interaktif (Admin sahaja)")
     .addChannelOption(opt => opt.setName("channel").setDescription("Pilih channel").setRequired(true)),
 
   new SlashCommandBuilder().setName("embed-image").setDescription("Hantar gambar sahaja dengan kod warna Hex (Admin sahaja)")
@@ -327,7 +415,7 @@ client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot || !message.guild) return;
   const content = message.content.trim().toLowerCase();
   if (content === "!wallet" || content === "!bank") {
-    await message.reply({ embeds: [walletEmbed(getWallet(message.author.id))] });
+    await message.reply({ components: [walletBox(getWallet(message.author.id))], flags: V2 });
   }
 });
 
@@ -339,7 +427,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const name = interaction.commandName;
 
       if (name === "wallet") {
-        await interaction.reply({ embeds: [walletEmbed(getWallet(interaction.user.id))], ephemeral: true });
+        await interaction.reply({ components: [walletBox(getWallet(interaction.user.id))], flags: V2_EPHEMERAL });
         return;
       }
 
@@ -386,22 +474,24 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         const logChannel = findChannel(interaction.guild, WALLET_LOG_CHANNEL_NAME);
         if (logChannel) {
-          const logEmbed = new EmbedBuilder()
-            .setColor(PINK)
-            .setTitle(`💳・Wallet Log: ${actionTitle}`)
-            .setDescription(
-              `👤 **Target:** ${targetUser} (\`${targetUser.id}\`)\n` +
-              `🛡️ **Admin:** ${interaction.user}\n` +
-              `📝 **Details:** ${actionDesc}\n` +
-              `📌 **Reason:** ${reason}\n\n` +
-              `📊 **Current Balances:**\n` +
-              `🪙 Coins: \`${targetWallet.coins.toLocaleString()}\`\n` +
-              `💠 Pips: \`${targetWallet.pips.toLocaleString()}\`\n` +
-              `🌸 Total Sponsor: \`${targetWallet.sponsorTotal.toLocaleString()}\``
-            )
-            .setFooter({ text: `PlatoMy Bank Log • Today at ${getMalaysiaTime()}` })
-            .setTimestamp();
-          await logChannel.send({ embeds: [logEmbed] }).catch(() => {});
+          await logChannel.send({
+            components: [
+              info(
+                `💳・Wallet Log: ${actionTitle}`,
+                `👤 **Target:** ${targetUser} (\`${targetUser.id}\`)\n` +
+                `🛡️ **Admin:** ${interaction.user}\n` +
+                `📝 **Details:** ${actionDesc}\n` +
+                `📌 **Reason:** ${reason}\n\n` +
+                `📊 **Current Balances:**\n` +
+                `🪙 Coins: \`${targetWallet.coins.toLocaleString()}\`\n` +
+                `💠 Pips: \`${targetWallet.pips.toLocaleString()}\`\n` +
+                `🌸 Total Sponsor: \`${targetWallet.sponsorTotal.toLocaleString()}\``,
+                `PlatoMy Bank Log • Today at ${getMalaysiaTime()}`
+              ),
+            ],
+            flags: V2,
+            allowedMentions: NO_PING,
+          }).catch(() => {});
         }
         return;
       }
@@ -410,12 +500,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
         if (!isAdmin(interaction)) {
           return interaction.reply({ content: "❌ Anda tidak mempunyai kebenaran Administrator!", ephemeral: true });
         }
-        const embed = new EmbedBuilder()
-          .setColor(PINK)
-          .setTitle("🛍️ PlatoMy BlackMarket")
-          .setDescription("Ingin melakukan trade item? Klik butang di bawah untuk membuka tiket.");
-        const btn = new ButtonBuilder().setCustomId("open_trading_modal").setLabel("🤝 Trading Ticket").setStyle(ButtonStyle.Success);
-        await interaction.channel.send({ embeds: [embed], components: [new ActionRowBuilder().addComponents(btn)] });
+        const listChannel = findChannel(interaction.guild, TRADING_LIST_CHANNEL_NAME);
+        const listRef = listChannel ? `<#${listChannel.id}>` : "#🛍️・trading-list";
+
+        await interaction.channel.send({
+          components: [buildTradePanel(listRef)],
+          flags: V2,
+        });
         await interaction.reply({ content: "✅ Panel Trading berjaya dihantar!", ephemeral: true });
         return;
       }
@@ -428,13 +519,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         const modal = new ModalBuilder()
           .setCustomId(`embed_builder:${targetChannel.id}`)
-          .setTitle("🎨 PlatoMy Embed Builder");
+          .setTitle("🎨 PlatoMy Container Builder");
 
         const titleInput = new TextInputBuilder().setCustomId("eb_title").setLabel("Tajuk (pilihan)")
           .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(256);
         const descInput = new TextInputBuilder().setCustomId("eb_desc").setLabel("Mesej / Penerangan")
-          .setStyle(TextInputStyle.Paragraph).setRequired(false).setMaxLength(4000);
-        const colorInput = new TextInputBuilder().setCustomId("eb_color").setLabel("Warna Hex (cth: #ff69b4)")
+          .setStyle(TextInputStyle.Paragraph).setRequired(false).setMaxLength(3500);
+        const colorInput = new TextInputBuilder().setCustomId("eb_color").setLabel("Warna Hex (pilihan, cth: #ff69b4)")
           .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(7).setPlaceholder("#ff69b4");
         const imageInput = new TextInputBuilder().setCustomId("eb_image").setLabel("URL gambar (pilihan)")
           .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(500).setPlaceholder("https://...");
@@ -461,9 +552,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
           return interaction.reply({ content: "❌ Link gambar tidak sah. Mesti bermula dengan https://", ephemeral: true });
         }
 
-        const imageEmbed = new EmbedBuilder().setColor(safeColor(colorInput)).setImage(imageUrl.trim());
+        const imageBox = new ContainerBuilder();
+        const ac = accent(colorInput);
+        if (ac !== null) imageBox.setAccentColor(ac);
+        imageBox.addMediaGalleryComponents(
+          new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(imageUrl.trim()))
+        );
 
-        await targetChannel.send({ embeds: [imageEmbed] });
+        await targetChannel.send({ components: [imageBox], flags: V2 });
         await interaction.reply({ content: "✅ Gambar berjaya dihantar!", ephemeral: true });
         return;
       }
@@ -477,29 +573,37 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const title = interaction.options.getString("title");
         const description = interaction.options.getString("description");
 
-        const eventEmbed = new EmbedBuilder()
-          .setColor(PINK)
-          .setTitle(title)
-          .setDescription(`${description}\n\n🎀 Dianjurkan oleh: ${interaction.user}`)
-          .setThumbnail(LOGO_URL)
-          .setTimestamp();
+        const eventBox = new ContainerBuilder()
+          .addTextDisplayComponents(txt("✨ **Pengumuman Event Baharu!**"))
+          .addSeparatorComponents(sep())
+          .addSectionComponents(
+            new SectionBuilder()
+              .addTextDisplayComponents(
+                txt(`## ${title}`),
+                txt(`${description}\n\n🎀 Dianjurkan oleh: ${interaction.user}`)
+              )
+              .setThumbnailAccessory(new ThumbnailBuilder().setURL(LOGO_URL))
+          )
+          .addTextDisplayComponents(txt(`-# Event • Today at ${getMalaysiaTime()}`));
 
-        await interaction.channel.send({ content: "✨ **Pengumuman Event Baharu!**", embeds: [eventEmbed] });
+        await interaction.channel.send({ components: [eventBox], flags: V2, allowedMentions: NO_PING });
         await interaction.reply({ content: "✅ Event berjaya dicipta dan diumumkan!", ephemeral: true });
 
         const eventLogChannel = findChannel(interaction.guild, EVENT_LOG_CHANNEL_NAME);
         if (eventLogChannel) {
-          const logEmbed = new EmbedBuilder()
-            .setColor(PINK)
-            .setTitle("🛡️・Event Log: New Event Created")
-            .setDescription(
-              `📌 **Tajuk:** ${title}\n` +
-              `📝 **Butiran:** ${description}\n` +
-              `👤 **Admin:** ${interaction.user} (\`${interaction.user.id}\`)`
-            )
-            .setFooter({ text: `Event Log • Today at ${getMalaysiaTime()}` })
-            .setTimestamp();
-          await eventLogChannel.send({ embeds: [logEmbed] }).catch(() => {});
+          await eventLogChannel.send({
+            components: [
+              info(
+                "🛡️・Event Log: New Event Created",
+                `📌 **Tajuk:** ${title}\n` +
+                `📝 **Butiran:** ${description}\n` +
+                `👤 **Admin:** ${interaction.user} (\`${interaction.user.id}\`)`,
+                `Event Log • Today at ${getMalaysiaTime()}`
+              ),
+            ],
+            flags: V2,
+            allowedMentions: NO_PING,
+          }).catch(() => {});
         }
         return;
       }
@@ -530,21 +634,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
         if (game.participants.includes(interaction.user.id)) return interaction.editReply({ content: "⚠️ You've already joined!" });
         game.participants.push(interaction.user.id);
 
-        const oldEmb = interaction.message.embeds[0];
-        const newEmb = EmbedBuilder.from(oldEmb).setDescription(
-          oldEmb.description.replace(
-            /👥 \*\*(?:Penyertaan|Players):\*\* \d+(?: pemain)?/,
-            `👥 **Players:** ${game.participants.length}`
-          )
-        );
-        await interaction.message.edit({ embeds: [newEmb] }).catch(() => {});
+        await interaction.message.edit({ components: [rumbleOpenBox(game)], flags: V2 }).catch(() => {});
         await interaction.editReply({ content: "✅ Successfully joined PlatoMy Rumble!" });
         return;
       }
 
       // --- buka borang tiket trading ---
       if (id === "open_trading_modal") {
-        const modal = new ModalBuilder().setCustomId("trading_modal").setTitle("🛍️ PlatoMy BlackMarket");
+        const modal = new ModalBuilder().setCustomId("trading_modal").setTitle("🛍️ PlatoMy Trading");
         const itemInput = new TextInputBuilder()
           .setCustomId("trading_text")
           .setLabel("Butiran item yang dimahukan")
@@ -574,18 +671,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         await interaction.deferUpdate();
 
-        const oldEmb = interaction.message.embeds[0];
-        const item = (oldEmb.description || "").split("**Butiran item yang dimahukan:**\n")[1] || "-";
+        // Baca butiran item daripada teks dalam container
+        const infoText = collectText(interaction.message.components).find(t => t.includes("**Item Details:**")) || "";
+        const item = infoText.split("**Item Details:**")[1]?.trim() || "-";
 
-        const newEmb = EmbedBuilder.from(oldEmb).setDescription(
-          `${oldEmb.description}\n\n✅ **Diterima oleh:** ${interaction.user}`
-        );
-        const doneBtn = new ButtonBuilder()
-          .setCustomId(`accept_trade:${requesterId}`)
-          .setLabel("Trade Accepted")
-          .setStyle(ButtonStyle.Secondary)
-          .setDisabled(true);
-        await interaction.editReply({ embeds: [newEmb], components: [new ActionRowBuilder().addComponents(doneBtn)] });
+        await interaction.editReply({
+          components: [buildTradeList({ requesterId, details: item, accepterId: interaction.user.id })],
+          flags: V2,
+        });
 
         await interaction.channel.send(
           `🤝 <@${requesterId}>, trade anda diterima oleh ${interaction.user}. Sila berhubung untuk selesaikan trade!`
@@ -593,17 +686,19 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         const logChannel = findChannel(interaction.guild, TRADING_LOG_CHANNEL_NAME);
         if (logChannel) {
-          const logEmbed = new EmbedBuilder()
-            .setColor(PINK)
-            .setTitle("🛍️ BlackMarket Log: Trade Accepted")
-            .setDescription(
-              `📥 **Requester:** <@${requesterId}> (\`${requesterId}\`)\n` +
-              `🤝 **Accepted by:** ${interaction.user} (\`${interaction.user.id}\`)\n\n` +
-              `📝 **Item:**\n${item}`
-            )
-            .setFooter({ text: `Trading Log • Today at ${getMalaysiaTime()}` })
-            .setTimestamp();
-          await logChannel.send({ embeds: [logEmbed] }).catch(() => {});
+          await logChannel.send({
+            components: [
+              info(
+                "🛍️ Trading Log: Trade Accepted",
+                `📥 **Requester:** <@${requesterId}> (\`${requesterId}\`)\n` +
+                `🤝 **Accepted by:** ${interaction.user} (\`${interaction.user.id}\`)\n\n` +
+                `📝 **Item:**\n${item}`,
+                `Trading Log • Today at ${getMalaysiaTime()}`
+              ),
+            ],
+            flags: V2,
+            allowedMentions: NO_PING,
+          }).catch(() => {});
         }
         return;
       }
@@ -623,22 +718,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
           return interaction.reply({ content: "❌ Channel trading-list tidak dijumpai.", ephemeral: true });
         }
 
-        const listEmbed = new EmbedBuilder()
-          .setColor(PINK)
-          .setTitle("🛍️ PlatoMy BlackMarket")
-          .setDescription(
-            `👤 **Requester:** ${interaction.user}\n\n` +
-            `📝 **Butiran item yang dimahukan:**\n${details}`
-          )
-          .setFooter({ text: `BlackMarket • Today at ${getMalaysiaTime()}` })
-          .setTimestamp();
-
-        const acceptBtn = new ButtonBuilder()
-          .setCustomId(`accept_trade:${interaction.user.id}`)
-          .setLabel("Accept Trade")
-          .setStyle(ButtonStyle.Success);
-
-        const sent = await listChannel.send({ embeds: [listEmbed], components: [new ActionRowBuilder().addComponents(acceptBtn)] }).catch(() => null);
+        const sent = await listChannel.send({
+          components: [buildTradeList({ requesterId: interaction.user.id, details })],
+          flags: V2,
+          allowedMentions: NO_PING,
+        }).catch(() => null);
         if (!sent) {
           return interaction.reply({ content: "❌ Bot tidak dapat menghantar ke channel trading-list. Semak permission bot.", ephemeral: true });
         }
@@ -647,21 +731,23 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         const logChannel = findChannel(interaction.guild, TRADING_LOG_CHANNEL_NAME);
         if (logChannel) {
-          const logEmbed = new EmbedBuilder()
-            .setColor(PINK)
-            .setTitle("🛍️ BlackMarket Log: New Request")
-            .setDescription(
-              `👤 **Requester:** ${interaction.user} (\`${interaction.user.id}\`)\n\n` +
-              `📝 **Item:**\n${details}`
-            )
-            .setFooter({ text: `Trading Log • Today at ${getMalaysiaTime()}` })
-            .setTimestamp();
-          await logChannel.send({ embeds: [logEmbed] }).catch(() => {});
+          await logChannel.send({
+            components: [
+              info(
+                "🛍️ Trading Log: New Request",
+                `👤 **Requester:** ${interaction.user} (\`${interaction.user.id}\`)\n\n` +
+                `📝 **Item:**\n${details}`,
+                `Trading Log • Today at ${getMalaysiaTime()}`
+              ),
+            ],
+            flags: V2,
+            allowedMentions: NO_PING,
+          }).catch(() => {});
         }
         return;
       }
 
-      // --- embed builder ---
+      // --- container builder ---
       if (interaction.customId.startsWith("embed_builder:")) {
         const channelId = interaction.customId.split(":")[1];
         const targetChannel = await interaction.guild.channels.fetch(channelId).catch(() => null);
@@ -678,13 +764,20 @@ client.on(Events.InteractionCreate, async (interaction) => {
           return interaction.reply({ content: "❌ Isi sekurang-kurangnya tajuk, mesej atau gambar.", ephemeral: true });
         }
 
-        const embed = new EmbedBuilder().setColor(safeColor(color));
-        if (title) embed.setTitle(title);
-        if (desc) embed.setDescription(desc);
-        if (isUrl(image)) embed.setImage(image);
+        const box = new ContainerBuilder();
+        const ac = accent(color);
+        if (ac !== null) box.setAccentColor(ac);
+        if (title) box.addTextDisplayComponents(txt(`## ${title}`));
+        if (title && desc) box.addSeparatorComponents(sep());
+        if (desc) box.addTextDisplayComponents(txt(desc));
+        if (isUrl(image)) {
+          box.addMediaGalleryComponents(
+            new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(image))
+          );
+        }
 
-        await targetChannel.send({ embeds: [embed] });
-        await interaction.reply({ content: `✅ Embed berjaya dihantar ke <#${targetChannel.id}>!`, ephemeral: true });
+        await targetChannel.send({ components: [box], flags: V2 });
+        await interaction.reply({ content: `✅ Container berjaya dihantar ke <#${targetChannel.id}>!`, ephemeral: true });
         return;
       }
     }
