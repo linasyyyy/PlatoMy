@@ -6,6 +6,7 @@ import {
   Routes,
   SlashCommandBuilder,
   PermissionFlagsBits,
+  ChannelType,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
@@ -67,7 +68,9 @@ const WALLET_LOG_CHANNEL_NAME = "wallet-log";
 const EVENT_LOG_CHANNEL_NAME = "event-log";
 const TRADING_LIST_CHANNEL_NAME = "trading-list"; // channel permintaan item (private untuk role Trade)
 const TRADING_LOG_CHANNEL_NAME = "trading-log";   // log: requester + accepter
-const TRADE_ROLE_NAME = "trade";                  // nama role mengandungi perkataan ini
+const TRADE_ROLE_NAME = "trade";                  // role yang boleh Accept Trade (nama mengandungi perkataan ini)
+const TRADER_ROLE_NAME = "trader";                // role yang di-ping bila ada trading list baru
+const TRADE_CATEGORY_ID = "1567527038368223332";  // category untuk channel trade sementara
 const LOGO_URL = "https://cdn.discordapp.com/attachments/1549051773438787724/1549403998686281808/IMG_5614.png";
 
 const isAdmin = (i) => i.member?.permissions?.has(PermissionFlagsBits.Administrator);
@@ -120,12 +123,44 @@ function collectText(components, out = []) {
 }
 
 // ================= WALLET =================
-function walletBox(w) {
-  return info(
-    "💳 PlatoMy • Wallet",
-    `🪙 **Plato Coins:** ${w.coins.toLocaleString()}\n💠 **Pips:** ${w.pips.toLocaleString()}\n🌸 **Total Sponsor:** ${w.sponsorTotal.toLocaleString()}`,
-    `PlatoMy Bank • Today at ${getMalaysiaTime()}`
+const BANK_FOOTER = "⋆˚࿔ 🎀 PlatoMy Bank 𝜗𝜚˚⋆";
+const bankFooter = () => `${BANK_FOOTER} • Today at ${getMalaysiaTime()}`;
+
+// Baris baki (digunakan oleh wallet dan wallet log)
+function balanceLines(w) {
+  return (
+    `╰┈➤ 🪙 Plato Coins: ${w.coins.toLocaleString()}\n` +
+    `╰┈➤ 💠 Pips: ${w.pips.toLocaleString()}\n` +
+    `╰┈➤ 🌸 Total Sponsor: ${w.sponsorTotal.toLocaleString()}`
   );
+}
+
+// Wallet pemain (/wallet dan !wallet)
+function walletBox(w) {
+  return new ContainerBuilder()
+    .addTextDisplayComponents(txt("# ˚₊‧꒰ა 👛 𝑃𝐿𝐴𝑇𝑂𝑀𝑌 𝑊𝐴𝐿𝐿𝐸𝑇 ໒꒱‧₊˚"))
+    .addSeparatorComponents(sep())
+    .addTextDisplayComponents(txt(balanceLines(w)))
+    .addTextDisplayComponents(txt(`-# ${bankFooter()}`));
+}
+
+// Wallet log (admin tambah/tolak baki)
+function walletLogBox({ actionTitle, target, admin, details, reason, w }) {
+  return new ContainerBuilder()
+    .addTextDisplayComponents(txt("# ˚₊‧꒰ა 👛 𝑊𝐴𝐿𝐿𝐸𝑇 𝐿𝑂𝐺 ໒꒱‧₊˚"))
+    .addSeparatorComponents(sep())
+    .addTextDisplayComponents(
+      txt(
+        `╰┈➤ 📌 **Action:** ${actionTitle}\n` +
+        `╰┈➤ 👤 **Target:** ${target} (\`${target.id}\`)\n` +
+        `╰┈➤ 🛡️ **Admin:** ${admin}\n` +
+        `╰┈➤ 📝 **Details:** ${details}\n` +
+        `╰┈➤ 💬 **Reason:** ${reason}`
+      )
+    )
+    .addSeparatorComponents(sep())
+    .addTextDisplayComponents(txt(`**Current Balances**\n${balanceLines(w)}`))
+    .addTextDisplayComponents(txt(`-# ${bankFooter()}`));
 }
 
 // ================= TRADING =================
@@ -174,6 +209,83 @@ function buildTradeList({ requesterId, details, accepterId = null }) {
     );
   }
   return box.addActionRowComponents(new ActionRowBuilder().addComponents(btn));
+}
+
+// Mesej dalam channel trade sementara (ada butang Close Trade untuk accepter)
+function buildTradeChatBox({ requesterId, accepterId, details }) {
+  const btn = new ButtonBuilder()
+    .setCustomId(`close_trade:${accepterId}`)
+    .setLabel("Close Trade")
+    .setEmoji("🔒")
+    .setStyle(ButtonStyle.Secondary); // kelabu
+
+  return new ContainerBuilder()
+    .addTextDisplayComponents(txt("# ˚₊‧꒰ა 🤝 𝑇𝑅𝐴𝐷𝐸 𝐶𝐻𝐴𝑇 ໒꒱‧₊˚"))
+    .addSeparatorComponents(sep())
+    .addTextDisplayComponents(
+      txt(
+        `╰┈➤ **Requester:** <@${requesterId}>\n` +
+        `╰┈➤ **Accepted by:** <@${accepterId}>\n` +
+        `╰┈➤ **Item Details:** ${details}`
+      )
+    )
+    .addSeparatorComponents(sep())
+    .addTextDisplayComponents(
+      txt(`╰┈➤ Discuss and complete your trade here. Only <@${accepterId}> (or an admin) can close this channel.`)
+    )
+    .addActionRowComponents(new ActionRowBuilder().addComponents(btn));
+}
+
+// Cipta channel trade sementara dalam category yang ditetapkan
+async function createTradeChannel(guild, requesterId, accepter, details) {
+  try {
+    const safe = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 20) || "user";
+    const requesterMember = await guild.members.fetch(requesterId).catch(() => null);
+    const requesterName = requesterMember?.user?.username;
+
+    const memberPerms = [
+      PermissionFlagsBits.ViewChannel,
+      PermissionFlagsBits.SendMessages,
+      PermissionFlagsBits.ReadMessageHistory,
+      PermissionFlagsBits.AttachFiles,
+      PermissionFlagsBits.EmbedLinks,
+    ];
+
+    const overwrites = [
+      { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] }, // @everyone tak nampak
+      { id: accepter.id, allow: memberPerms },
+      {
+        id: guild.client.user.id, // bot
+        allow: [
+          PermissionFlagsBits.ViewChannel,
+          PermissionFlagsBits.SendMessages,
+          PermissionFlagsBits.ReadMessageHistory,
+          PermissionFlagsBits.ManageChannels,
+        ],
+      },
+    ];
+    if (requesterMember) overwrites.push({ id: requesterId, allow: memberPerms });
+
+    const channel = await guild.channels.create({
+      name: `🤝・trade-${safe(requesterName)}-${safe(accepter.username)}`,
+      type: ChannelType.GuildText,
+      parent: TRADE_CATEGORY_ID,
+      topic: `Trade chat • Accepted by ${accepter.username}`,
+      permissionOverwrites: overwrites,
+      reason: `Trade accepted by ${accepter.tag}`,
+    });
+
+    await channel.send({
+      components: [buildTradeChatBox({ requesterId, accepterId: accepter.id, details })],
+      flags: V2,
+      allowedMentions: { users: [requesterId, accepter.id] },
+    });
+
+    return channel;
+  } catch (err) {
+    console.error("Gagal cipta channel trade:", err);
+    return null;
+  }
 }
 
 // ================= RUMBLE (battle royale) =================
@@ -476,18 +588,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
         if (logChannel) {
           await logChannel.send({
             components: [
-              info(
-                `💳・Wallet Log: ${actionTitle}`,
-                `👤 **Target:** ${targetUser} (\`${targetUser.id}\`)\n` +
-                `🛡️ **Admin:** ${interaction.user}\n` +
-                `📝 **Details:** ${actionDesc}\n` +
-                `📌 **Reason:** ${reason}\n\n` +
-                `📊 **Current Balances:**\n` +
-                `🪙 Coins: \`${targetWallet.coins.toLocaleString()}\`\n` +
-                `💠 Pips: \`${targetWallet.pips.toLocaleString()}\`\n` +
-                `🌸 Total Sponsor: \`${targetWallet.sponsorTotal.toLocaleString()}\``,
-                `PlatoMy Bank Log • Today at ${getMalaysiaTime()}`
-              ),
+              walletLogBox({
+                actionTitle,
+                target: targetUser,
+                admin: interaction.user,
+                details: actionDesc,
+                reason,
+                w: targetWallet,
+              }),
             ],
             flags: V2,
             allowedMentions: NO_PING,
@@ -675,14 +783,28 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const infoText = collectText(interaction.message.components).find(t => t.includes("**Item Details:**")) || "";
         const item = infoText.split("**Item Details:**")[1]?.trim() || "-";
 
+        // Buka channel trade sementara
+        const tradeChannel = await createTradeChannel(interaction.guild, requesterId, interaction.user, item);
+
         await interaction.editReply({
           components: [buildTradeList({ requesterId, details: item, accepterId: interaction.user.id })],
           flags: V2,
         });
 
-        await interaction.channel.send(
-          `🤝 <@${requesterId}>, your trade was accepted by ${interaction.user}. Please contact each other to complete the trade!`
-        ).catch(() => {});
+        if (tradeChannel) {
+          await interaction.channel.send({
+            content: `🤝 <@${requesterId}>, your trade was accepted by ${interaction.user}. Head to ${tradeChannel} to complete the trade!`,
+            allowedMentions: { users: [requesterId] },
+          }).catch(() => {});
+        } else {
+          await interaction.followUp({
+            content: "❌ I couldn't create the trade channel. Please check the bot's permissions on the trade category.",
+            ephemeral: true,
+          }).catch(() => {});
+          await interaction.channel.send(
+            `🤝 <@${requesterId}>, your trade was accepted by ${interaction.user}. Please contact each other to complete the trade!`
+          ).catch(() => {});
+        }
 
         const logChannel = findChannel(interaction.guild, TRADING_LOG_CHANNEL_NAME);
         if (logChannel) {
@@ -691,8 +813,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
               info(
                 "🛍️ Trading Log: Trade Accepted",
                 `📥 **Requester:** <@${requesterId}> (\`${requesterId}\`)\n` +
-                `🤝 **Accepted by:** ${interaction.user} (\`${interaction.user.id}\`)\n\n` +
-                `📝 **Item:**\n${item}`,
+                `🤝 **Accepted by:** ${interaction.user} (\`${interaction.user.id}\`)\n` +
+                (tradeChannel ? `📍 **Trade Channel:** ${tradeChannel}\n` : "") +
+                `\n📝 **Item:**\n${item}`,
                 `Trading Log • Today at ${getMalaysiaTime()}`
               ),
             ],
@@ -700,6 +823,47 @@ client.on(Events.InteractionCreate, async (interaction) => {
             allowedMentions: NO_PING,
           }).catch(() => {});
         }
+        return;
+      }
+
+      // --- Close Trade (dalam channel trade sementara) ---
+      if (id.startsWith("close_trade:")) {
+        const accepterId = id.split(":")[1];
+
+        if (interaction.channel?.parentId !== TRADE_CATEGORY_ID) {
+          return interaction.reply({ content: "❌ This button only works inside a trade channel.", ephemeral: true });
+        }
+        if (interaction.user.id !== accepterId && !isAdmin(interaction)) {
+          return interaction.reply({ content: "❌ Only the person who accepted this trade can close this channel.", ephemeral: true });
+        }
+
+        const channelName = interaction.channel.name;
+        await interaction.reply({
+          content: `🔒 Trade closed by ${interaction.user}. This channel will be deleted in 5 seconds...`,
+          allowedMentions: NO_PING,
+        });
+
+        const logChannel = findChannel(interaction.guild, TRADING_LOG_CHANNEL_NAME);
+        if (logChannel) {
+          await logChannel.send({
+            components: [
+              info(
+                "🛍️ Trading Log: Trade Closed",
+                `🔒 **Closed by:** ${interaction.user} (\`${interaction.user.id}\`)\n` +
+                `🤝 **Accepted by:** <@${accepterId}>\n` +
+                `📍 **Channel:** ${channelName}`,
+                `Trading Log • Today at ${getMalaysiaTime()}`
+              ),
+            ],
+            flags: V2,
+            allowedMentions: NO_PING,
+          }).catch(() => {});
+        }
+
+        await sleep(5000);
+        await interaction.channel.delete(`Trade closed by ${interaction.user.tag}`).catch((e) => {
+          console.error("Gagal padam channel trade:", e);
+        });
         return;
       }
     }
@@ -718,10 +882,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
           return interaction.reply({ content: "❌ The trading-list channel was not found.", ephemeral: true });
         }
 
+        // Ping role @trader bila ada list baru
+        const traderRole = interaction.guild.roles.cache.find(r => r.name.toLowerCase().includes(TRADER_ROLE_NAME));
+
         const sent = await listChannel.send({
-          components: [buildTradeList({ requesterId: interaction.user.id, details })],
+          components: [
+            ...(traderRole ? [txt(`<@&${traderRole.id}>`)] : []),
+            buildTradeList({ requesterId: interaction.user.id, details }),
+          ],
           flags: V2,
-          allowedMentions: NO_PING,
+          allowedMentions: traderRole ? { roles: [traderRole.id] } : NO_PING,
         }).catch(() => null);
         if (!sent) {
           return interaction.reply({ content: "❌ The bot can't send to the trading-list channel. Please check the bot's permissions.", ephemeral: true });
