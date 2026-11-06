@@ -73,6 +73,9 @@ const TRADER_ROLE_NAME = "trader";                // role yang di-ping bila ada 
 const TRADE_CATEGORY_ID = "1567527038368223332";  // category untuk channel trade sementara
 const LOGO_URL = "https://cdn.discordapp.com/attachments/1549051773438787724/1549403998686281808/IMG_5614.png";
 
+// GIF di atas panel trading (kosongkan "" kalau tak mahu)
+const TRADE_GIF_URL = "https://cdn.discordapp.com/attachments/1556946394239991848/1562348900705374259/IMG_6986.gif?ex=6aeec24c&is=6aed70cc&hm=b4094237e998531634199814f373fd7d8827c9aa8dbb8d0ec626aeb70ca092e5&";
+
 const isAdmin = (i) => i.member?.permissions?.has(PermissionFlagsBits.Administrator);
 const isUrl = (u) => /^https?:\/\/\S+$/i.test(String(u || "").trim());
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -172,7 +175,16 @@ function buildTradePanel(listRef) {
     .setEmoji("🤝")
     .setStyle(ButtonStyle.Secondary); // kelabu
 
-  return new ContainerBuilder()
+  const box = new ContainerBuilder();
+
+  // GIF di bahagian paling atas
+  if (isUrl(TRADE_GIF_URL)) {
+    box.addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(TRADE_GIF_URL.trim()))
+    );
+  }
+
+  return box
     .addTextDisplayComponents(txt("# ˚₊‧꒰ა 🛍️ 𝑃𝐿𝐴𝑇𝑂𝑀𝑌 𝑇𝑅𝐴𝐷𝐼𝑁𝐺 ໒꒱‧₊˚"))
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(
