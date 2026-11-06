@@ -73,8 +73,12 @@ const TRADER_ROLE_NAME = "trader";                // role yang di-ping bila ada 
 const TRADE_CATEGORY_ID = "1567527038368223332";  // category untuk channel trade sementara
 const LOGO_URL = "https://cdn.discordapp.com/attachments/1549051773438787724/1549403998686281808/IMG_5614.png";
 
-// GIF di atas panel trading (kosongkan "" kalau tak mahu)
-const TRADE_GIF_URL = "https://cdn.discordapp.com/attachments/1556946394239991848/1562348900705374259/IMG_6986.gif?ex=6aeec24c&is=6aed70cc&hm=b4094237e998531634199814f373fd7d8827c9aa8dbb8d0ec626aeb70ca092e5&";
+// Gambar / GIF di atas panel trading (susunan ikut senarai. Buang baris untuk keluarkan, maksimum 10)
+const TRADE_MEDIA_URLS = [
+  "https://cdn.discordapp.com/attachments/1556946394239991848/1562348900705374259/IMG_6986.gif?ex=6aeec24c&is=6aed70cc&hm=b4094237e998531634199814f373fd7d8827c9aa8dbb8d0ec626aeb70ca092e5&",
+  "https://cdn.discordapp.com/attachments/1556946394239991848/1567858191537279016/20261105_190812_0000.png?ex=6aee5dfa&is=6aed0c7a&hm=703dd68300d271f1087bbbc0b932f49a379a78b33f00cdbef8a9f4ac80fd74c0&",
+  "https://cdn.discordapp.com/attachments/1556946394239991848/1562348900705374259/IMG_6986.gif?ex=6aeec24c&is=6aed70cc&hm=b4094237e998531634199814f373fd7d8827c9aa8dbb8d0ec626aeb70ca092e5&",
+];
 
 const isAdmin = (i) => i.member?.permissions?.has(PermissionFlagsBits.Administrator);
 const isUrl = (u) => /^https?:\/\/\S+$/i.test(String(u || "").trim());
@@ -177,11 +181,14 @@ function buildTradePanel(listRef) {
 
   const box = new ContainerBuilder();
 
-  // GIF di bahagian paling atas
-  if (isUrl(TRADE_GIF_URL)) {
-    box.addMediaGalleryComponents(
-      new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(TRADE_GIF_URL.trim()))
-    );
+  // Gambar / GIF di bahagian paling atas (galeri, maksimum 10)
+  const mediaUrls = TRADE_MEDIA_URLS.filter(isUrl).slice(0, 10);
+  if (mediaUrls.length > 0) {
+    const gallery = new MediaGalleryBuilder();
+    for (const u of mediaUrls) {
+      gallery.addItems(new MediaGalleryItemBuilder().setURL(u.trim()));
+    }
+    box.addMediaGalleryComponents(gallery);
   }
 
   return box
