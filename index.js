@@ -13,13 +13,10 @@ import {
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
-  StringSelectMenuBuilder,
   ContainerBuilder,
   TextDisplayBuilder,
   SeparatorBuilder,
   SeparatorSpacingSize,
-  SectionBuilder,
-  ThumbnailBuilder,
   MediaGalleryBuilder,
   MediaGalleryItemBuilder,
   MessageFlags,
@@ -66,17 +63,11 @@ startAutosave(wallets);
 
 // --- TETAPAN BOT ---
 const WALLET_LOG_CHANNEL_NAME = "wallet-log";
-const EVENT_LOG_CHANNEL_NAME = "event-log";
 const TRADING_LIST_CHANNEL_NAME = "trading-list"; // channel permintaan item (private untuk role Trade)
 const TRADING_LOG_CHANNEL_NAME = "trading-log";   // log: requester + accepter
 const TRADE_ROLE_NAME = "trade";                  // role yang boleh Accept Trade (nama mengandungi perkataan ini)
 const TRADER_ROLE_NAME = "trader";                // role yang di-ping bila ada trading list baru
 const TRADE_CATEGORY_ID = "1567527038368223332";  // category untuk channel trade sementara
-const GIVE_ROLE_NAME = "mymember";                // role yang diberi oleh Role Giver (nama mengandungi perkataan ini)
-// Siapa boleh guna Role Giver? Kosong [] = sesiapa yang nampak panel. Contoh: ["staff", "mod"]
-// Admin sentiasa boleh.
-const GIVER_STAFF_ROLE_PARTS = [];
-const LOGO_URL = "https://cdn.discordapp.com/attachments/1549051773438787724/1549403998686281808/IMG_5614.png";
 
 // Gambar di atas panel trading. Disusun ke bawah, satu-satu penuh lebar (macam panel Support)
 // Susunan: garisan atas, tajuk, garisan bawah. Maksimum 10.
@@ -174,112 +165,6 @@ function walletLogBox({ actionTitle, target, admin, details, reason, w }) {
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(txt(`**Current Balances**\n${balanceLines(w)}`))
     .addTextDisplayComponents(txt(`-# ${bankFooter()}`));
-}
-
-// ================= ROLE GIVER =================
-const findGiveRole = (guild) =>
-  guild.roles.cache.find((r) => r.name.toLowerCase().includes(GIVE_ROLE_NAME));
-
-// Siapa boleh guna panel (admin sentiasa boleh)
-function canUseGiver(interaction) {
-  if (isAdmin(interaction)) return true;
-  if (GIVER_STAFF_ROLE_PARTS.length === 0) return true;
-  return Boolean(
-    interaction.member?.roles?.cache?.some((r) =>
-      GIVER_STAFF_ROLE_PARTS.some((p) => r.name.toLowerCase().includes(p))
-    )
-  );
-}
-
-// Panel utama (dihantar oleh /setup-giverole)
-function buildGiverPanel(role) {
-  const openBtn = new ButtonBuilder()
-    .setCustomId("giverole_open")
-    .setLabel("Open Menu")
-    .setEmoji("🐾")
-    .setStyle(ButtonStyle.Secondary); // kelabu
-  const searchBtn = new ButtonBuilder()
-    .setCustomId("giverole_search")
-    .setLabel("Search")
-    .setEmoji("🔍")
-    .setStyle(ButtonStyle.Secondary); // kelabu
-
-  return new ContainerBuilder()
-    .addTextDisplayComponents(txt("# ˚₊‧꒰ა 🐾 𝑅𝑂𝐿𝐸 𝐺𝐼𝑉𝐸𝑅 𝑃𝐴𝑁𝐸𝐿 ໒꒱‧₊˚"))
-    .addSeparatorComponents(sep())
-    .addTextDisplayComponents(
-      txt(`╰┈➤ Click **Open Menu** below to select a member and grant the <@&${role.id}> role.`)
-    )
-    .addActionRowComponents(new ActionRowBuilder().addComponents(openBtn, searchBtn));
-}
-
-// Menu pilih ahli (dropdown 25 seorang sehalaman, ada Previous/Next kalau lebih)
-async function buildGiverMenu(guild, role, page = 0, query = "") {
-  if (guild.members.cache.size < guild.memberCount) {
-    await guild.members.fetch().catch(() => {});
-  }
-
-  const q = query.toLowerCase().trim();
-  const list = [...guild.members.cache.values()]
-    .filter(
-      (m) =>
-        !m.user.bot &&
-        !m.roles.cache.has(role.id) &&
-        (!q || m.displayName.toLowerCase().includes(q) || m.user.username.toLowerCase().includes(q))
-    )
-    .sort((a, b) => a.displayName.localeCompare(b.displayName));
-
-  const PER_PAGE = 25;
-  const pages = Math.max(1, Math.ceil(list.length / PER_PAGE));
-  const cur = Math.min(Math.max(0, page), pages - 1);
-  const slice = list.slice(cur * PER_PAGE, cur * PER_PAGE + PER_PAGE);
-  const safeQ = query.replace(/:/g, " ").trim().slice(0, 40);
-
-  let body = `╰┈➤ Select a member from the dropdown menu below to grant <@&${role.id}>.`;
-  if (safeQ) body += `\n╰┈➤ 🔍 Search: **${safeQ}**`;
-
-  const box = new ContainerBuilder()
-    .addTextDisplayComponents(txt(`## 🐾 Role Giver — ${role.name}`))
-    .addSeparatorComponents(sep());
-
-  if (slice.length === 0) {
-    box.addTextDisplayComponents(
-      txt(safeQ ? `${body}\n\n❌ No members found for that search.` : `${body}\n\n❌ There are no members available to grant this role.`)
-    );
-    return box;
-  }
-
-  box.addTextDisplayComponents(txt(body));
-
-  const select = new StringSelectMenuBuilder()
-    .setCustomId("giverole_pick")
-    .setPlaceholder(`Select a member (Page ${cur + 1}/${pages})`)
-    .addOptions(
-      slice.map((m) => ({
-        label: m.displayName.slice(0, 100),
-        value: m.id,
-        description: `@${m.user.username}`.slice(0, 100),
-      }))
-    );
-  box.addActionRowComponents(new ActionRowBuilder().addComponents(select));
-
-  if (pages > 1) {
-    const prev = new ButtonBuilder()
-      .setCustomId(`giverole_page:${cur - 1}:${safeQ}`)
-      .setLabel("Previous")
-      .setEmoji("◀️")
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(cur === 0);
-    const next = new ButtonBuilder()
-      .setCustomId(`giverole_page:${cur + 1}:${safeQ}`)
-      .setLabel("Next")
-      .setEmoji("▶️")
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(cur >= pages - 1);
-    box.addActionRowComponents(new ActionRowBuilder().addComponents(prev, next));
-  }
-
-  return box;
 }
 
 // ================= TRADING =================
@@ -445,25 +330,28 @@ function rumbleLabel(currencyType) {
   return currencyType === "coins" ? "🪙 Plato Coins" : "💠 Pips";
 }
 
-// Container rumble yang masih terbuka (ada butang Join)
+// Container rumble yang masih terbuka (ada butang Join, kelabu)
 function rumbleOpenBox(game) {
   const joinBtn = new ButtonBuilder()
     .setCustomId(`join_rumble_${game.currencyType}_${game.totalPrize}`)
     .setLabel("🎟️ Join Rumble")
-    .setStyle(ButtonStyle.Success);
+    .setStyle(ButtonStyle.Secondary); // kelabu
 
   return info(
     "🌸・PlatoMy Rumble Arena",
     `🎁 **Total Prize:** ${game.totalPrize.toLocaleString()} ${rumbleLabel(game.currencyType)}\n` +
+    `🏆 **Winners:** ${game.winnersCount}\n` +
     `⏳ **Ends:** <t:${game.endTimeSeconds}:R>\n\n` +
     `👥 **Players:** ${game.participants.length}`
   ).addActionRowComponents(new ActionRowBuilder().addComponents(joinBtn));
 }
 
-async function createRumble(channel, currencyType, totalPrize, durationMins) {
+// winnersCount = berapa ramai pemenang (hadiah dibahagi sama rata)
+async function createRumble(channel, currencyType, totalPrize, durationMins, winnersCount = 1) {
   const game = {
     currencyType,
     totalPrize,
+    winnersCount: Math.max(1, Math.floor(Number(winnersCount)) || 1),
     participants: [],
     ended: false,
     endTimeSeconds: Math.floor((Date.now() + durationMins * 60 * 1000) / 1000),
@@ -482,6 +370,7 @@ async function runRumbleBattle(channel, msgId) {
 
   const label = rumbleLabel(game.currencyType);
   const prizeText = `${game.totalPrize.toLocaleString()} ${label}`;
+  const winnersCount = game.winnersCount || 1;
   const msg = await channel.messages.fetch(msgId).catch(() => null);
   const edit = (box) => (msg ? msg.edit({ components: [box], flags: V2 }).catch(() => {}) : null);
 
@@ -489,7 +378,7 @@ async function runRumbleBattle(channel, msgId) {
 
   if (players.length === 0) {
     await edit(
-      info("🌸・Rumble Ended", `🎁 **Prize:** ${prizeText}\n🏆 **Winner:** No participants\n\n👥 **Players:** 0`)
+      info("🌸・Rumble Ended", `🎁 **Prize:** ${prizeText}\n🏆 **Winners:** No participants\n\n👥 **Players:** 0`)
     );
     await channel.send("😢 Rumble ended with no participants.").catch(() => {});
     return;
@@ -497,16 +386,21 @@ async function runRumbleBattle(channel, msgId) {
 
   let alive = [...players];
 
-  if (alive.length > 1) {
+  // Bertarung sehingga tinggal sebanyak bilangan pemenang
+  if (alive.length > winnersCount) {
     await edit(
-      info("🌸・PlatoMy Rumble Arena", `🔥 **The battle begins!**\n${players.length} players have entered the arena...`)
+      info(
+        "🌸・PlatoMy Rumble Arena",
+        `🔥 **The battle begins!**\n${players.length} players have entered the arena...` +
+        (winnersCount > 1 ? `\n🏆 Last **${winnersCount}** standing win!` : "")
+      )
     );
     await sleep(5000);
 
     let round = 0;
-    while (alive.length > 1) {
+    while (alive.length > winnersCount) {
       round++;
-      const kills = Math.max(1, Math.min(alive.length - 1, Math.ceil(alive.length * 0.35)));
+      const kills = Math.max(1, Math.min(alive.length - winnersCount, Math.ceil(alive.length * 0.35)));
       const lines = [];
 
       for (let i = 0; i < kills; i++) {
@@ -526,20 +420,43 @@ async function runRumbleBattle(channel, msgId) {
       await edit(
         info("🌸・PlatoMy Rumble Arena", `⚔️ **Round ${round}**\n\n${shown.join("\n")}\n\n👥 **Players left:** ${alive.length}`)
       );
-      if (alive.length > 1) await sleep(5000);
+      if (alive.length > winnersCount) await sleep(5000);
     }
     await sleep(2000);
   }
 
-  const winnerId = alive[0];
-  const w = getWallet(winnerId);
-  if (game.currencyType === "coins") w.coins += game.totalPrize;
-  else w.pips += game.totalPrize;
+  // Bahagi hadiah sama rata. Baki (kalau ada) diberi kepada pemenang pertama.
+  const winners = alive;
+  const share = Math.floor(game.totalPrize / winners.length);
+  const remainder = game.totalPrize - share * winners.length;
+
+  winners.forEach((id, i) => {
+    const w = getWallet(id);
+    const amount = share + (i === 0 ? remainder : 0);
+    if (game.currencyType === "coins") w.coins += amount;
+    else w.pips += amount;
+  });
+
+  const winnerMentions = winners.map((id) => `<@${id}>`).join(", ");
+  const shareText =
+    winners.length > 1
+      ? ` (${share.toLocaleString()} ${label} each${remainder > 0 ? `, +${remainder.toLocaleString()} to <@${winners[0]}>` : ""})`
+      : "";
 
   await edit(
-    info("🌸・Rumble Ended", `🎁 **Prize:** ${prizeText}\n🏆 **Winner:** <@${winnerId}>\n\n👥 **Players:** ${players.length}`)
+    info(
+      "🌸・Rumble Ended",
+      `🎁 **Prize:** ${prizeText}${shareText}\n🏆 **Winner${winners.length > 1 ? "s" : ""}:** ${winnerMentions}\n\n👥 **Players:** ${players.length}`
+    )
   );
-  await channel.send(`🏆 <@${winnerId}> won **${prizeText}** in PlatoMy Rumble!`).catch(() => {});
+
+  if (winners.length === 1) {
+    await channel.send(`🏆 <@${winners[0]}> won **${prizeText}** in PlatoMy Rumble!`).catch(() => {});
+  } else {
+    await channel.send(
+      `🏆 ${winnerMentions} won **${prizeText}** in PlatoMy Rumble!${shareText}`
+    ).catch(() => {});
+  }
 }
 
 // --- INTEGRASI WEB DASHBOARD & PASSPORT ---
@@ -617,9 +534,6 @@ const commands = [
 
   new SlashCommandBuilder().setName("setup-trading").setDescription("Hantar panel PlatoMy Trading (Admin sahaja)"),
 
-  new SlashCommandBuilder().setName("setup-giverole").setDescription("Hantar panel Role Giver (Admin sahaja)")
-    .addChannelOption(opt => opt.setName("channel").setDescription("Channel untuk panel (kosong = channel ini)").setRequired(false)),
-
   new SlashCommandBuilder().setName("embed-builder").setDescription("Cipta custom container interaktif (Admin sahaja)")
     .addChannelOption(opt => opt.setName("channel").setDescription("Pilih channel").setRequired(true)),
 
@@ -628,19 +542,14 @@ const commands = [
     .addStringOption(opt => opt.setName("image_url").setDescription("Link URL gambar").setRequired(true))
     .addStringOption(opt => opt.setName("color").setDescription("Kod warna Hex (cth: #ffb6c1)").setRequired(false)),
 
-  new SlashCommandBuilder().setName("event").setDescription("Urus event komuniti")
-    .addSubcommand(sub => sub.setName("create").setDescription("Cipta event baharu (Admin sahaja)")
-      .addStringOption(opt => opt.setName("title").setDescription("Tajuk event").setRequired(true))
-      .addStringOption(opt => opt.setName("description").setDescription("Butiran event").setRequired(true))
-    ),
-
   new SlashCommandBuilder().setName("rumble").setDescription("Mula permainan PlatoMy Rumble (Admin sahaja)")
     .addStringOption(opt => opt.setName("currency").setDescription("Jenis mata wang").setRequired(true).addChoices(
       { name: "🪙 Plato Coins", value: "coins" },
       { name: "💠 Pips", value: "pips" }
     ))
     .addIntegerOption(opt => opt.setName("prize").setDescription("Jumlah Hadiah Utama").setRequired(true).setMinValue(1))
-    .addIntegerOption(opt => opt.setName("duration").setDescription("Tempoh masa (minit)").setRequired(true).setMinValue(1).setMaxValue(10080)),
+    .addIntegerOption(opt => opt.setName("duration").setDescription("Tempoh masa (minit)").setRequired(true).setMinValue(1).setMaxValue(10080))
+    .addIntegerOption(opt => opt.setName("winners").setDescription("Berapa ramai pemenang (hadiah dibahagi sama rata, default 1)").setRequired(false).setMinValue(1).setMaxValue(25)),
 ].map(c => c.toJSON());
 
 client.once(Events.ClientReady, async (c) => {
@@ -751,25 +660,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return;
       }
 
-      if (name === "setup-giverole") {
-        if (!isAdmin(interaction)) {
-          return interaction.reply({ content: "❌ Anda tidak mempunyai kebenaran Administrator!", ephemeral: true });
-        }
-        const role = findGiveRole(interaction.guild);
-        if (!role) {
-          return interaction.reply({ content: "❌ I couldn't find the MyMember role. Please check the role name.", ephemeral: true });
-        }
-        const targetChannel = interaction.options.getChannel("channel") || interaction.channel;
-
-        await targetChannel.send({
-          components: [buildGiverPanel(role)],
-          flags: V2,
-          allowedMentions: NO_PING,
-        });
-        await interaction.reply({ content: `✅ Role Giver panel sent to <#${targetChannel.id}>!`, ephemeral: true });
-        return;
-      }
-
       if (name === "embed-builder") {
         if (!isAdmin(interaction)) {
           return interaction.reply({ content: "❌ Anda tidak mempunyai kebenaran Administrator!", ephemeral: true });
@@ -823,50 +713,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return;
       }
 
-      if (name === "event") {
-        if (interaction.options.getSubcommand() !== "create") return;
-        if (!isAdmin(interaction)) {
-          return interaction.reply({ content: "❌ Anda tidak mempunyai kebenaran Administrator!", ephemeral: true });
-        }
-
-        const title = interaction.options.getString("title");
-        const description = interaction.options.getString("description");
-
-        const eventBox = new ContainerBuilder()
-          .addTextDisplayComponents(txt("✨ **Pengumuman Event Baharu!**"))
-          .addSeparatorComponents(sep())
-          .addSectionComponents(
-            new SectionBuilder()
-              .addTextDisplayComponents(
-                txt(`## ${title}`),
-                txt(`${description}\n\n🎀 Dianjurkan oleh: ${interaction.user}`)
-              )
-              .setThumbnailAccessory(new ThumbnailBuilder().setURL(LOGO_URL))
-          )
-          .addTextDisplayComponents(txt(`-# Event • Today at ${getMalaysiaTime()}`));
-
-        await interaction.channel.send({ components: [eventBox], flags: V2, allowedMentions: NO_PING });
-        await interaction.reply({ content: "✅ Event berjaya dicipta dan diumumkan!", ephemeral: true });
-
-        const eventLogChannel = findChannel(interaction.guild, EVENT_LOG_CHANNEL_NAME);
-        if (eventLogChannel) {
-          await eventLogChannel.send({
-            components: [
-              info(
-                "🛡️・Event Log: New Event Created",
-                `📌 **Tajuk:** ${title}\n` +
-                `📝 **Butiran:** ${description}\n` +
-                `👤 **Admin:** ${interaction.user} (\`${interaction.user.id}\`)`,
-                `Event Log • Today at ${getMalaysiaTime()}`
-              ),
-            ],
-            flags: V2,
-            allowedMentions: NO_PING,
-          }).catch(() => {});
-        }
-        return;
-      }
-
       if (name === "rumble") {
         if (!isAdmin(interaction)) {
           return interaction.reply({ content: "❌ Anda tidak mempunyai kebenaran Administrator!", ephemeral: true });
@@ -874,8 +720,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const currencyType = interaction.options.getString("currency");
         const totalPrize = interaction.options.getInteger("prize");
         const durationMins = interaction.options.getInteger("duration");
+        const winnersCount = interaction.options.getInteger("winners") ?? 1;
 
-        await createRumble(interaction.channel, currencyType, totalPrize, durationMins);
+        if (totalPrize < winnersCount) {
+          return interaction.reply({
+            content: "❌ Hadiah mesti sekurang-kurangnya sama dengan bilangan pemenang.",
+            ephemeral: true,
+          });
+        }
+
+        await createRumble(interaction.channel, currencyType, totalPrize, durationMins, winnersCount);
         await interaction.reply({ content: "✅ PlatoMy Rumble berjaya dimulakan!", ephemeral: true });
         return;
       }
@@ -884,54 +738,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
     // ===== BUTANG =====
     if (interaction.isButton()) {
       const id = interaction.customId;
-
-      // --- Role Giver: buka menu ---
-      if (id === "giverole_open") {
-        if (!canUseGiver(interaction)) {
-          return interaction.reply({ content: "❌ You don't have permission to use the Role Giver.", ephemeral: true });
-        }
-        const role = findGiveRole(interaction.guild);
-        if (!role) {
-          return interaction.reply({ content: "❌ I couldn't find the MyMember role.", ephemeral: true });
-        }
-        const menu = await buildGiverMenu(interaction.guild, role, 0, "");
-        await interaction.reply({ components: [menu], flags: V2_EPHEMERAL });
-        return;
-      }
-
-      // --- Role Giver: tukar halaman ---
-      if (id.startsWith("giverole_page:")) {
-        if (!canUseGiver(interaction)) {
-          return interaction.reply({ content: "❌ You don't have permission to use the Role Giver.", ephemeral: true });
-        }
-        const role = findGiveRole(interaction.guild);
-        if (!role) {
-          return interaction.reply({ content: "❌ I couldn't find the MyMember role.", ephemeral: true });
-        }
-        const parts = id.split(":");
-        const page = Number(parts[1]) || 0;
-        const query = parts.slice(2).join(":");
-        const menu = await buildGiverMenu(interaction.guild, role, page, query);
-        await interaction.update({ components: [menu], flags: V2 });
-        return;
-      }
-
-      // --- Role Giver: carian (buka borang) ---
-      if (id === "giverole_search") {
-        if (!canUseGiver(interaction)) {
-          return interaction.reply({ content: "❌ You don't have permission to use the Role Giver.", ephemeral: true });
-        }
-        const modal = new ModalBuilder().setCustomId("giverole_search_modal").setTitle("🔍 Search Member");
-        const queryInput = new TextInputBuilder()
-          .setCustomId("giverole_query")
-          .setLabel("Member name")
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-          .setMaxLength(40);
-        modal.addComponents(new ActionRowBuilder().addComponents(queryInput));
-        await interaction.showModal(modal);
-        return;
-      }
 
       // --- join rumble ---
       if (id.startsWith("join_rumble_")) {
@@ -1067,60 +873,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
     }
 
-    // ===== DROPDOWN =====
-    if (interaction.isStringSelectMenu()) {
-      // --- Role Giver: pilih ahli ---
-      if (interaction.customId === "giverole_pick") {
-        if (!canUseGiver(interaction)) {
-          return interaction.reply({ content: "❌ You don't have permission to use the Role Giver.", ephemeral: true });
-        }
-        const role = findGiveRole(interaction.guild);
-        if (!role) {
-          return interaction.reply({ content: "❌ I couldn't find the MyMember role.", ephemeral: true });
-        }
-        if (!role.editable) {
-          return interaction.reply({
-            content: "❌ I can't grant that role. Please move my bot role above it and give me the Manage Roles permission.",
-            ephemeral: true,
-          });
-        }
-
-        const targetId = interaction.values[0];
-        const member = await interaction.guild.members.fetch(targetId).catch(() => null);
-        if (!member) {
-          return interaction.reply({ content: "❌ I couldn't find that member.", ephemeral: true });
-        }
-        if (member.roles.cache.has(role.id)) {
-          return interaction.reply({ content: `⚠️ ${member} already has this role.`, ephemeral: true });
-        }
-
-        await member.roles.add(role, `Granted by ${interaction.user.tag} via Role Giver`);
-
-        const done = new ContainerBuilder().addTextDisplayComponents(
-          txt(`✅ Successfully granted <@&${role.id}> to <@${member.id}>!`)
-        );
-        await interaction.update({ components: [done], flags: V2 });
-        return;
-      }
-    }
-
     // ===== MODAL =====
     if (interaction.isModalSubmit()) {
-      // --- Role Giver: keputusan carian ---
-      if (interaction.customId === "giverole_search_modal") {
-        if (!canUseGiver(interaction)) {
-          return interaction.reply({ content: "❌ You don't have permission to use the Role Giver.", ephemeral: true });
-        }
-        const role = findGiveRole(interaction.guild);
-        if (!role) {
-          return interaction.reply({ content: "❌ I couldn't find the MyMember role.", ephemeral: true });
-        }
-        const query = interaction.fields.getTextInputValue("giverole_query").trim();
-        const menu = await buildGiverMenu(interaction.guild, role, 0, query);
-        await interaction.reply({ components: [menu], flags: V2_EPHEMERAL });
-        return;
-      }
-
       // --- tiket trading ---
       if (interaction.customId === "trading_modal") {
         const details = interaction.fields.getTextInputValue("trading_text").trim();
