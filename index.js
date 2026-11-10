@@ -69,6 +69,12 @@ const TRADE_ROLE_NAME = "trade";                  // role yang boleh Accept Trad
 const TRADER_ROLE_NAME = "trader";                // role yang di-ping bila ada trading list baru
 const TRADE_CATEGORY_ID = "1567527038368223332";  // category untuk channel trade sementara
 
+// ID channel log baharu (kalau ID tak dijumpai, bot cari ikut nama channel seperti dulu)
+const LOG_CHANNEL_IDS = {
+  [WALLET_LOG_CHANNEL_NAME]: "1569585830224461884",  // wallet log baharu
+  [TRADING_LOG_CHANNEL_NAME]: "1569585956439461908", // ticket (trading) log baharu
+};
+
 // Gambar di atas panel trading. Disusun ke bawah, satu-satu penuh lebar (macam panel Support)
 // Susunan: garisan atas, tajuk, garisan bawah. Maksimum 10.
 const TRADE_MEDIA_URLS = [
@@ -81,8 +87,11 @@ const isAdmin = (i) => i.member?.permissions?.has(PermissionFlagsBits.Administra
 const isUrl = (u) => /^https?:\/\/\S+$/i.test(String(u || "").trim());
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
-const findChannel = (guild, part) =>
-  guild.channels.cache.find((c) => c.name.toLowerCase().includes(part) && c.isTextBased());
+const findChannel = (guild, part) => {
+  const byId = guild.channels.cache.get(LOG_CHANNEL_IDS[part]);
+  if (byId?.isTextBased()) return byId;
+  return guild.channels.cache.find((c) => c.name.toLowerCase().includes(part) && c.isTextBased());
+};
 
 // Tukar kod hex jadi nombor warna. Kalau kosong/tak sah, bagi null (container tanpa warna)
 const accent = (c) => {
