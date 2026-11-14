@@ -143,10 +143,8 @@ const bankFooter = () => `${BANK_FOOTER} • Today at ${getMalaysiaTime()}`;
 // Baris baki (digunakan oleh wallet dan wallet log)
 function balanceLines(w) {
   return (
-    `╰┈➤ 🪙 Plato Coins: ${w.coins.toLocaleString()}
-` +
-    `╰┈➤ 💠 Pips: ${w.pips.toLocaleString()}
-` +
+    `╰┈➤ 🪙 Plato Coins: ${w.coins.toLocaleString()}\n` +
+    `╰┈➤ 💠 Pips: ${w.pips.toLocaleString()}\n` +
     `╰┈➤ 🌸 Total Sponsor: ${w.sponsorTotal.toLocaleString()}`
   );
 }
@@ -167,20 +165,15 @@ function walletLogBox({ actionTitle, target, admin, details, reason, w }) {
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(
       txt(
-        `╰┈➤ 📌 **Action:** ${actionTitle}
-` +
-        `╰┈➤ 👤 **Target:** ${target} (\`${target.id}\`)
-` +
-        `╰┈➤ 🛡️ **Admin:** ${admin}
-` +
-        `╰┈➤ 📝 **Details:** ${details}
-` +
+        `╰┈➤ 📌 **Action:** ${actionTitle}\n` +
+        `╰┈➤ 👤 **Target:** ${target} (\`${target.id}\`)\n` +
+        `╰┈➤ 🛡️ **Admin:** ${admin}\n` +
+        `╰┈➤ 📝 **Details:** ${details}\n` +
         `╰┈➤ 💬 **Reason:** ${reason}`
       )
     )
     .addSeparatorComponents(sep())
-    .addTextDisplayComponents(txt(`**Current Balances**
-${balanceLines(w)}`))
+    .addTextDisplayComponents(txt(`**Current Balances**\n${balanceLines(w)}`))
     .addTextDisplayComponents(txt(`-# ${bankFooter()}`));
 }
 
@@ -208,8 +201,7 @@ function buildTradePanel(listRef) {
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(
       txt(
-        "╰┈➤ Click the **Trading Ticket** button below to look for or trade your Plato items.
-" +
+        "╰┈➤ Click the **Trading Ticket** button below to look for or trade your Plato items.\n" +
         `╰┈➤ Your trade request will be posted automatically in ${listRef}.`
       )
     )
@@ -229,8 +221,7 @@ function buildTradeList({ requesterId, details, accepterId = null }) {
     .addTextDisplayComponents(txt("# ˚₊‧꒰ა 📋 𝑇𝑅𝐴𝐷𝐼𝑁𝐺 𝐿𝐼𝑆𝑇 ໒꒱‧₊˚"))
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(
-      txt(`╰┈➤ **Requester:** <@${requesterId}>
-╰┈➤ **Item Details:** ${details}`)
+      txt(`╰┈➤ **Requester:** <@${requesterId}>\n╰┈➤ **Item Details:** ${details}`)
     )
     .addSeparatorComponents(sep());
 
@@ -257,10 +248,8 @@ function buildTradeChatBox({ requesterId, accepterId, details }) {
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(
       txt(
-        `╰┈➤ **Requester:** <@${requesterId}>
-` +
-        `╰┈➤ **Accepted by:** <@${accepterId}>
-` +
+        `╰┈➤ **Requester:** <@${requesterId}>\n` +
+        `╰┈➤ **Accepted by:** <@${accepterId}>\n` +
         `╰┈➤ **Item Details:** ${details}`
       )
     )
@@ -360,13 +349,9 @@ function rumbleOpenBox(game) {
 
   return info(
     "🌸・PlatoMy Rumble Arena",
-    `🎁 **Total Prize:** ${game.totalPrize.toLocaleString()} ${rumbleLabel(game.currencyType)}
-` +
-    `🏆 **Winners:** ${game.winnersCount}
-` +
-    `⏳ **Ends:** <t:${game.endTimeSeconds}:R>
-
-` +
+    `🎁 **Total Prize:** ${game.totalPrize.toLocaleString()} ${rumbleLabel(game.currencyType)}\n` +
+    `🏆 **Winners:** ${game.winnersCount}\n` +
+    `⏳ **Ends:** <t:${game.endTimeSeconds}:R>\n\n` +
     `👥 **Players:** ${game.participants.length}`
   ).addActionRowComponents(new ActionRowBuilder().addComponents(joinBtn));
 }
@@ -403,10 +388,7 @@ async function runRumbleBattle(channel, msgId) {
 
   if (players.length === 0) {
     await edit(
-      info("🌸・Rumble Ended", `🎁 **Prize:** ${prizeText}
-🏆 **Winners:** No participants
-
-👥 **Players:** 0`)
+      info("🌸・Rumble Ended", `🎁 **Prize:** ${prizeText}\n🏆 **Winners:** No participants\n\n👥 **Players:** 0`)
     );
     await channel.send("😢 Rumble ended with no participants.").catch(() => {});
     return;
@@ -419,10 +401,8 @@ async function runRumbleBattle(channel, msgId) {
     await edit(
       info(
         "🌸・PlatoMy Rumble Arena",
-        `🔥 **The battle begins!**
-${players.length} players have entered the arena...` +
-        (winnersCount > 1 ? `
-🏆 Last **${winnersCount}** standing win!` : "")
+        `🔥 **The battle begins!**\n${players.length} players have entered the arena...` +
+        (winnersCount > 1 ? `\n🏆 Last **${winnersCount}** standing win!` : "")
       )
     );
     await sleep(5000);
@@ -448,12 +428,7 @@ ${players.length} players have entered the arena...` +
       if (lines.length > shown.length) shown.push(`...and ${lines.length - shown.length} more fell in the chaos.`);
 
       await edit(
-        info("🌸・PlatoMy Rumble Arena", `⚔️ **Round ${round}**
-
-${shown.join("
-")}
-
-👥 **Players left:** ${alive.length}`)
+        info("🌸・PlatoMy Rumble Arena", `⚔️ **Round ${round}**\n\n${shown.join("\n")}\n\n👥 **Players left:** ${alive.length}`)
       );
       if (alive.length > winnersCount) await sleep(5000);
     }
@@ -481,10 +456,7 @@ ${shown.join("
   await edit(
     info(
       "🌸・Rumble Ended",
-      `🎁 **Prize:** ${prizeText}${shareText}
-🏆 **Winner${winners.length > 1 ? "s" : ""}:** ${winnerMentions}
-
-👥 **Players:** ${players.length}`
+      `🎁 **Prize:** ${prizeText}${shareText}\n🏆 **Winner${winners.length > 1 ? "s" : ""}:** ${winnerMentions}\n\n👥 **Players:** ${players.length}`
     )
   );
 
@@ -855,15 +827,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
             components: [
               info(
                 "🛍️ Trading Log: Trade Accepted",
-                `📥 **Requester:** <@${requesterId}> (\`${requesterId}\`)
-` +
-                `🤝 **Accepted by:** ${interaction.user} (\`${interaction.user.id}\`)
-` +
-                (tradeChannel ? `📍 **Trade Channel:** ${tradeChannel}
-` : "") +
-                `
-📝 **Item:**
-${item}`,
+                `📥 **Requester:** <@${requesterId}> (\`${requesterId}\`)\n` +
+                `🤝 **Accepted by:** ${interaction.user} (\`${interaction.user.id}\`)\n` +
+                (tradeChannel ? `📍 **Trade Channel:** ${tradeChannel}\n` : "") +
+                `\n📝 **Item:**\n${item}`,
                 `Trading Log • Today at ${getMalaysiaTime()}`
               ),
             ],
@@ -897,10 +864,8 @@ ${item}`,
             components: [
               info(
                 "🛍️ Trading Log: Trade Closed",
-                `🔒 **Closed by:** ${interaction.user} (\`${interaction.user.id}\`)
-` +
-                `🤝 **Accepted by:** <@${accepterId}>
-` +
+                `🔒 **Closed by:** ${interaction.user} (\`${interaction.user.id}\`)\n` +
+                `🤝 **Accepted by:** <@${accepterId}>\n` +
                 `📍 **Channel:** ${channelName}`,
                 `Trading Log • Today at ${getMalaysiaTime()}`
               ),
@@ -955,11 +920,8 @@ ${item}`,
             components: [
               info(
                 "🛍️ Trading Log: New Request",
-                `👤 **Requester:** ${interaction.user} (\`${interaction.user.id}\`)
-
-` +
-                `📝 **Item:**
-${details}`,
+                `👤 **Requester:** ${interaction.user} (\`${interaction.user.id}\`)\n\n` +
+                `📝 **Item:**\n${details}`,
                 `Trading Log • Today at ${getMalaysiaTime()}`
               ),
             ],
