@@ -151,7 +151,7 @@ function balanceLines(w) {
 
 function walletBox(w) {
   return new ContainerBuilder()
-    .addTextDisplayComponents(txt("# ˚₊‧꒰ა 👛 𝑃𝐿𝐴𝑇𝑂𝑀𝑌 𝑊𝐴𝐿𝐿𝐸𝑇 ໒꒱‧₊˚"))
+    .addTextDisplayComponents(txt("# ˚₊‧꒰ാ 👛 𝑃𝐿𝐴𝑇𝑂𝑀𝑌 𝑊𝐴𝐿𝐿𝐸𝑇 ໒꒱‧₊˚"))
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(txt(balanceLines(w)))
     .addTextDisplayComponents(txt(`-# ${bankFooter()}`));
@@ -159,7 +159,7 @@ function walletBox(w) {
 
 function walletLogBox({ actionTitle, target, admin, details, reason, w }) {
   return new ContainerBuilder()
-    .addTextDisplayComponents(txt("# ˚₊‧꒰ა 👛 𝑊𝐴𝐿𝐿𝐸𝑇 𝐿𝑂𝐺 ໒꒱‧₊˚"))
+    .addTextDisplayComponents(txt("# ˚₊‧꒰ാ 👛 𝑊𝐴𝐿𝐿𝐸𝑇 𝐿𝑂𝐺 ໒꒱‧₊˚"))
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(
       txt(
@@ -197,7 +197,7 @@ function buildTradePanel(listRef) {
   }
 
   return box
-    .addTextDisplayComponents(txt("# ˚₊‧꒰ა 🛍️ 𝑃𝐿𝐴𝑇𝑂𝑀𝑌 𝑇𝑅𝐴𝐷𝐼𝑁𝐺 ໒꒱‧₊˚"))
+    .addTextDisplayComponents(txt("# ˚₊‧꒰ാ 🛍️ 𝑃𝐿𝐴𝑇𝑂𝑀𝑌 𝑇𝑅𝐴𝐷𝐼𝑁𝐺 ໒꒱‧₊˚"))
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(
       txt(
@@ -218,7 +218,7 @@ function buildTradeList({ requesterId, details, accepterId = null }) {
     .setDisabled(accepted);
 
   const box = new ContainerBuilder()
-    .addTextDisplayComponents(txt("# ˚₊‧꒰ა 📋 𝑇𝑅𝐴𝐷𝐼𝑁𝐺 𝐿𝐼𝑆𝑇 ໒꒱‧₊˚"))
+    .addTextDisplayComponents(txt("# ˚₊‧꒰ാ 📋 𝑇𝑅𝐴𝐷𝐼𝑁𝐺 𝐿𝐼𝑆𝑇 ໒꒱‧₊˚"))
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(
       txt(`╰┈➤ **Requester:** <@${requesterId}>
@@ -244,7 +244,7 @@ function buildTradeChatBox({ requesterId, accepterId, details }) {
     .setStyle(ButtonStyle.Secondary);
 
   return new ContainerBuilder()
-    .addTextDisplayComponents(txt("# ˚₊‧꒰ა 🤝 𝑇𝑅𝐴𝐷𝐸 𝐶𝐻𝐴𝑇 ໒꒱‧₊˚"))
+    .addTextDisplayComponents(txt("# ˚₊‧꒰ാ 🤝 𝑇𝑅𝐴𝐷𝐸 𝐶𝐻𝐴𝑇 ໒꒱‧₊˚"))
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(
       txt(
@@ -488,7 +488,7 @@ ${shown.join("
 async function generateLeaderboardImage() {
   const browser = await puppeteer.launch({
     headless: "new",
-    args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
   });
 
   try {
@@ -627,6 +627,8 @@ const commands = [
 
   new SlashCommandBuilder().setName("setup-leaderboard").setDescription("Hantar mesej tapak Leaderboard (Admin sahaja)"),
 
+  new SlashCommandBuilder().setName("reset-leaderboard").setDescription("Set semula (reset) semua EXP ahli kepada 0 (Admin sahaja)"),
+
   new SlashCommandBuilder().setName("embed-builder").setDescription("Cipta custom container interaktif (Admin sahaja)")
     .addChannelOption(opt => opt.setName("channel").setDescription("Pilih channel").setRequired(true)),
 
@@ -658,7 +660,6 @@ client.once(Events.ClientReady, async (c) => {
   // --- AUTOMATIC CRON JOB UNTUK UPDATE LEADERBOARD (Setiap 10 minit) ---
   cron.schedule("*/10 * * * *", async () => {
     try {
-      // Simpan konfigurasi channelId & messageId dalam file config ringkas
       if (fs.existsSync("./leaderboard-config.json")) {
         const config = JSON.parse(fs.readFileSync("./leaderboard-config.json", "utf8"));
         const channel = await client.channels.fetch(config.channelId).catch(() => null);
@@ -678,6 +679,41 @@ Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
       }
     } catch (err) {
       console.error("Ralat semasa auto-update leaderboard:", err);
+    }
+  });
+
+  // --- AUTOMATIC CRON JOB UNTUK AUTO-RESET EXP BULANAN (Setiap 1 hari bulan, jam 12:00 Tengah Malam) ---
+  cron.schedule("0 0 1 * *", async () => {
+    try {
+      console.log("Memulakan proses auto-reset EXP bulanan...");
+
+      // 1. Set semula semua EXP dalam memori Map 'wallets' ke 0
+      for (const [id, data] of wallets.entries()) {
+        data.exp = 0;
+      }
+      console.log("✅ Semua EXP ahli dalam memori berjaya di-reset ke 0!");
+
+      // 2. Maklumkan kepada komuniti di channel leaderboard
+      if (fs.existsSync("./leaderboard-config.json")) {
+        const config = JSON.parse(fs.readFileSync("./leaderboard-config.json", "utf8"));
+        const channel = await client.channels.fetch(config.channelId).catch(() => null);
+        if (channel) {
+          await channel.send("🎉 **Monthly Leaderboard telah tamat! Semua EXP ahli telah diset semula ke 0 untuk bulan baharu. Semoga berjaya!** 🌸");
+
+          // Jana imej baharu yang kosong (fresh start)
+          const attachment = await generateLeaderboardImage();
+          const message = await channel.messages.fetch(config.messageId).catch(() => null);
+          if (message) {
+            await message.edit({
+              content: `**Monthly Leaderboard (Bulan Baharu)**
+Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
+              files: [attachment]
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Ralat semasa auto-reset bulanan:", err);
     }
   });
 });
@@ -808,6 +844,38 @@ Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
           console.error(err);
           await interaction.editReply({ content: "❌ Leaderboard tapak berjaya dihantar, tetapi gagal menjana gambar kali pertama. Pastikan fail `leaderboard.html` diletakkan di dalam folder bot." });
         }
+        return;
+      }
+
+      if (name === "reset-leaderboard") {
+        if (!isAdmin(interaction)) {
+          return interaction.reply({ content: "❌ Anda tidak mempunyai kebenaran Administrator!", ephemeral: true });
+        }
+        await interaction.deferReply({ ephemeral: true });
+
+        // 1. Set semula semua EXP dalam memori Map 'wallets' ke 0
+        for (const [id, data] of wallets.entries()) {
+          data.exp = 0;
+        }
+
+        // 2. Kemas kini gambar leaderboard serta-merta
+        if (fs.existsSync("./leaderboard-config.json")) {
+          const config = JSON.parse(fs.readFileSync("./leaderboard-config.json", "utf8"));
+          const channel = await client.channels.fetch(config.channelId).catch(() => null);
+          if (channel) {
+            const message = await channel.messages.fetch(config.messageId).catch(() => null);
+            if (message) {
+              const attachment = await generateLeaderboardImage();
+              await message.edit({
+                content: `**Monthly Leaderboard (Telah Di-reset)**
+Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
+                files: [attachment]
+              });
+            }
+          }
+        }
+
+        await interaction.editReply({ content: "✅ Berjaya mereset semua EXP ahli kepada 0 dan mengemaskini paparan Leaderboard!" });
         return;
       }
 
