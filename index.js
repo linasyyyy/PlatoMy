@@ -21,6 +21,7 @@ import {
   MediaGalleryBuilder,
   MediaGalleryItemBuilder,
   MessageFlags,
+  AttachmentBuilder,
 } from "discord.js";
 import express from "express";
 import session from "express-session";
@@ -28,6 +29,9 @@ import passport from "passport";
 import { Strategy as DiscordStrategy } from "passport-discord";
 import path from "path";
 import { fileURLToPath } from "url";
+import fs from "fs";
+import puppeteer from "puppeteer";
+import cron from "node-cron";
 import { registerDashboardApi } from "./dashboard-api.js";
 import { loadWallets, startAutosave } from "./db.js";
 
@@ -76,8 +80,6 @@ const LOG_CHANNEL_IDS = {
   [TRADING_LOG_CHANNEL_NAME]: "1569585956439461908", // ticket (trading) log baharu
 };
 
-// Gambar di atas panel trading. Disusun ke bawah, satu-satu penuh lebar (macam panel Support)
-// Susunan: garisan atas, tajuk, garisan bawah. Maksimum 10.
 const TRADE_MEDIA_URLS = [
   "https://cdn.discordapp.com/attachments/1556946394239991848/1562348900705374259/IMG_6986.gif?ex=6aeec24c&is=6aed70cc&hm=b4094237e998531634199814f373fd7d8827c9aa8dbb8d0ec626aeb70ca092e5&",
   "https://cdn.discordapp.com/attachments/1556946394239991848/1567858191537279016/20261105_190812_0000.png?ex=6aee5dfa&is=6aed0c7a&hm=703dd68300d271f1087bbbc0b932f49a379a78b33f00cdbef8a9f4ac80fd74c0&",
@@ -94,7 +96,6 @@ const findChannel = (guild, part) => {
   return guild.channels.cache.find((c) => c.name.toLowerCase().includes(part) && c.isTextBased());
 };
 
-// Tukar kod hex jadi nombor warna. Kalau kosong/tak sah, bagi null (container tanpa warna)
 const accent = (c) => {
   const v = String(c || "").trim().replace("#", "");
   return /^[0-9a-fA-F]{6}$/.test(v) ? parseInt(v, 16) : null;
@@ -112,11 +113,10 @@ function getMalaysiaTime() {
 // ================= CONTAINER (Components V2) =================
 const V2 = MessageFlags.IsComponentsV2;
 const V2_EPHEMERAL = MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral;
-const NO_PING = { parse: [] }; // mention nampak tapi tak ping
+const NO_PING = { parse: [] };
 const sep = () => new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small);
 const txt = (content) => new TextDisplayBuilder().setContent(content);
 
-// Container umum: tajuk + garisan + isi + footer kecil (tanpa warna)
 function info(title, body, footer = null) {
   const box = new ContainerBuilder()
     .addTextDisplayComponents(txt(`## ${title}`))
@@ -126,7 +126,6 @@ function info(title, body, footer = null) {
   return box;
 }
 
-// Kumpul semua teks dalam mesej container (untuk baca butiran item semasa Accept)
 function collectText(components, out = []) {
   for (const c of components || []) {
     const t = c.content ?? c.data?.content;
@@ -140,16 +139,16 @@ function collectText(components, out = []) {
 const BANK_FOOTER = "⋆˚࿔ 🎀 PlatoMy Bank 𝜗𝜚˚⋆";
 const bankFooter = () => `${BANK_FOOTER} • Today at ${getMalaysiaTime()}`;
 
-// Baris baki (digunakan oleh wallet dan wallet log)
 function balanceLines(w) {
   return (
-    `╰┈➤ 🪙 Plato Coins: ${w.coins.toLocaleString()}\n` +
-    `╰┈➤ 💠 Pips: ${w.pips.toLocaleString()}\n` +
+    `╰┈➤ 🪙 Plato Coins: ${w.coins.toLocaleString()}
+` +
+    `╰┈➤ 💠 Pips: ${w.pips.toLocaleString()}
+` +
     `╰┈➤ 🌸 Total Sponsor: ${w.sponsorTotal.toLocaleString()}`
   );
 }
 
-// Wallet pemain (/wallet dan !wallet)
 function walletBox(w) {
   return new ContainerBuilder()
     .addTextDisplayComponents(txt("# ˚₊‧꒰ა 👛 𝑃𝐿𝐴𝑇𝑂𝑀𝑌 𝑊𝐴𝐿𝐿𝐸𝑇 ໒꒱‧₊˚"))
@@ -158,37 +157,38 @@ function walletBox(w) {
     .addTextDisplayComponents(txt(`-# ${bankFooter()}`));
 }
 
-// Wallet log (admin tambah/tolak baki)
 function walletLogBox({ actionTitle, target, admin, details, reason, w }) {
   return new ContainerBuilder()
     .addTextDisplayComponents(txt("# ˚₊‧꒰ა 👛 𝑊𝐴𝐿𝐿𝐸𝑇 𝐿𝑂𝐺 ໒꒱‧₊˚"))
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(
       txt(
-        `╰┈➤ 📌 **Action:** ${actionTitle}\n` +
-        `╰┈➤ 👤 **Target:** ${target} (\`${target.id}\`)\n` +
-        `╰┈➤ 🛡️ **Admin:** ${admin}\n` +
-        `╰┈➤ 📝 **Details:** ${details}\n` +
+        `╰┈➤ 📌 **Action:** ${actionTitle}
+` +
+        `╰┈➤ 👤 **Target:** ${target} (\`${target.id}\`)
+` +
+        `╰┈➤ 🛡️ **Admin:** ${admin}
+` +
+        `╰┈➤ 📝 **Details:** ${details}
+` +
         `╰┈➤ 💬 **Reason:** ${reason}`
       )
     )
     .addSeparatorComponents(sep())
-    .addTextDisplayComponents(txt(`**Current Balances**\n${balanceLines(w)}`))
+    .addTextDisplayComponents(txt(`**Current Balances**
+${balanceLines(w)}`))
     .addTextDisplayComponents(txt(`-# ${bankFooter()}`));
 }
 
 // ================= TRADING =================
-// Panel trading (dihantar oleh /setup-trading)
 function buildTradePanel(listRef) {
   const btn = new ButtonBuilder()
     .setCustomId("open_trading_modal")
     .setLabel("Trading Ticket")
     .setEmoji("🤝")
-    .setStyle(ButtonStyle.Secondary); // kelabu
+    .setStyle(ButtonStyle.Secondary);
 
   const box = new ContainerBuilder();
-
-  // Gambar disusun ke bawah, satu galeri untuk setiap gambar supaya penuh lebar (tak jadi petak)
   const mediaUrls = TRADE_MEDIA_URLS.filter(isUrl).slice(0, 10);
   for (const u of mediaUrls) {
     box.addMediaGalleryComponents(
@@ -201,27 +201,28 @@ function buildTradePanel(listRef) {
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(
       txt(
-        "╰┈➤ Click the **Trading Ticket** button below to look for or trade your Plato items.\n" +
+        "╰┈➤ Click the **Trading Ticket** button below to look for or trade your Plato items.
+" +
         `╰┈➤ Your trade request will be posted automatically in ${listRef}.`
       )
     )
     .addActionRowComponents(new ActionRowBuilder().addComponents(btn));
 }
 
-// Mesej permintaan dalam trading-list (accepterId diisi bila dah diterima)
 function buildTradeList({ requesterId, details, accepterId = null }) {
   const accepted = Boolean(accepterId);
   const btn = new ButtonBuilder()
     .setCustomId(`accept_trade:${requesterId}`)
     .setLabel(accepted ? "Trade Accepted" : "Accept Trade")
-    .setStyle(ButtonStyle.Secondary) // kelabu
+    .setStyle(ButtonStyle.Secondary)
     .setDisabled(accepted);
 
   const box = new ContainerBuilder()
     .addTextDisplayComponents(txt("# ˚₊‧꒰ა 📋 𝑇𝑅𝐴𝐷𝐼𝑁𝐺 𝐿𝐼𝑆𝑇 ໒꒱‧₊˚"))
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(
-      txt(`╰┈➤ **Requester:** <@${requesterId}>\n╰┈➤ **Item Details:** ${details}`)
+      txt(`╰┈➤ **Requester:** <@${requesterId}>
+╰┈➤ **Item Details:** ${details}`)
     )
     .addSeparatorComponents(sep());
 
@@ -235,21 +236,22 @@ function buildTradeList({ requesterId, details, accepterId = null }) {
   return box.addActionRowComponents(new ActionRowBuilder().addComponents(btn));
 }
 
-// Mesej dalam channel trade sementara (ada butang Close Trade untuk accepter)
 function buildTradeChatBox({ requesterId, accepterId, details }) {
   const btn = new ButtonBuilder()
     .setCustomId(`close_trade:${accepterId}`)
     .setLabel("Close Trade")
     .setEmoji("🔒")
-    .setStyle(ButtonStyle.Secondary); // kelabu
+    .setStyle(ButtonStyle.Secondary);
 
   return new ContainerBuilder()
     .addTextDisplayComponents(txt("# ˚₊‧꒰ა 🤝 𝑇𝑅𝐴𝐷𝐸 𝐶𝐻𝐴𝑇 ໒꒱‧₊˚"))
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(
       txt(
-        `╰┈➤ **Requester:** <@${requesterId}>\n` +
-        `╰┈➤ **Accepted by:** <@${accepterId}>\n` +
+        `╰┈➤ **Requester:** <@${requesterId}>
+` +
+        `╰┈➤ **Accepted by:** <@${accepterId}>
+` +
         `╰┈➤ **Item Details:** ${details}`
       )
     )
@@ -260,7 +262,6 @@ function buildTradeChatBox({ requesterId, accepterId, details }) {
     .addActionRowComponents(new ActionRowBuilder().addComponents(btn));
 }
 
-// Cipta channel trade sementara dalam category yang ditetapkan
 async function createTradeChannel(guild, requesterId, accepter, details) {
   try {
     const safe = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 20) || "user";
@@ -276,10 +277,10 @@ async function createTradeChannel(guild, requesterId, accepter, details) {
     ];
 
     const overwrites = [
-      { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] }, // @everyone tak nampak
+      { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
       { id: accepter.id, allow: memberPerms },
       {
-        id: guild.client.user.id, // bot
+        id: guild.client.user.id,
         allow: [
           PermissionFlagsBits.ViewChannel,
           PermissionFlagsBits.SendMessages,
@@ -340,23 +341,25 @@ function rumbleLabel(currencyType) {
   return currencyType === "coins" ? "🪙 Plato Coins" : "💠 Pips";
 }
 
-// Container rumble yang masih terbuka (ada butang Join, kelabu)
 function rumbleOpenBox(game) {
   const joinBtn = new ButtonBuilder()
     .setCustomId(`join_rumble_${game.currencyType}_${game.totalPrize}`)
     .setLabel("🎟️ Join Rumble")
-    .setStyle(ButtonStyle.Secondary); // kelabu
+    .setStyle(ButtonStyle.Secondary);
 
   return info(
     "🌸・PlatoMy Rumble Arena",
-    `🎁 **Total Prize:** ${game.totalPrize.toLocaleString()} ${rumbleLabel(game.currencyType)}\n` +
-    `🏆 **Winners:** ${game.winnersCount}\n` +
-    `⏳ **Ends:** <t:${game.endTimeSeconds}:R>\n\n` +
+    `🎁 **Total Prize:** ${game.totalPrize.toLocaleString()} ${rumbleLabel(game.currencyType)}
+` +
+    `🏆 **Winners:** ${game.winnersCount}
+` +
+    `⏳ **Ends:** <t:${game.endTimeSeconds}:R>
+
+` +
     `👥 **Players:** ${game.participants.length}`
   ).addActionRowComponents(new ActionRowBuilder().addComponents(joinBtn));
 }
 
-// winnersCount = berapa ramai pemenang (hadiah dibahagi sama rata)
 async function createRumble(channel, currencyType, totalPrize, durationMins, winnersCount = 1) {
   const game = {
     currencyType,
@@ -388,7 +391,10 @@ async function runRumbleBattle(channel, msgId) {
 
   if (players.length === 0) {
     await edit(
-      info("🌸・Rumble Ended", `🎁 **Prize:** ${prizeText}\n🏆 **Winners:** No participants\n\n👥 **Players:** 0`)
+      info("🌸・Rumble Ended", `🎁 **Prize:** ${prizeText}
+🏆 **Winners:** No participants
+
+👥 **Players:** 0`)
     );
     await channel.send("😢 Rumble ended with no participants.").catch(() => {});
     return;
@@ -396,13 +402,14 @@ async function runRumbleBattle(channel, msgId) {
 
   let alive = [...players];
 
-  // Bertarung sehingga tinggal sebanyak bilangan pemenang
   if (alive.length > winnersCount) {
     await edit(
       info(
         "🌸・PlatoMy Rumble Arena",
-        `🔥 **The battle begins!**\n${players.length} players have entered the arena...` +
-        (winnersCount > 1 ? `\n🏆 Last **${winnersCount}** standing win!` : "")
+        `🔥 **The battle begins!**
+${players.length} players have entered the arena...` +
+        (winnersCount > 1 ? `
+🏆 Last **${winnersCount}** standing win!` : "")
       )
     );
     await sleep(5000);
@@ -428,14 +435,18 @@ async function runRumbleBattle(channel, msgId) {
       if (lines.length > shown.length) shown.push(`...and ${lines.length - shown.length} more fell in the chaos.`);
 
       await edit(
-        info("🌸・PlatoMy Rumble Arena", `⚔️ **Round ${round}**\n\n${shown.join("\n")}\n\n👥 **Players left:** ${alive.length}`)
+        info("🌸・PlatoMy Rumble Arena", `⚔️ **Round ${round}**
+
+${shown.join("
+")}
+
+👥 **Players left:** ${alive.length}`)
       );
       if (alive.length > winnersCount) await sleep(5000);
     }
     await sleep(2000);
   }
 
-  // Bahagi hadiah sama rata. Baki (kalau ada) diberi kepada pemenang pertama.
   const winners = alive;
   const share = Math.floor(game.totalPrize / winners.length);
   const remainder = game.totalPrize - share * winners.length;
@@ -456,7 +467,10 @@ async function runRumbleBattle(channel, msgId) {
   await edit(
     info(
       "🌸・Rumble Ended",
-      `🎁 **Prize:** ${prizeText}${shareText}\n🏆 **Winner${winners.length > 1 ? "s" : ""}:** ${winnerMentions}\n\n👥 **Players:** ${players.length}`
+      `🎁 **Prize:** ${prizeText}${shareText}
+🏆 **Winner${winners.length > 1 ? "s" : ""}:** ${winnerMentions}
+
+👥 **Players:** ${players.length}`
     )
   );
 
@@ -466,6 +480,75 @@ async function runRumbleBattle(channel, msgId) {
     await channel.send(
       `🏆 ${winnerMentions} won **${prizeText}** in PlatoMy Rumble!${shareText}`
     ).catch(() => {});
+  }
+}
+
+// ================= LEADERBOARD GENERATOR (PUPPETEER) =================
+
+async function generateLeaderboardImage() {
+  const browser = await puppeteer.launch({
+    headless: "new",
+    args: ["--no-sandbox", "--disable-setuid-sandbox"]
+  });
+
+  try {
+    const page = await browser.newPage();
+    await page.setViewport({ width: 640, height: 940, deviceScaleFactor: 2 });
+
+    // 1. Ambil & susun data top 10 mengikut EXP dari local Map 'wallets'
+    const sortedWallets = [...wallets.entries()]
+      .map(([id, data]) => ({ id, ...data }))
+      .sort((a, b) => b.exp - a.exp)
+      .slice(0, 10);
+
+    const formattedPlayers = [];
+    for (let i = 0; i < sortedWallets.length; i++) {
+      const p = sortedWallets[i];
+      let username = "Unknown User";
+      let avatarUrl = null;
+
+      // Cuba tarik data pengguna daripada cache Discord
+      try {
+        const user = await client.users.fetch(p.id);
+        username = user.username;
+        avatarUrl = user.displayAvatarURL({ extension: 'png', size: 64 });
+      } catch (err) {
+        // Jika gagal, kekalkan nama Unknown
+      }
+
+      // Kira progress bar (contoh 1000 EXP setiap level)
+      const level = Math.floor(p.exp / 1000) || 1;
+      const progressPercent = Math.floor(((p.exp % 1000) / 1000) * 100) || 0;
+
+      formattedPlayers.push({
+        rank: i + 1,
+        initials: username.substring(0, 2).toUpperCase(),
+        name: username,
+        exp: p.exp.toLocaleString(),
+        xp: progressPercent,
+        level: String(level).padStart(2, '0'),
+        avatarUrl: avatarUrl,
+        crown: i === 0
+      });
+    }
+
+    // 2. Baca template HTML
+    let htmlContent = fs.readFileSync(path.join(__dirname, "leaderboard.html"), "utf8");
+
+    // 3. Masukkan data dinamik ke dalam HTML
+    const finalHtml = htmlContent.replace("{{PLAYERS_DATA}}", JSON.stringify(formattedPlayers));
+
+    await page.setContent(finalHtml, { waitUntil: "networkidle0" });
+
+    // 4. Ambil screenshot
+    const imageBuffer = await page.screenshot({ type: "png", omitBackground: true });
+    return new AttachmentBuilder(imageBuffer, { name: "leaderboard.png" });
+
+  } catch (error) {
+    console.error("Gagal menjana gambar leaderboard:", error);
+    throw error;
+  } finally {
+    await browser.close();
   }
 }
 
@@ -515,10 +598,8 @@ app.get("/login", passport.authenticate("discord"));
 app.get("/discord/callback", passport.authenticate("discord", { failureRedirect: "/" }), (req, res) => { res.redirect("/"); });
 app.get("/logout", (req, res) => { req.logout(() => { res.redirect("/"); }); });
 
-// Logo (fail di repo bernama "public:logo.jpg.jpg")
 app.get("/logo.jpg", (req, res) => res.sendFile(path.join(__dirname, "public:logo.jpg.jpg")));
 
-// Halaman dashboard + API web
 registerDashboardApi({ app, client, wallets, getWallet, giveawaysMap, rumbleMap, createRumble });
 
 app.listen(PORT, () => {
@@ -543,6 +624,8 @@ const commands = [
     .addStringOption(opt => opt.setName("reason").setDescription("Sebab / Nota").setRequired(false)),
 
   new SlashCommandBuilder().setName("setup-trading").setDescription("Hantar panel PlatoMy Trading (Admin sahaja)"),
+
+  new SlashCommandBuilder().setName("setup-leaderboard").setDescription("Hantar mesej tapak Leaderboard (Admin sahaja)"),
 
   new SlashCommandBuilder().setName("embed-builder").setDescription("Cipta custom container interaktif (Admin sahaja)")
     .addChannelOption(opt => opt.setName("channel").setDescription("Pilih channel").setRequired(true)),
@@ -571,6 +654,32 @@ client.once(Events.ClientReady, async (c) => {
   } catch (error) {
     console.error("Gagal mendaftarkan slash commands:", error);
   }
+
+  // --- AUTOMATIC CRON JOB UNTUK UPDATE LEADERBOARD (Setiap 10 minit) ---
+  cron.schedule("*/10 * * * *", async () => {
+    try {
+      // Simpan konfigurasi channelId & messageId dalam file config ringkas
+      if (fs.existsSync("./leaderboard-config.json")) {
+        const config = JSON.parse(fs.readFileSync("./leaderboard-config.json", "utf8"));
+        const channel = await client.channels.fetch(config.channelId).catch(() => null);
+        if (channel) {
+          const message = await channel.messages.fetch(config.messageId).catch(() => null);
+          if (message) {
+            console.log("Mengemas kini automatic leaderboard...");
+            const attachment = await generateLeaderboardImage();
+            await message.edit({
+              content: `**Monthly Leaderboard**
+Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
+              files: [attachment]
+            });
+            console.log("✅ Automatic Leaderboard berjaya dikemas kini!");
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Ralat semasa auto-update leaderboard:", err);
+    }
+  });
 });
 
 // --- !wallet / !bank ---
@@ -585,7 +694,6 @@ client.on(Events.MessageCreate, async (message) => {
 // --- INTERACTIONS ---
 client.on(Events.InteractionCreate, async (interaction) => {
   try {
-    // ===== SLASH COMMANDS =====
     if (interaction.isChatInputCommand()) {
       const name = interaction.commandName;
 
@@ -670,6 +778,39 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return;
       }
 
+      if (name === "setup-leaderboard") {
+        if (!isAdmin(interaction)) {
+          return interaction.reply({ content: "❌ Anda tidak mempunyai kebenaran Administrator!", ephemeral: true });
+        }
+        await interaction.deferReply({ ephemeral: true });
+
+        // Hantar mesej kosong tapak leaderboard
+        const msg = await interaction.channel.send({
+          content: "📊 **Leaderboard PlatoMy sedang dijana... Sila tunggu sebentar.**"
+        });
+
+        // Simpan ID Mesej & Channel ke config
+        fs.writeFileSync("./leaderboard-config.json", JSON.stringify({
+          channelId: interaction.channel.id,
+          messageId: msg.id
+        }));
+
+        // Jana imej kali pertama
+        try {
+          const attachment = await generateLeaderboardImage();
+          await msg.edit({
+            content: `**Monthly Leaderboard**
+Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
+            files: [attachment]
+          });
+          await interaction.editReply({ content: "✅ Leaderboard berjaya ditubuhkan dan dikemas kini!" });
+        } catch (err) {
+          console.error(err);
+          await interaction.editReply({ content: "❌ Leaderboard tapak berjaya dihantar, tetapi gagal menjana gambar kali pertama. Pastikan fail `leaderboard.html` diletakkan di dalam folder bot." });
+        }
+        return;
+      }
+
       if (name === "embed-builder") {
         if (!isAdmin(interaction)) {
           return interaction.reply({ content: "❌ Anda tidak mempunyai kebenaran Administrator!", ephemeral: true });
@@ -749,7 +890,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.isButton()) {
       const id = interaction.customId;
 
-      // --- join rumble ---
       if (id.startsWith("join_rumble_")) {
         await interaction.deferReply({ ephemeral: true });
         const game = rumbleMap.get(interaction.message.id);
@@ -762,7 +902,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return;
       }
 
-      // --- buka borang tiket trading ---
       if (id === "open_trading_modal") {
         const modal = new ModalBuilder().setCustomId("trading_modal").setTitle("🛍️ PlatoMy Trading");
         const itemInput = new TextInputBuilder()
@@ -776,7 +915,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return;
       }
 
-      // --- Accept Trade ---
       if (id.startsWith("accept_trade:")) {
         const requesterId = id.split(":")[1];
         const hasTradeRole = interaction.member?.roles?.cache?.some(r => r.name.toLowerCase().includes(TRADE_ROLE_NAME));
@@ -794,11 +932,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         await interaction.deferUpdate();
 
-        // Baca butiran item daripada teks dalam container
         const infoText = collectText(interaction.message.components).find(t => t.includes("**Item Details:**")) || "";
         const item = infoText.split("**Item Details:**")[1]?.trim() || "-";
 
-        // Buka channel trade sementara
         const tradeChannel = await createTradeChannel(interaction.guild, requesterId, interaction.user, item);
 
         await interaction.editReply({
@@ -827,10 +963,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
             components: [
               info(
                 "🛍️ Trading Log: Trade Accepted",
-                `📥 **Requester:** <@${requesterId}> (\`${requesterId}\`)\n` +
-                `🤝 **Accepted by:** ${interaction.user} (\`${interaction.user.id}\`)\n` +
-                (tradeChannel ? `📍 **Trade Channel:** ${tradeChannel}\n` : "") +
-                `\n📝 **Item:**\n${item}`,
+                `📥 **Requester:** <@${requesterId}> (\`${requesterId}\`)
+` +
+                `🤝 **Accepted by:** ${interaction.user} (\`${interaction.user.id}\`)
+` +
+                (tradeChannel ? `📍 **Trade Channel:** ${tradeChannel}
+` : "") +
+                `
+📝 **Item:**
+${item}`,
                 `Trading Log • Today at ${getMalaysiaTime()}`
               ),
             ],
@@ -841,7 +982,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return;
       }
 
-      // --- Close Trade (dalam channel trade sementara) ---
       if (id.startsWith("close_trade:")) {
         const accepterId = id.split(":")[1];
 
@@ -864,8 +1004,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
             components: [
               info(
                 "🛍️ Trading Log: Trade Closed",
-                `🔒 **Closed by:** ${interaction.user} (\`${interaction.user.id}\`)\n` +
-                `🤝 **Accepted by:** <@${accepterId}>\n` +
+                `🔒 **Closed by:** ${interaction.user} (\`${interaction.user.id}\`)
+` +
+                `🤝 **Accepted by:** <@${accepterId}>
+` +
                 `📍 **Channel:** ${channelName}`,
                 `Trading Log • Today at ${getMalaysiaTime()}`
               ),
@@ -885,7 +1027,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     // ===== MODAL =====
     if (interaction.isModalSubmit()) {
-      // --- tiket trading ---
       if (interaction.customId === "trading_modal") {
         const details = interaction.fields.getTextInputValue("trading_text").trim();
         if (!details) {
@@ -897,7 +1038,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
           return interaction.reply({ content: "❌ The trading-list channel was not found.", ephemeral: true });
         }
 
-        // Ping role @trader bila ada list baru
         const traderRole = interaction.guild.roles.cache.find(r => r.name.toLowerCase().includes(TRADER_ROLE_NAME));
 
         const sent = await listChannel.send({
@@ -920,8 +1060,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
             components: [
               info(
                 "🛍️ Trading Log: New Request",
-                `👤 **Requester:** ${interaction.user} (\`${interaction.user.id}\`)\n\n` +
-                `📝 **Item:**\n${details}`,
+                `👤 **Requester:** ${interaction.user} (\`${interaction.user.id}\`)
+
+` +
+                `📝 **Item:**
+${details}`,
                 `Trading Log • Today at ${getMalaysiaTime()}`
               ),
             ],
@@ -932,7 +1075,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return;
       }
 
-      // --- container builder ---
       if (interaction.customId.startsWith("embed_builder:")) {
         const channelId = interaction.customId.split(":")[1];
         const targetChannel = await interaction.guild.channels.fetch(channelId).catch(() => null);
