@@ -30,7 +30,7 @@ import { Strategy as DiscordStrategy } from "passport-discord";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
-import puppeteer from "puppeteer";
+import puppeteer from "puppeteer-core"; // Ditukar kepada puppeteer-core untuk kestabilan Wispbyte
 import cron from "node-cron";
 import { registerDashboardApi } from "./dashboard-api.js";
 import { loadWallets, startAutosave } from "./db.js";
@@ -487,8 +487,10 @@ ${shown.join("
 
 async function generateLeaderboardImage() {
   const browser = await puppeteer.launch({
+    // Ditukar untuk menggunakan Chrome sistem yang dipasang di pelayan Linux Wispbyte
+    executablePath: "/usr/bin/google-chrome" || "/usr/bin/chromium-browser",
     headless: "new",
-    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
+    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"]
   });
 
   try {
