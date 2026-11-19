@@ -30,7 +30,7 @@ import { Strategy as DiscordStrategy } from "passport-discord";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
-import puppeteer from "puppeteer-core"; // Ditukar kepada puppeteer-core untuk kestabilan Wispbyte
+import puppeteer from "puppeteer"; // Ditukar semula kepada puppeteer biasa untuk muat turun automatik
 import cron from "node-cron";
 import { registerDashboardApi } from "./dashboard-api.js";
 import { loadWallets, startAutosave } from "./db.js";
@@ -80,11 +80,28 @@ const LOG_CHANNEL_IDS = {
   [TRADING_LOG_CHANNEL_NAME]: "1569585956439461908", // ticket (trading) log baharu
 };
 
-const TRADE_MEDIA_URLS = [
-  "https://cdn.discordapp.com/attachments/1556946394239991848/1562348900705374259/IMG_6986.gif?ex=6aeec24c&is=6aed70cc&hm=b4094237e998531634199814f373fd7d8827c9aa8dbb8d0ec626aeb70ca092e5&",
-  "https://cdn.discordapp.com/attachments/1556946394239991848/1567858191537279016/20261105_190812_0000.png?ex=6aee5dfa&is=6aed0c7a&hm=703dd68300d271f1087bbbc0b932f49a379a78b33f00cdbef8a9f4ac80fd74c0&",
-  "https://cdn.discordapp.com/attachments/1556946394239991848/1562348900705374259/IMG_6986.gif?ex=6aeec24c&is=6aed70cc&hm=b4094237e998531634199814f373fd7d8827c9aa8dbb8d0ec626aeb70ca092e5&",
-];
+// URL Dipecahkan kepada bahagian kecil agar selamat daripada 'Auto-Wrap' Wispbyte
+const URL_1 = "https://cdn.discordapp.com/attachments/155694639423" +
+              "9991848/" +
+              "15623489007053" +
+              "74259/IMG_6986.gif?ex=6aeec24c&is" +
+              "=6aed70cc&" +
+              "hm=b4094237e9" +
+              "98531634199814f373fd7d882" +
+              "7c9aa8dbb8d0ec626aeb70ca092e5" +
+              "&";
+
+const URL_2 = "https://cdn.discordapp.com/attachments/1556" +
+              "946394239991848/" +
+              "1567" +
+              "858191537279016/20261105" +
+              "_190812_0000.png?ex=6aee5dfa&" +
+              "is=6aed0c7a&hm=703dd683" +
+              "00d271f1087bbbc0b932f49a37" +
+              "9a78b33f00cdbef8a9f4ac80fd74c" +
+              "0&";
+
+const TRADE_MEDIA_URLS = [URL_1, URL_2, URL_1];
 
 const isAdmin = (i) => i.member?.permissions?.has(PermissionFlagsBits.Administrator);
 const isUrl = (u) => /^https?:\/\/\S+$/i.test(String(u || "").trim());
@@ -486,55 +503,83 @@ ${shown.join("\
 
 async function generateLeaderboardImage() {
   const browser = await puppeteer.launch({
-    executablePath: "/usr/bin/google-chrome" || "/usr/bin/chromium-browser",
+    // Laluan 'executablePath' dibuang sepenuhnya supaya Puppeteer memuat turun Chromium tersendiri yang serasi
     headless: "new",
     args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"]
   });
 
   try {
     const page = await browser.newPage();
-    await page.setViewport({ width: 640, height: 940, deviceScaleFactor: 2 });
+    // Lebarkan viewport kepada 1100px untuk memuatkan dua lajur dengan selesa
+    await page.setViewport({ width: 1100, height: 740, deviceScaleFactor: 2 });
 
-    const sortedWallets = [...wallets.entries()]
-      .map(([id, data]) => ({ id, ...data }))
-      .sort((a, b) => b.exp - a.exp)
-      .slice(0, 10);
+    const allWallets = [...wallets.entries()].map(([id, data]) => ({ id, ...data }));
 
-    const formattedPlayers = [];
-    for (let i = 0; i < sortedWallets.length; i++) {
-      const p = sortedWallets[i];
+    // 1. Susun Kedudukan EXP (XP Players)
+    const sortedXp = [...allWallets].sort((a, b) => b.exp - a.exp).slice(0, 10);
+    const xpPlayers = [];
+
+    // 2. Susun Kedudukan Sponsor (Sponsor Players)
+    const sortedSponsor = [...allWallets].sort((a, b) => b.sponsorTotal - a.sponsorTotal).slice(0, 10);
+    const sponsorPlayers = [];
+
+    // Fungsi pembantu untuk memformat data pengguna Discord
+    const formatUser = async (p, index, type) => {
       let username = "Unknown User";
       let avatarUrl = null;
-
       try {
         const user = await client.users.fetch(p.id);
         username = user.username;
         avatarUrl = user.displayAvatarURL({ extension: 'png', size: 64 });
       } catch (err) {}
 
-      const level = Math.floor(p.exp / 1000) || 1;
-      const progressPercent = Math.floor(((p.exp % 1000) / 1000) * 100) || 0;
+      if (type === "xp") {
+        const level = Math.floor(p.exp / 1000) || 1;
+        return {
+          rank: index + 1,
+          initials: username.substring(0, 2).toUpperCase(),
+          name: username,
+          subText: `${p.exp.toLocaleString()} EXP`,
+          badgeText: `LVL ${String(level).padStart(2, '0')}`,
+          avatarUrl: avatarUrl
+        };
+      } else {
+        return {
+          rank: index + 1,
+          initials: username.substring(0, 2).toUpperCase(),
+          name: username,
+          subText: `Sponsor Rank`,
+          badgeText: `🌸 ${p.sponsorTotal.toLocaleString()}`,
+          avatarUrl: avatarUrl
+        };
+      }
+    };
 
-      formattedPlayers.push({
-        rank: i + 1,
-        initials: username.substring(0, 2).toUpperCase(),
-        name: username,
-        exp: p.exp.toLocaleString(),
-        xp: progressPercent,
-        level: String(level).padStart(2, '0'),
-        avatarUrl: avatarUrl,
-        crown: i === 0
-      });
+    // Pakejkan data EXP
+    for (let i = 0; i < sortedXp.length; i++) {
+      xpPlayers.push(await formatUser(sortedXp[i], i, "xp"));
     }
 
+    // Pakejkan data Sponsor
+    for (let i = 0; i < sortedSponsor.length; i++) {
+      sponsorPlayers.push(await formatUser(sortedSponsor[i], i, "sponsor"));
+    }
+
+    // 3. Baca fail template HTML
     let htmlContent = fs.readFileSync(path.join(__dirname, "leaderboard.html"), "utf8");
-    const finalHtml = htmlContent.replace("{{PLAYERS_DATA}}", JSON.stringify(formattedPlayers));
+
+    // 4. Masukkan struktur data dua lajur ke dalam HTML
+    const finalData = { xpPlayers, sponsorPlayers };
+    const finalHtml = htmlContent.replace("{{PLAYERS_DATA}}", JSON.stringify(finalData));
+
     await page.setContent(finalHtml, { waitUntil: "networkidle0" });
+
+    // 5. Ambil screenshot
     const imageBuffer = await page.screenshot({ type: "png", omitBackground: true });
     return new AttachmentBuilder(imageBuffer, { name: "leaderboard.png" });
 
   } catch (error) {
-    console.error("Gagal menjana gambar leaderboard:", error);
+    console.error("Gagal menjana gambar leaderboard berkembar:", error);
     throw error;
   } finally {
     await browser.close();
