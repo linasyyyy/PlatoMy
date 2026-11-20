@@ -30,7 +30,7 @@ import { Strategy as DiscordStrategy } from "passport-discord";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
-import puppeteer from "puppeteer"; // Ditukar semula kepada puppeteer biasa untuk muat turun automatik
+import { createCanvas, loadImage } from "@napi-rs/canvas";
 import cron from "node-cron";
 import { registerDashboardApi } from "./dashboard-api.js";
 import { loadWallets, startAutosave } from "./db.js";
@@ -53,7 +53,7 @@ const client = new Client({
 });
 
 const wallets = new Map();
-const giveawaysMap = new Map(); // kosong, diperlukan oleh dashboard-api.js
+const giveawaysMap = new Map();
 const rumbleMap = new Map();
 const acceptedTrades = new Set();
 
@@ -62,44 +62,31 @@ function getWallet(id) {
   return wallets.get(id);
 }
 
-// Muat data dari PostgreSQL dan autosave (perlu DATABASE_URL di Railway)
 await loadWallets(wallets);
 startAutosave(wallets);
 
-// --- TETAPAN BOT ---
+// --- BOT SETTINGS ---
 const WALLET_LOG_CHANNEL_NAME = "wallet-log";
-const TRADING_LIST_CHANNEL_NAME = "trading-list"; // channel permintaan item (private untuk role Trade)
-const TRADING_LOG_CHANNEL_NAME = "trading-log";   // log: requester + accepter
-const TRADE_ROLE_NAME = "trade";                  // role yang boleh Accept Trade (nama mengandungi perkataan ini)
-const TRADER_ROLE_NAME = "trader";                // role yang di-ping bila ada trading list baru
-const TRADE_CATEGORY_ID = "1567527038368223332";  // category untuk channel trade sementara
+const TRADING_LIST_CHANNEL_NAME = "trading-list";
+const TRADING_LOG_CHANNEL_NAME = "trading-log";
+const TRADE_ROLE_NAME = "trade";
+const TRADER_ROLE_NAME = "trader";
+const TRADE_CATEGORY_ID = "1567527038368223332";
 
-// ID channel log baharu (kalau ID tak dijumpai, bot cari ikut nama channel seperti dulu)
 const LOG_CHANNEL_IDS = {
-  [WALLET_LOG_CHANNEL_NAME]: "1569585830224461884",  // wallet log baharu
-  [TRADING_LOG_CHANNEL_NAME]: "1569585956439461908", // ticket (trading) log baharu
+  [WALLET_LOG_CHANNEL_NAME]: "1569585830224461884",
+  [TRADING_LOG_CHANNEL_NAME]: "1569585956439461908",
 };
 
-// URL Dipecahkan kepada bahagian kecil agar selamat daripada 'Auto-Wrap' Wispbyte
-const URL_1 = "https://cdn.discordapp.com/attachments/155694639423" +
-              "9991848/" +
-              "15623489007053" +
-              "74259/IMG_6986.gif?ex=6aeec24c&is" +
-              "=6aed70cc&" +
-              "hm=b4094237e9" +
-              "98531634199814f373fd7d882" +
-              "7c9aa8dbb8d0ec626aeb70ca092e5" +
-              "&";
+const URL_1 =
+  "https://cdn.discordapp.com/attachments/1556946394239991848/" +
+  "1562348900705374259/IMG_6986.gif?ex=6aeec24c&is=6aed70cc&" +
+  "hm=b4094237e998531634199814f373fd7d8827c9aa8dbb8d0ec626aeb70ca092e5&";
 
-const URL_2 = "https://cdn.discordapp.com/attachments/1556" +
-              "946394239991848/" +
-              "1567" +
-              "858191537279016/20261105" +
-              "_190812_0000.png?ex=6aee5dfa&" +
-              "is=6aed0c7a&hm=703dd683" +
-              "00d271f1087bbbc0b932f49a37" +
-              "9a78b33f00cdbef8a9f4ac80fd74c" +
-              "0&";
+const URL_2 =
+  "https://cdn.discordapp.com/attachments/1556946394239991848/" +
+  "1567858191537279016/20261105_190812_0000.png?ex=6aee5dfa&" +
+  "is=6aed0c7a&hm=703dd68300d271f1087bbbc0b932f49a379a78b33f00cdbef8a9f4ac80fd74c0&";
 
 const TRADE_MEDIA_URLS = [URL_1, URL_2, URL_1];
 
@@ -218,7 +205,8 @@ function buildTradePanel(listRef) {
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(
       txt(
-        "╰┈➤ Click the **Trading Ticket** button below to look for or trade your Plato items. " +
+        "╰┈➤ Click the **Trading Ticket** button below to look for or trade your Plato items.
+" +
         `╰┈➤ Your trade request will be posted automatically in ${listRef}.`
       )
     )
@@ -453,7 +441,7 @@ ${players.length} players have entered the arena...` +
       await edit(
         info("🌸・PlatoMy Rumble Arena", `⚔️ **Round ${round}**
 
-${shown.join("\
+${shown.join("
 ")}
 
 👥 **Players left:** ${alive.length}`)
@@ -499,94 +487,293 @@ ${shown.join("\
   }
 }
 
-// ================= LEADERBOARD GENERATOR (PUPPETEER) =================
+// ================= LEADERBOARD GENERATOR (@napi-rs/canvas) =================
 
-async function generateLeaderboardImage() {
-  const browser = await puppeteer.launch({
-    // Laluan 'executablePath' dibuang sepenuhnya supaya Puppeteer memuat turun Chromium tersendiri yang serasi
-    headless: "new",
-    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"]
-  });
-
-  try {
-    const page = await browser.newPage();
-    // Lebarkan viewport kepada 1100px untuk memuatkan dua lajur dengan selesa
-    await page.setViewport({ width: 1100, height: 740, deviceScaleFactor: 2 });
-
-    const allWallets = [...wallets.entries()].map(([id, data]) => ({ id, ...data }));
-
-    // 1. Susun Kedudukan EXP (XP Players)
-    const sortedXp = [...allWallets].sort((a, b) => b.exp - a.exp).slice(0, 10);
-    const xpPlayers = [];
-
-    // 2. Susun Kedudukan Sponsor (Sponsor Players)
-    const sortedSponsor = [...allWallets].sort((a, b) => b.sponsorTotal - a.sponsorTotal).slice(0, 10);
-    const sponsorPlayers = [];
-
-    // Fungsi pembantu untuk memformat data pengguna Discord
-    const formatUser = async (p, index, type) => {
-      let username = "Unknown User";
-      let avatarUrl = null;
-      try {
-        const user = await client.users.fetch(p.id);
-        username = user.username;
-        avatarUrl = user.displayAvatarURL({ extension: 'png', size: 64 });
-      } catch (err) {}
-
-      if (type === "xp") {
-        const level = Math.floor(p.exp / 1000) || 1;
-        return {
-          rank: index + 1,
-          initials: username.substring(0, 2).toUpperCase(),
-          name: username,
-          subText: `${p.exp.toLocaleString()} EXP`,
-          badgeText: `LVL ${String(level).padStart(2, '0')}`,
-          avatarUrl: avatarUrl
-        };
-      } else {
-        return {
-          rank: index + 1,
-          initials: username.substring(0, 2).toUpperCase(),
-          name: username,
-          subText: `Sponsor Rank`,
-          badgeText: `🌸 ${p.sponsorTotal.toLocaleString()}`,
-          avatarUrl: avatarUrl
-        };
-      }
-    };
-
-    // Pakejkan data EXP
-    for (let i = 0; i < sortedXp.length; i++) {
-      xpPlayers.push(await formatUser(sortedXp[i], i, "xp"));
-    }
-
-    // Pakejkan data Sponsor
-    for (let i = 0; i < sortedSponsor.length; i++) {
-      sponsorPlayers.push(await formatUser(sortedSponsor[i], i, "sponsor"));
-    }
-
-    // 3. Baca fail template HTML
-    let htmlContent = fs.readFileSync(path.join(__dirname, "leaderboard.html"), "utf8");
-
-    // 4. Masukkan struktur data dua lajur ke dalam HTML
-    const finalData = { xpPlayers, sponsorPlayers };
-    const finalHtml = htmlContent.replace("{{PLAYERS_DATA}}", JSON.stringify(finalData));
-
-    await page.setContent(finalHtml, { waitUntil: "networkidle0" });
-
-    // 5. Ambil screenshot
-    const imageBuffer = await page.screenshot({ type: "png", omitBackground: true });
-    return new AttachmentBuilder(imageBuffer, { name: "leaderboard.png" });
-
-  } catch (error) {
-    console.error("Gagal menjana gambar leaderboard berkembar:", error);
-    throw error;
-  } finally {
-    await browser.close();
-  }
+function drawRoundRect(ctx, x, y, w, h, r, fill = true, stroke = false) {
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, r);
+  ctx.closePath();
+  if (fill) ctx.fill();
+  if (stroke) ctx.stroke();
 }
 
-// --- INTEGRASI WEB DASHBOARD & PASSPORT ---
+async function generateLeaderboardImage() {
+  const width = 1200;
+  const height = 860;
+  const canvas = createCanvas(width, height);
+  const ctx = canvas.getContext("2d");
+
+  // 1. Base Dark Glassmorphic Card Background
+  const bgGrad = ctx.createLinearGradient(0, 0, width, height);
+  bgGrad.addColorStop(0, "#12121a");
+  bgGrad.addColorStop(1, "#09090d");
+  ctx.fillStyle = bgGrad;
+  drawRoundRect(ctx, 10, 10, width - 20, height - 20, 28, true, false);
+
+  // 2. Ambient Pink Glow Orbs
+  const orb1 = ctx.createRadialGradient(200, 130, 10, 200, 130, 320);
+  orb1.addColorStop(0, "rgba(249, 150, 177, 0.18)");
+  orb1.addColorStop(1, "rgba(249, 150, 177, 0)");
+  ctx.fillStyle = orb1;
+  ctx.fillRect(10, 10, width - 20, height - 20);
+
+  const orb2 = ctx.createRadialGradient(width - 200, height - 130, 10, width - 200, height - 130, 320);
+  orb2.addColorStop(0, "rgba(249, 150, 177, 0.15)");
+  orb2.addColorStop(1, "rgba(249, 150, 177, 0)");
+  ctx.fillStyle = orb2;
+  ctx.fillRect(10, 10, width - 20, height - 20);
+
+  // Outer Glowing Pink Border
+  ctx.strokeStyle = "rgba(249, 150, 177, 0.4)";
+  ctx.lineWidth = 2;
+  drawRoundRect(ctx, 10, 10, width - 20, height - 20, 28, false, true);
+
+  // 3. Header Section
+  // Top Pill Badge
+  ctx.fillStyle = "rgba(249, 150, 177, 0.12)";
+  ctx.strokeStyle = "rgba(249, 150, 177, 0.45)";
+  ctx.lineWidth = 1;
+  drawRoundRect(ctx, width / 2 - 75, 32, 150, 24, 12, true, true);
+
+  ctx.fillStyle = "#F996B1";
+  ctx.font = "bold 12px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("✦ PLATOMY ✦", width / 2, 48);
+
+  // Main Title with Pink-White Gradient
+  const titleGrad = ctx.createLinearGradient(width / 2 - 220, 0, width / 2 + 220, 0);
+  titleGrad.addColorStop(0, "#FFFFFF");
+  titleGrad.addColorStop(0.5, "#F996B1");
+  titleGrad.addColorStop(1, "#FFFFFF");
+  ctx.fillStyle = titleGrad;
+  ctx.font = "900 32px serif";
+  ctx.fillText("MONTHLY LEADERBOARD", width / 2, 88);
+
+  // Divider Line
+  const divGrad = ctx.createLinearGradient(100, 0, width - 100, 0);
+  divGrad.addColorStop(0, "rgba(249, 150, 177, 0)");
+  divGrad.addColorStop(0.5, "rgba(249, 150, 177, 0.55)");
+  divGrad.addColorStop(1, "rgba(249, 150, 177, 0)");
+  ctx.strokeStyle = divGrad;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(100, 108);
+  ctx.lineTo(width - 100, 108);
+  ctx.stroke();
+
+  // 4. Prepare Data from Wallets Map
+  const allWallets = [...wallets.entries()].map(([id, data]) => ({ id, ...data }));
+  const sortedXp = [...allWallets].sort((a, b) => b.exp - a.exp).slice(0, 10);
+  const sortedSponsor = [...allWallets].sort((a, b) => b.sponsorTotal - a.sponsorTotal).slice(0, 10);
+
+  // Pad up to 10 rows so the board always looks full and balanced
+  while (sortedXp.length < 10) sortedXp.push({ id: null, exp: 0, sponsorTotal: 0 });
+  while (sortedSponsor.length < 10) sortedSponsor.push({ id: null, exp: 0, sponsorTotal: 0 });
+
+  const fetchPlayerInfo = async (entry) => {
+    if (!entry.id) return { username: "Empty Slot", initials: "--", avatarUrl: null };
+    try {
+      const user = await client.users.fetch(entry.id);
+      const name = user.username || "User";
+      return {
+        username: name,
+        initials: name.substring(0, 2).toUpperCase(),
+        avatarUrl: user.displayAvatarURL({ extension: "png", size: 64 }),
+      };
+    } catch {
+      return { username: "Unknown", initials: "UN", avatarUrl: null };
+    }
+  };
+
+  // 5. Helper to Draw Each Column (Left = EXP, Right = Sponsor)
+  const drawColumn = async (title, entries, startX, type) => {
+    const colWidth = 540;
+
+    // Column Header Accent Bar + Title
+    ctx.fillStyle = "#F996B1";
+    ctx.fillRect(startX, 126, 4, 18);
+    ctx.font = "bold 15px sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText(title, startX + 12, 140);
+
+    let y = 156;
+    const rowH = 56;
+
+    for (let i = 0; i < 10; i++) {
+      const rank = i + 1;
+      const entry = entries[i];
+      const info = await fetchPlayerInfo(entry);
+
+      // Row Card Background & Border
+      if (rank === 1) {
+        const r1Grad = ctx.createLinearGradient(startX, y, startX + colWidth, y);
+        r1Grad.addColorStop(0, "rgba(249, 150, 177, 0.22)");
+        r1Grad.addColorStop(0.65, "rgba(20, 20, 28, 0.78)");
+        ctx.fillStyle = r1Grad;
+        ctx.strokeStyle = "#F996B1";
+        ctx.lineWidth = 1.5;
+      } else if (rank <= 3) {
+        ctx.fillStyle = "rgba(24, 24, 34, 0.7)";
+        ctx.strokeStyle = "rgba(249, 150, 177, 0.35)";
+        ctx.lineWidth = 1;
+      } else {
+        ctx.fillStyle = "rgba(20, 20, 28, 0.55)";
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+        ctx.lineWidth = 1;
+      }
+      drawRoundRect(ctx, startX, y, colWidth, rowH, 12, true, true);
+
+      // Rank #
+      ctx.font = rank === 1 ? "900 17px sans-serif" : "bold 15px sans-serif";
+      ctx.fillStyle = rank === 1 ? "#F996B1" : rank <= 3 ? "#FFFFFF" : "rgba(255, 255, 255, 0.45)";
+      ctx.textAlign = "center";
+      ctx.fillText(`#${rank}`, startX + 28, y + 34);
+
+      // Avatar Circle + Crystal Border
+      const avX = startX + 72;
+      const avY = y + rowH / 2;
+      const avR = 18;
+
+      ctx.beginPath();
+      ctx.arc(avX, avY, avR + 1.5, 0, Math.PI * 2);
+      ctx.fillStyle = "#F996B1";
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(avX, avY, avR, 0, Math.PI * 2);
+      ctx.fillStyle = "#181822";
+      ctx.fill();
+
+      let drewAvatar = false;
+      if (info.avatarUrl) {
+        try {
+          const img = await loadImage(info.avatarUrl);
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(avX, avY, avR, 0, Math.PI * 2);
+          ctx.clip();
+          ctx.drawImage(img, avX - avR, avY - avR, avR * 2, avR * 2);
+          ctx.restore();
+          drewAvatar = true;
+        } catch {}
+      }
+
+      if (!drewAvatar) {
+        ctx.fillStyle = "#FFFFFF";
+        ctx.font = "bold 12px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(info.initials, avX, avY + 4);
+      }
+
+      // Player Name & Subtitle
+      ctx.textAlign = "left";
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = "bold 14px sans-serif";
+      const displayName = info.username.length > 14 ? info.username.slice(0, 14) + "…" : info.username;
+      ctx.fillText(displayName, startX + 102, y + 24);
+
+      ctx.fillStyle = "#F996B1";
+      ctx.font = "bold 11px sans-serif";
+      if (type === "xp") {
+        ctx.fillText(`${entry.exp.toLocaleString()} EXP`, startX + 102, y + 41);
+
+        // Progress Bar (XP Column)
+        const xpPct = Math.min(100, Math.floor(((entry.exp % 1000) / 1000) * 100));
+        const barX = startX + 245;
+        const barW = 175;
+        const barY = y + 31;
+
+        ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+        ctx.font = "10px sans-serif";
+        ctx.fillText("XP Progress", barX, y + 23);
+        ctx.textAlign = "right";
+        ctx.fillText(`${xpPct}%`, barX + barW, y + 23);
+
+        ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+        drawRoundRect(ctx, barX, barY, barW, 7, 4, true, false);
+
+        if (xpPct > 0) {
+          const fillGrad = ctx.createLinearGradient(barX, 0, barX + barW, 0);
+          fillGrad.addColorStop(0, "#F996B1");
+          fillGrad.addColorStop(1, "#ffd1df");
+          ctx.fillStyle = fillGrad;
+          drawRoundRect(ctx, barX, barY, Math.max(8, (barW * xpPct) / 100), 7, 4, true, false);
+        }
+
+        // Level Badge
+        const level = entry.id ? Math.floor(entry.exp / 1000) + 1 : 0;
+        const badgeX = startX + colWidth - 88;
+        ctx.fillStyle = "rgba(249, 150, 177, 0.14)";
+        ctx.strokeStyle = "rgba(249, 150, 177, 0.45)";
+        ctx.lineWidth = 1;
+        drawRoundRect(ctx, badgeX, y + 14, 74, 28, 8, true, true);
+
+        ctx.fillStyle = "#FFFFFF";
+        ctx.font = "bold 12px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(`LVL ${String(level).padStart(2, "0")}`, badgeX + 37, y + 32);
+      } else {
+        ctx.fillText("Community Sponsor", startX + 102, y + 41);
+
+        // Sponsor Progress Bar (Visual relative to Top Sponsor)
+        const maxSponsor = Math.max(1, entries[0]?.sponsorTotal || 1);
+        const spPct = entry.sponsorTotal > 0 ? Math.min(100, Math.round((entry.sponsorTotal / maxSponsor) * 100)) : 0;
+        const barX = startX + 245;
+        const barW = 165;
+        const barY = y + 31;
+
+        ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+        ctx.font = "10px sans-serif";
+        ctx.fillText("Contribution", barX, y + 23);
+        ctx.textAlign = "right";
+        ctx.fillText(`${spPct}%`, barX + barW, y + 23);
+
+        ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+        drawRoundRect(ctx, barX, barY, barW, 7, 4, true, false);
+
+        if (spPct > 0) {
+          const fillGrad = ctx.createLinearGradient(barX, 0, barX + barW, 0);
+          fillGrad.addColorStop(0, "#F996B1");
+          fillGrad.addColorStop(1, "#ffd1df");
+          ctx.fillStyle = fillGrad;
+          drawRoundRect(ctx, barX, barY, Math.max(8, (barW * spPct) / 100), 7, 4, true, false);
+        }
+
+        // Sponsor Total Badge
+        const badgeX = startX + colWidth - 98;
+        ctx.fillStyle = "rgba(249, 150, 177, 0.14)";
+        ctx.strokeStyle = "rgba(249, 150, 177, 0.45)";
+        ctx.lineWidth = 1;
+        drawRoundRect(ctx, badgeX, y + 14, 84, 28, 8, true, true);
+
+        ctx.fillStyle = "#FFFFFF";
+        ctx.font = "bold 12px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(`🌸 ${entry.sponsorTotal.toLocaleString()}`, badgeX + 42, y + 32);
+      }
+
+      y += rowH + 8;
+    }
+  };
+
+  await drawColumn("XP & LEVELS RANKINGS", sortedXp, 42, "xp");
+  await drawColumn("SPONSOR TOTAL RANKINGS", sortedSponsor, 618, "sponsor");
+
+  // 6. Footer
+  ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+  ctx.font = "bold 11px sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText("AUTO-UPDATE SETIAP 10 MINIT", 42, height - 28);
+
+  ctx.textAlign = "right";
+  ctx.fillStyle = "#F996B1";
+  ctx.fillText("POWERED BY PLATOMY", width - 42, height - 28);
+
+  const imageBuffer = canvas.toBuffer("image/png");
+  return new AttachmentBuilder(imageBuffer, { name: "leaderboard.png" });
+}
+
+// --- WEB DASHBOARD & PASSPORT ---
 const app = express();
 const PORT = process.env.PORT || 8080;
 
@@ -629,8 +816,14 @@ passport.use(
 );
 
 app.get("/login", passport.authenticate("discord"));
-app.get("/discord/callback", passport.authenticate("discord", { failureRedirect: "/" }), (req, res) => { res.redirect("/"); });
-app.get("/logout", (req, res) => { req.logout(() => { res.redirect("/"); }); });
+app.get("/discord/callback", passport.authenticate("discord", { failureRedirect: "/" }), (req, res) => {
+  res.redirect("/");
+});
+app.get("/logout", (req, res) => {
+  req.logout(() => {
+    res.redirect("/");
+  });
+});
 
 app.get("/logo.jpg", (req, res) => res.sendFile(path.join(__dirname, "public:logo.jpg.jpg")));
 
@@ -644,18 +837,26 @@ app.listen(PORT, () => {
 const commands = [
   new SlashCommandBuilder().setName("wallet").setDescription("Semak baki akaun PlatoMy • Wallet anda! 🏦"),
 
-  new SlashCommandBuilder().setName("admin-wallet").setDescription("Urus baki akaun PlatoMy • Wallet ahli (Admin sahaja)")
-    .addStringOption(opt => opt.setName("action").setDescription("Tindakan").setRequired(true).addChoices(
-      { name: "Add Sponsor", value: "add_sponsor" },
-      { name: "Add Coins", value: "add_coins" },
-      { name: "Deduct Coins", value: "deduct_coins" },
-      { name: "Add Pips", value: "add_pips" },
-      { name: "Deduct Pips", value: "deduct_pips" },
-      { name: "Check", value: "check" }
-    ))
-    .addUserOption(opt => opt.setName("target").setDescription("Ahli / Penaja").setRequired(true))
-    .addIntegerOption(opt => opt.setName("amount").setDescription("Jumlah").setRequired(true))
-    .addStringOption(opt => opt.setName("reason").setDescription("Sebab / Nota").setRequired(false)),
+  new SlashCommandBuilder()
+    .setName("admin-wallet")
+    .setDescription("Urus baki akaun PlatoMy • Wallet ahli (Admin sahaja)")
+    .addStringOption((opt) =>
+      opt
+        .setName("action")
+        .setDescription("Tindakan")
+        .setRequired(true)
+        .addChoices(
+          { name: "Add Sponsor", value: "add_sponsor" },
+          { name: "Add Coins", value: "add_coins" },
+          { name: "Deduct Coins", value: "deduct_coins" },
+          { name: "Add Pips", value: "add_pips" },
+          { name: "Deduct Pips", value: "deduct_pips" },
+          { name: "Check", value: "check" }
+        )
+    )
+    .addUserOption((opt) => opt.setName("target").setDescription("Ahli / Penaja").setRequired(true))
+    .addIntegerOption((opt) => opt.setName("amount").setDescription("Jumlah").setRequired(true))
+    .addStringOption((opt) => opt.setName("reason").setDescription("Sebab / Nota").setRequired(false)),
 
   new SlashCommandBuilder().setName("setup-trading").setDescription("Hantar panel PlatoMy Trading (Admin sahaja)"),
 
@@ -663,23 +864,37 @@ const commands = [
 
   new SlashCommandBuilder().setName("reset-leaderboard").setDescription("Set semula (reset) semua EXP ahli kepada 0 (Admin sahaja)"),
 
-  new SlashCommandBuilder().setName("embed-builder").setDescription("Cipta custom container interaktif (Admin sahaja)")
-    .addChannelOption(opt => opt.setName("channel").setDescription("Pilih channel").setRequired(true)),
+  new SlashCommandBuilder()
+    .setName("embed-builder")
+    .setDescription("Cipta custom container interaktif (Admin sahaja)")
+    .addChannelOption((opt) => opt.setName("channel").setDescription("Pilih channel").setRequired(true)),
 
-  new SlashCommandBuilder().setName("embed-image").setDescription("Hantar gambar sahaja dengan kod warna Hex (Admin sahaja)")
-    .addChannelOption(opt => opt.setName("channel").setDescription("Pilih channel").setRequired(true))
-    .addStringOption(opt => opt.setName("image_url").setDescription("Link URL gambar").setRequired(true))
-    .addStringOption(opt => opt.setName("color").setDescription("Kod warna Hex (cth: #ffb6c1)").setRequired(false)),
+  new SlashCommandBuilder()
+    .setName("embed-image")
+    .setDescription("Hantar gambar sahaja dengan kod warna Hex (Admin sahaja)")
+    .addChannelOption((opt) => opt.setName("channel").setDescription("Pilih channel").setRequired(true))
+    .addStringOption((opt) => opt.setName("image_url").setDescription("Link URL gambar").setRequired(true))
+    .addStringOption((opt) => opt.setName("color").setDescription("Kod warna Hex (cth: #ffb6c1)").setRequired(false)),
 
-  new SlashCommandBuilder().setName("rumble").setDescription("Mula permainan PlatoMy Rumble (Admin sahaja)")
-    .addStringOption(opt => opt.setName("currency").setDescription("Jenis mata wang").setRequired(true).addChoices(
-      { name: "🪙 Plato Coins", value: "coins" },
-      { name: "💠 Pips", value: "pips" }
-    ))
-    .addIntegerOption(opt => opt.setName("prize").setDescription("Jumlah Hadiah Utama").setRequired(true).setMinValue(1))
-    .addIntegerOption(opt => opt.setName("duration").setDescription("Tempoh masa (minit)").setRequired(true).setMinValue(1).setMaxValue(10080))
-    .addIntegerOption(opt => opt.setName("winners").setDescription("Berapa ramai pemenang (hadiah dibahagi sama rata, default 1)").setRequired(false).setMinValue(1).setMaxValue(25)),
-].map(c => c.toJSON());
+  new SlashCommandBuilder()
+    .setName("rumble")
+    .setDescription("Mula permainan PlatoMy Rumble (Admin sahaja)")
+    .addStringOption((opt) =>
+      opt
+        .setName("currency")
+        .setDescription("Jenis mata wang")
+        .setRequired(true)
+        .addChoices(
+          { name: "🪙 Plato Coins", value: "coins" },
+          { name: "💠 Pips", value: "pips" }
+        )
+    )
+    .addIntegerOption((opt) => opt.setName("prize").setDescription("Jumlah Hadiah Utama").setRequired(true).setMinValue(1))
+    .addIntegerOption((opt) => opt.setName("duration").setDescription("Tempoh masa (minit)").setRequired(true).setMinValue(1).setMaxValue(10080))
+    .addIntegerOption((opt) =>
+      opt.setName("winners").setDescription("Berapa ramai pemenang (hadiah dibahagi sama rata, default 1)").setRequired(false).setMinValue(1).setMaxValue(25)
+    ),
+].map((c) => c.toJSON());
 
 client.once(Events.ClientReady, async (c) => {
   console.log(`Bot telah berjaya log masuk sebagai ${c.user.tag}!`);
@@ -691,7 +906,7 @@ client.once(Events.ClientReady, async (c) => {
     console.error("Gagal mendaftarkan slash commands:", error);
   }
 
-  // --- AUTOMATIC CRON JOB UNTUK UPDATE LEADERBOARD (Setiap 10 minit) ---
+  // --- AUTO-UPDATE LEADERBOARD (Every 10 minutes) ---
   cron.schedule("*/10 * * * *", async () => {
     try {
       if (fs.existsSync("./leaderboard-config.json")) {
@@ -705,7 +920,7 @@ client.once(Events.ClientReady, async (c) => {
             await message.edit({
               content: `**Monthly Leaderboard**
 Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
-              files: [attachment]
+              files: [attachment],
             });
             console.log("✅ Automatic Leaderboard berjaya dikemas kini!");
           }
@@ -716,32 +931,29 @@ Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
     }
   });
 
-  // --- AUTOMATIC CRON JOB UNTUK AUTO-RESET EXP BULANAN (Setiap 1 hari bulan, jam 12:00 Tengah Malam) ---
+  // --- MONTHLY AUTO-RESET EXP (1st of every month at 00:00) ---
   cron.schedule("0 0 1 * *", async () => {
     try {
       console.log("Memulakan proses auto-reset EXP bulanan...");
-
-      // 1. Set semula semua EXP dalam memori Map 'wallets' ke 0
-      for (const [id, data] of wallets.entries()) {
+      for (const [, data] of wallets.entries()) {
         data.exp = 0;
       }
       console.log("✅ Semua EXP ahli dalam memori berjaya di-reset ke 0!");
 
-      // 2. Maklumkan kepada komuniti di channel leaderboard
       if (fs.existsSync("./leaderboard-config.json")) {
         const config = JSON.parse(fs.readFileSync("./leaderboard-config.json", "utf8"));
         const channel = await client.channels.fetch(config.channelId).catch(() => null);
         if (channel) {
-          await channel.send("🎉 **Monthly Leaderboard telah tamat! Semua EXP ahli telah diset semula ke 0 untuk bulan baharu. Semoga berjaya!** 🌸");
-
-          // Jana imej baharu yang kosong (fresh start)
+          await channel.send(
+            "🎉 **Monthly Leaderboard telah tamat! Semua EXP ahli telah diset semula ke 0 untuk bulan baharu. Semoga berjaya!** 🌸"
+          );
           const attachment = await generateLeaderboardImage();
           const message = await channel.messages.fetch(config.messageId).catch(() => null);
           if (message) {
             await message.edit({
               content: `**Monthly Leaderboard (Bulan Baharu)**
 Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
-              files: [attachment]
+              files: [attachment],
             });
           }
         }
@@ -815,20 +1027,22 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         const logChannel = findChannel(interaction.guild, WALLET_LOG_CHANNEL_NAME);
         if (logChannel) {
-          await logChannel.send({
-            components: [
-              walletLogBox({
-                actionTitle,
-                target: targetUser,
-                admin: interaction.user,
-                details: actionDesc,
-                reason,
-                w: targetWallet,
-              }),
-            ],
-            flags: V2,
-            allowedMentions: NO_PING,
-          }).catch(() => {});
+          await logChannel
+            .send({
+              components: [
+                walletLogBox({
+                  actionTitle,
+                  target: targetUser,
+                  admin: interaction.user,
+                  details: actionDesc,
+                  reason,
+                  w: targetWallet,
+                }),
+              ],
+              flags: V2,
+              allowedMentions: NO_PING,
+            })
+            .catch(() => {});
         }
         return;
       }
@@ -855,25 +1069,30 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await interaction.deferReply({ ephemeral: true });
 
         const msg = await interaction.channel.send({
-          content: "📊 **Leaderboard PlatoMy sedang dijana... Sila tunggu sebentar.**"
+          content: "📊 **Leaderboard PlatoMy sedang dijana... Sila tunggu sebentar.**",
         });
 
-        fs.writeFileSync("./leaderboard-config.json", JSON.stringify({
-          channelId: interaction.channel.id,
-          messageId: msg.id
-        }));
+        fs.writeFileSync(
+          "./leaderboard-config.json",
+          JSON.stringify({
+            channelId: interaction.channel.id,
+            messageId: msg.id,
+          })
+        );
 
         try {
           const attachment = await generateLeaderboardImage();
           await msg.edit({
             content: `**Monthly Leaderboard**
 Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
-            files: [attachment]
+            files: [attachment],
           });
           await interaction.editReply({ content: "✅ Leaderboard berjaya ditubuhkan dan dikemas kini!" });
         } catch (err) {
-          console.error(err);
-          await interaction.editReply({ content: "❌ Leaderboard tapak berjaya dihantar, tetapi gagal menjana gambar kali pertama. Pastikan fail `leaderboard.html` diletakkan di dalam folder bot." });
+          console.error("Leaderboard generation error:", err);
+          await interaction.editReply({
+            content: `❌ Ralat semasa menjana gambar leaderboard: ${err.message}`,
+          });
         }
         return;
       }
@@ -884,7 +1103,7 @@ Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
         }
         await interaction.deferReply({ ephemeral: true });
 
-        for (const [id, data] of wallets.entries()) {
+        for (const [, data] of wallets.entries()) {
           data.exp = 0;
         }
 
@@ -898,13 +1117,15 @@ Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
               await message.edit({
                 content: `**Monthly Leaderboard (Telah Di-reset)**
 Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
-                files: [attachment]
+                files: [attachment],
               });
             }
           }
         }
 
-        await interaction.editReply({ content: "✅ Berjaya mereset semua EXP ahli kepada 0 dan mengemaskini paparan Leaderboard!" });
+        await interaction.editReply({
+          content: "✅ Berjaya mereset semua EXP ahli kepada 0 dan mengemaskini paparan Leaderboard!",
+        });
         return;
       }
 
@@ -918,14 +1139,32 @@ Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
           .setCustomId(`embed_builder:${targetChannel.id}`)
           .setTitle("🎨 PlatoMy Container Builder");
 
-        const titleInput = new TextInputBuilder().setCustomId("eb_title").setLabel("Tajuk (pilihan)")
-          .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(256);
-        const descInput = new TextInputBuilder().setCustomId("eb_desc").setLabel("Mesej / Penerangan")
-          .setStyle(TextInputStyle.Paragraph).setRequired(false).setMaxLength(3500);
-        const colorInput = new TextInputBuilder().setCustomId("eb_color").setLabel("Warna Hex (pilihan, cth: #ff69b4)")
-          .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(7).setPlaceholder("#ff69b4");
-        const imageInput = new TextInputBuilder().setCustomId("eb_image").setLabel("URL gambar (pilihan)")
-          .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(500).setPlaceholder("https://...");
+        const titleInput = new TextInputBuilder()
+          .setCustomId("eb_title")
+          .setLabel("Tajuk (pilihan)")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(false)
+          .setMaxLength(256);
+        const descInput = new TextInputBuilder()
+          .setCustomId("eb_desc")
+          .setLabel("Mesej / Penerangan")
+          .setStyle(TextInputStyle.Paragraph)
+          .setRequired(false)
+          .setMaxLength(3500);
+        const colorInput = new TextInputBuilder()
+          .setCustomId("eb_color")
+          .setLabel("Warna Hex (pilihan, cth: #ff69b4)")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(false)
+          .setMaxLength(7)
+          .setPlaceholder("#ff69b4");
+        const imageInput = new TextInputBuilder()
+          .setCustomId("eb_image")
+          .setLabel("URL gambar (pilihan)")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(false)
+          .setMaxLength(500)
+          .setPlaceholder("https://...");
 
         modal.addComponents(
           new ActionRowBuilder().addComponents(titleInput),
@@ -983,7 +1222,7 @@ Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
       }
     }
 
-    // ===== BUTANG =====
+    // ===== BUTTONS =====
     if (interaction.isButton()) {
       const id = interaction.customId;
 
@@ -991,7 +1230,9 @@ Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
         await interaction.deferReply({ ephemeral: true });
         const game = rumbleMap.get(interaction.message.id);
         if (!game || game.ended) return interaction.editReply({ content: "❌ This rumble has ended." });
-        if (game.participants.includes(interaction.user.id)) return interaction.editReply({ content: "⚠️ You've already joined!" });
+        if (game.participants.includes(interaction.user.id)) {
+          return interaction.editReply({ content: "⚠️ You've already joined!" });
+        }
         game.participants.push(interaction.user.id);
 
         await interaction.message.edit({ components: [rumbleOpenBox(game)], flags: V2 }).catch(() => {});
@@ -1014,7 +1255,9 @@ Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
 
       if (id.startsWith("accept_trade:")) {
         const requesterId = id.split(":")[1];
-        const hasTradeRole = interaction.member?.roles?.cache?.some(r => r.name.toLowerCase().includes(TRADE_ROLE_NAME));
+        const hasTradeRole = interaction.member?.roles?.cache?.some((r) =>
+          r.name.toLowerCase().includes(TRADE_ROLE_NAME)
+        );
 
         if (!hasTradeRole) {
           return interaction.reply({ content: "❌ You need the Trade role to accept trades.", ephemeral: true });
@@ -1029,7 +1272,7 @@ Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
 
         await interaction.deferUpdate();
 
-        const infoText = collectText(interaction.message.components).find(t => t.includes("**Item Details:**")) || "";
+        const infoText = collectText(interaction.message.components).find((t) => t.includes("**Item Details:**")) || "";
         const item = infoText.split("**Item Details:**")[1]?.trim() || "-";
 
         const tradeChannel = await createTradeChannel(interaction.guild, requesterId, interaction.user, item);
@@ -1040,41 +1283,49 @@ Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
         });
 
         if (tradeChannel) {
-          await interaction.channel.send({
-            content: `🤝 <@${requesterId}>, your trade was accepted by ${interaction.user}. Head to ${tradeChannel} to complete the trade!`,
-            allowedMentions: { users: [requesterId] },
-          }).catch(() => {});
+          await interaction.channel
+            .send({
+              content: `🤝 <@${requesterId}>, your trade was accepted by ${interaction.user}. Head to ${tradeChannel} to complete the trade!`,
+              allowedMentions: { users: [requesterId] },
+            })
+            .catch(() => {});
         } else {
-          await interaction.followUp({
-            content: "❌ I couldn't create the trade channel. Please check the bot's permissions on the trade category.",
-            ephemeral: true,
-          }).catch(() => {});
-          await interaction.channel.send(
-            `🤝 <@${requesterId}>, your trade was accepted by ${interaction.user}. Please contact each other to complete the trade!`
-          ).catch(() => {});
+          await interaction
+            .followUp({
+              content: "❌ I couldn't create the trade channel. Please check the bot's permissions on the trade category.",
+              ephemeral: true,
+            })
+            .catch(() => {});
+          await interaction.channel
+            .send(
+              `🤝 <@${requesterId}>, your trade was accepted by ${interaction.user}. Please contact each other to complete the trade!`
+            )
+            .catch(() => {});
         }
 
         const logChannel = findChannel(interaction.guild, TRADING_LOG_CHANNEL_NAME);
         if (logChannel) {
-          await logChannel.send({
-            components: [
-              info(
-                "🛍️ Trading Log: Trade Accepted",
-                `📥 **Requester:** <@${requesterId}> (\`${requesterId}\`)
+          await logChannel
+            .send({
+              components: [
+                info(
+                  "🛍️ Trading Log: Trade Accepted",
+                  `📥 **Requester:** <@${requesterId}> (\`${requesterId}\`)
 ` +
-                `🤝 **Accepted by:** ${interaction.user} (\`${interaction.user.id}\`)
+                  `🤝 **Accepted by:** ${interaction.user} (\`${interaction.user.id}\`)
 ` +
-                (tradeChannel ? `📍 **Trade Channel:** ${tradeChannel}
+                  (tradeChannel ? `📍 **Trade Channel:** ${tradeChannel}
 ` : "") +
-                `
+                  `
 📝 **Item:**
 ${item}`,
-                `Trading Log • Today at ${getMalaysiaTime()}`
-              ),
-            ],
-            flags: V2,
-            allowedMentions: NO_PING,
-          }).catch(() => {});
+                  `Trading Log • Today at ${getMalaysiaTime()}`
+                ),
+              ],
+              flags: V2,
+              allowedMentions: NO_PING,
+            })
+            .catch(() => {});
         }
         return;
       }
@@ -1086,7 +1337,10 @@ ${item}`,
           return interaction.reply({ content: "❌ This button only works inside a trade channel.", ephemeral: true });
         }
         if (interaction.user.id !== accepterId && !isAdmin(interaction)) {
-          return interaction.reply({ content: "❌ Only the person who accepted this trade can close this channel.", ephemeral: true });
+          return interaction.reply({
+            content: "❌ Only the person who accepted this trade can close this channel.",
+            ephemeral: true,
+          });
         }
 
         const channelName = interaction.channel.name;
@@ -1097,21 +1351,23 @@ ${item}`,
 
         const logChannel = findChannel(interaction.guild, TRADING_LOG_CHANNEL_NAME);
         if (logChannel) {
-          await logChannel.send({
-            components: [
-              info(
-                "🛍️ Trading Log: Trade Closed",
-                `🔒 **Closed by:** ${interaction.user} (\`${interaction.user.id}\`)
+          await logChannel
+            .send({
+              components: [
+                info(
+                  "🛍️ Trading Log: Trade Closed",
+                  `🔒 **Closed by:** ${interaction.user} (\`${interaction.user.id}\`)
 ` +
-                `🤝 **Accepted by:** <@${accepterId}>
+                  `🤝 **Accepted by:** <@${accepterId}>
 ` +
-                `📍 **Channel:** ${channelName}`,
-                `Trading Log • Today at ${getMalaysiaTime()}`
-              ),
-            ],
-            flags: V2,
-            allowedMentions: NO_PING,
-          }).catch(() => {});
+                  `📍 **Channel:** ${channelName}`,
+                  `Trading Log • Today at ${getMalaysiaTime()}`
+                ),
+              ],
+              flags: V2,
+              allowedMentions: NO_PING,
+            })
+            .catch(() => {});
         }
 
         await sleep(5000);
@@ -1122,7 +1378,7 @@ ${item}`,
       }
     }
 
-    // ===== MODAL =====
+    // ===== MODALS =====
     if (interaction.isModalSubmit()) {
       if (interaction.customId === "trading_modal") {
         const details = interaction.fields.getTextInputValue("trading_text").trim();
@@ -1135,39 +1391,45 @@ ${item}`,
           return interaction.reply({ content: "❌ The trading-list channel was not found.", ephemeral: true });
         }
 
-        const traderRole = interaction.guild.roles.cache.find(r => r.name.toLowerCase().includes(TRADER_ROLE_NAME));
+        const traderRole = interaction.guild.roles.cache.find((r) => r.name.toLowerCase().includes(TRADER_ROLE_NAME));
 
-        const sent = await listChannel.send({
-          components: [
-            ...(traderRole ? [txt(`<@&${traderRole.id}>`)] : []),
-            buildTradeList({ requesterId: interaction.user.id, details }),
-          ],
-          flags: V2,
-          allowedMentions: traderRole ? { roles: [traderRole.id] } : NO_PING,
-        }).catch(() => null);
+        const sent = await listChannel
+          .send({
+            components: [
+              ...(traderRole ? [txt(`<@&${traderRole.id}>`)] : []),
+              buildTradeList({ requesterId: interaction.user.id, details }),
+            ],
+            flags: V2,
+            allowedMentions: traderRole ? { roles: [traderRole.id] } : NO_PING,
+          })
+          .catch(() => null);
         if (!sent) {
-          return interaction.reply({ content: "❌ The bot can't send to the trading-list channel. Please check the bot's permissions.", ephemeral: true });
+          return interaction.reply({
+            content: "❌ The bot can't send to the trading-list channel. Please check the bot's permissions.",
+            ephemeral: true,
+          });
         }
 
         await interaction.reply({ content: "✅ Your item details have been sent!", ephemeral: true });
 
         const logChannel = findChannel(interaction.guild, TRADING_LOG_CHANNEL_NAME);
         if (logChannel) {
-          await logChannel.send({
-            components: [
-              info(
-                "🛍️ Trading Log: New Request",
-                `👤 **Requester:** ${interaction.user} (\`${interaction.user.id}\`)
+          await logChannel
+            .send({
+              components: [
+                info(
+                  "🛍️ Trading Log: New Request",
+                  `👤 **Requester:** ${interaction.user} (\`${interaction.user.id}\`)
 
-` +
-                `📝 **Item:**
+` + `📝 **Item:**
 ${details}`,
-                `Trading Log • Today at ${getMalaysiaTime()}`
-              ),
-            ],
-            flags: V2,
-            allowedMentions: NO_PING,
-          }).catch(() => {});
+                  `Trading Log • Today at ${getMalaysiaTime()}`
+                ),
+              ],
+              flags: V2,
+              allowedMentions: NO_PING,
+            })
+            .catch(() => {});
         }
         return;
       }
@@ -1213,4 +1475,6 @@ ${details}`,
   }
 });
 
-client.login(token).catch(err => { console.error("GAGAL LOGIN:", err); });
+client.login(token).catch((err) => {
+  console.error("GAGAL LOGIN:", err);
+});
