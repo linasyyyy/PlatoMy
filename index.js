@@ -35,7 +35,12 @@ import fs from "fs";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import cron from "node-cron";
 import { registerDashboardApi } from "./dashboard-api.js";
-import { loadWallets, startAutosave } from "./db.js";
+import {
+  loadWallets,
+  startAutosave,
+  loadLeaderboardConfigsDB,
+  saveLeaderboardConfigDB,
+} from "./db.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -859,7 +864,7 @@ async function runRumbleBattle(channel, msgId) {
   }
 }
 
-// ================= LEADERBOARD & RANK CARD (@napi-rs/canvas) =================
+// ================= LEADERBOARD & RANK CARD (@napi-rs/canvas + PostgreSQL) =================
 const LEADERBOARD_CONFIG_PATH = "./leaderboard-config.json";
 
 const LEADERBOARD_CATEGORIES = {
@@ -909,21 +914,29 @@ const LEADERBOARD_CATEGORIES = {
   },
 };
 
-function loadLeaderboardConfigs() {
-  if (!fs.existsSync(LEADERBOARD_CONFIG_PATH)) return {};
-  try {
-    const raw = JSON.parse(fs.readFileSync(LEADERBOARD_CONFIG_PATH, "utf8"));
-    if (raw && raw.channelId && raw.messageId) {
-      return { exp: { channelId: raw.channelId, messageId: raw.messageId } };
-    }
-    return raw || {};
-  } catch {
-    return {};
+async function getLeaderboardConfigs() {
+  let local = {};
+  if (fs.existsSync(LEADERBOARD_CONFIG_PATH)) {
+    try {
+      const raw = JSON.parse(fs.readFileSync(LEADERBOARD_CONFIG_PATH, "utf8"));
+      if (raw && raw.channelId && raw.messageId) {
+        local = { exp: { channelId: raw.channelId, messageId: raw.messageId } };
+      } else if (raw) {
+        local = raw;
+      }
+    } catch {}
   }
+  const fromDb = await loadLeaderboardConfigsDB().catch(() => ({}));
+  return { ...local, ...fromDb };
 }
 
-function saveLeaderboardConfigs(configs) {
-  fs.writeFileSync(LEADERBOARD_CONFIG_PATH, JSON.stringify(configs, null, 2));
+async function saveLeaderboardConfig(category, channelId, messageId) {
+  await saveLeaderboardConfigDB(category, channelId, messageId).catch(() => {});
+  const current = await getLeaderboardConfigs();
+  current[category] = { channelId, messageId };
+  try {
+    fs.writeFileSync(LEADERBOARD_CONFIG_PATH, JSON.stringify(current, null, 2));
+  } catch {}
 }
 
 function drawRoundRect(ctx, x, y, w, h, r, fill = true, stroke = false) {
@@ -963,7 +976,6 @@ async function generateLeaderboardImage(category = "exp") {
   ctx.lineWidth = 2;
   drawRoundRect(ctx, 10, 10, width - 20, height - 20, 26, false, true);
 
-  // Header bersih (tanpa logo/badge atas)
   const titleGrad = ctx.createLinearGradient(width / 2 - 220, 0, width / 2 + 220, 0);
   titleGrad.addColorStop(0, "#FFFFFF");
   titleGrad.addColorStop(0.5, "#F996B1");
@@ -1453,28 +1465,35 @@ client.once(Events.ClientReady, async (c) => {
   }
 
   // --- AUTO-UPDATE SEMUA CHANNEL LEADERBOARD (Setiap 10 minit) ---
-  cron.schedule("*/10 * * * *", async () => {
-    const configs = loadLeaderboardConfigs();
-    for (const [category, cfg] of Object.entries(configs)) {
-      if (!cfg?.channelId || !cfg?.messageId) continue;
-      try {
-        const channel = await client.channels.fetch(cfg.channelId).catch(() => null);
-        const message = await channel?.messages.fetch(cfg.messageId).catch(() => null);
-        if (!message) continue;
+  cron.schedule(
+    "*/10 * * * *",
+    async () => {
+      const configs = await getLeaderboardConfigs();
+      const entries = Object.entries(configs);
+      if (entries.length === 0) return;
 
-        const attachment = await generateLeaderboardImage(category);
-        await message.edit({
-          components: [buildLeaderboardBox(category)],
-          files: [attachment],
-          attachments: [],
-          flags: V2,
-        });
-        console.log(`✅ Auto-update leaderboard [${category}] berjaya!`);
-      } catch (err) {
-        console.error(`Ralat auto-update leaderboard [${category}]:`, err);
+      for (const [category, cfg] of entries) {
+        if (!cfg?.channelId || !cfg?.messageId) continue;
+        try {
+          const channel = await client.channels.fetch(cfg.channelId).catch(() => null);
+          const message = await channel?.messages.fetch(cfg.messageId).catch(() => null);
+          if (!message) continue;
+
+          const attachment = await generateLeaderboardImage(category);
+          await message.edit({
+            components: [buildLeaderboardBox(category)],
+            files: [attachment],
+            attachments: [],
+            flags: V2,
+          });
+          console.log(`✅ Auto-update leaderboard [${category}] berjaya!`);
+        } catch (err) {
+          console.error(`Ralat auto-update leaderboard [${category}]:`, err);
+        }
       }
-    }
-  });
+    },
+    { timezone: "Asia/Kuala_Lumpur" }
+  );
 
   // --- AUTO-REMOVE ROLE MURAI YAPPERS BILA 3 HARI TAK AKTIF (Semak setiap 1 jam) ---
   cron.schedule("0 * * * *", async () => {
@@ -1530,7 +1549,7 @@ client.once(Events.ClientReady, async (c) => {
         }
         console.log("✅ Semua EXP ahli dalam memori berjaya di-reset ke 0!");
 
-        const configs = loadLeaderboardConfigs();
+        const configs = await getLeaderboardConfigs();
         const expCfg = configs.exp;
         if (expCfg?.channelId && expCfg?.messageId) {
           const channel = await client.channels.fetch(expCfg.channelId).catch(() => null);
@@ -1751,12 +1770,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           flags: V2,
         });
 
-        const configs = loadLeaderboardConfigs();
-        configs[category] = {
-          channelId: interaction.channel.id,
-          messageId: msg.id,
-        };
-        saveLeaderboardConfigs(configs);
+        await saveLeaderboardConfig(category, interaction.channel.id, msg.id);
 
         try {
           const attachment = await generateLeaderboardImage(category);
@@ -1767,7 +1781,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             flags: V2,
           });
           await interaction.editReply({
-            content: `✅ **${meta.label}** berjaya ditetapkan di <#${interaction.channel.id}> dalam Container V2 dan akan auto-update setiap 10 minit!`,
+            content: `✅ **${meta.label}** berjaya ditetapkan di <#${interaction.channel.id}> (disimpan ke Neon) dan akan auto-update setiap 10 minit!`,
           });
         } catch (err) {
           console.error("Leaderboard generation error:", err);
@@ -1788,7 +1802,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           data.exp = 0;
         }
 
-        const configs = loadLeaderboardConfigs();
+        const configs = await getLeaderboardConfigs();
         const expCfg = configs.exp;
         if (expCfg?.channelId && expCfg?.messageId) {
           const channel = await client.channels.fetch(expCfg.channelId).catch(() => null);
