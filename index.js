@@ -15,6 +15,8 @@ import {
   TextInputBuilder,
   TextInputStyle,
   ContainerBuilder,
+  SectionBuilder,
+  ThumbnailBuilder,
   TextDisplayBuilder,
   SeparatorBuilder,
   SeparatorSpacingSize,
@@ -74,6 +76,9 @@ const TRADE_ROLE_NAME = "trade";
 const TRADER_ROLE_NAME = "trader";
 const TRADE_CATEGORY_ID = "1567527038368223332";
 
+const LEVEL_UP_CHANNEL_ID = "1552249117621747782";
+const LOW_EXP_CHANNEL_IDS = new Set(["1548984832263065640"]);
+
 const LOG_CHANNEL_IDS = {
   [WALLET_LOG_CHANNEL_NAME]: "1569585830224461884",
   [TRADING_LOG_CHANNEL_NAME]: "1569585956439461908",
@@ -91,6 +96,127 @@ const URL_2 =
 
 const TRADE_MEDIA_URLS = [URL_1, URL_2, URL_1];
 
+// --- TETAPAN LEVEL (MAX 100) & EXP BERPERINGKAT ---
+const MAX_LEVEL = 100;
+const NORMAL_EXP_COOLDOWN_MS = 30 * 1000;  // 30 saat (channel biasa)
+const LOW_EXP_COOLDOWN_MS = 60 * 1000;     // 60 saat (channel bot/game)
+const expCooldowns = new Map();
+
+const LEVEL_ROLES = [
+  { level: 100, keyword: "diamond", label: "Diamond" },
+  { level: 75, keyword: "ruby", label: "Ruby" },
+  { level: 50, keyword: "sapphire", label: "Sapphire" },
+  { level: 25, keyword: "emerald", label: "Emerald" },
+  { level: 10, keyword: "amethyst", label: "Amethyst" },
+];
+
+// EXP diperlukan untuk naik dari level semasa ke level seterusnya
+function getExpNeededForLevel(lvl) {
+  if (lvl <= 10) return 300;   // Senang (Lvl 1-10)
+  if (lvl <= 40) return 800;   // Sederhana (Lvl 11-40)
+  if (lvl <= 75) return 1500;  // Susah (Lvl 41-75)
+  return 2500;                 // Sangat Susah (Lvl 76-100)
+}
+
+function getLevelInfo(exp) {
+  let remaining = Math.max(0, Number(exp) || 0);
+  let level = 1;
+
+  while (level < MAX_LEVEL) {
+    const needed = getExpNeededForLevel(level);
+    if (remaining >= needed) {
+      remaining -= needed;
+      level++;
+    } else {
+      break;
+    }
+  }
+
+  const isMax = level >= MAX_LEVEL;
+  const neededForNext = isMax ? getExpNeededForLevel(MAX_LEVEL - 1) : getExpNeededForLevel(level);
+  const currentLevelExp = isMax ? neededForNext : remaining;
+  const expToNext = isMax ? 0 : neededForNext - currentLevelExp;
+  const progressPct = isMax ? 100 : Math.min(100, Math.floor((currentLevelExp / neededForNext) * 100));
+  const tier = LEVEL_ROLES.find((r) => level >= r.level)?.label || "Unranked";
+
+  return { level, isMax, currentLevelExp, neededForNext, expToNext, progressPct, tier };
+}
+
+async function syncLevelRoles(member, level) {
+  if (!member?.guild) return;
+  const targetTier = LEVEL_ROLES.find((r) => level >= r.level) || null;
+
+  for (const tier of LEVEL_ROLES) {
+    const role = member.guild.roles.cache.find((r) => r.name.toLowerCase().includes(tier.keyword));
+    if (!role) continue;
+
+    const shouldHave = targetTier && targetTier.keyword === tier.keyword;
+    const hasRole = member.roles.cache.has(role.id);
+
+    if (shouldHave && !hasRole) {
+      await member.roles.add(role).catch(() => {});
+    } else if (!shouldHave && hasRole) {
+      await member.roles.remove(role).catch(() => {});
+    }
+  }
+}
+
+// --- TETAPAN MURAI YAPPERS (Aktif Seminggu, Auto-Remove 3 Hari Tak Aktif) ---
+const YAPPER_DATA_PATH = "./yapper-activity.json";
+const YAPPER_ROLE_KEYWORD = "murai yappers";
+const YAPPER_MSG_THRESHOLD = 50;                     // 50 mesej dalam 7 hari
+const YAPPER_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;    // 7 hari (1 minggu)
+const YAPPER_INACTIVE_MS = 3 * 24 * 60 * 60 * 1000;  // 3 hari tak aktif -> auto remove
+
+function loadYapperActivity() {
+  if (!fs.existsSync(YAPPER_DATA_PATH)) return new Map();
+  try {
+    const obj = JSON.parse(fs.readFileSync(YAPPER_DATA_PATH, "utf8"));
+    return new Map(Object.entries(obj || {}));
+  } catch {
+    return new Map();
+  }
+}
+
+const yapperActivity = loadYapperActivity();
+let yapperSaveTimer = null;
+
+function scheduleSaveYapperActivity() {
+  if (yapperSaveTimer) return;
+  yapperSaveTimer = setTimeout(() => {
+    yapperSaveTimer = null;
+    try {
+      const obj = Object.fromEntries(yapperActivity.entries());
+      fs.writeFileSync(YAPPER_DATA_PATH, JSON.stringify(obj));
+    } catch (err) {
+      console.error("Gagal simpan yapper-activity.json:", err);
+    }
+  }, 15000);
+}
+
+async function handleYapperActivity(member) {
+  if (!member?.guild) return;
+  const now = Date.now();
+  const data = yapperActivity.get(member.id) || { timestamps: [], lastActive: now, guildId: member.guild.id };
+
+  data.timestamps = (data.timestamps || []).filter((t) => now - t <= YAPPER_WINDOW_MS);
+  data.timestamps.push(now);
+  data.lastActive = now;
+  data.guildId = member.guild.id;
+  yapperActivity.set(member.id, data);
+  scheduleSaveYapperActivity();
+
+  if (data.timestamps.length >= YAPPER_MSG_THRESHOLD) {
+    const yapperRole = member.guild.roles.cache.find((r) =>
+      r.name.toLowerCase().includes(YAPPER_ROLE_KEYWORD)
+    );
+    if (yapperRole && !member.roles.cache.has(yapperRole.id)) {
+      await member.roles.add(yapperRole).catch(() => {});
+    }
+  }
+}
+
+// --- UTILITI ---
 const isAdmin = (i) => i.member?.permissions?.has(PermissionFlagsBits.Administrator);
 const isUrl = (u) => /^https?:\/\/\S+$/i.test(String(u || "").trim());
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -113,6 +239,18 @@ function getMalaysiaTime() {
     minute: "2-digit",
     hour12: true,
   });
+}
+
+function getMalaysiaDateParts() {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kuala_Lumpur",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  }).formatToParts(new Date());
+
+  const get = (type) => Number(parts.find((p) => p.type === type)?.value || 1);
+  return { year: get("year"), month: get("month"), day: get("day") };
 }
 
 // ================= CONTAINER (Components V2) =================
@@ -138,6 +276,254 @@ function collectText(components, out = []) {
     if (c.components) collectText(c.components, out);
   }
   return out;
+}
+
+// ================= LEVEL UP CONTAINER =================
+function buildLevelUpBox(member, newLevel, totalExp) {
+  const avatarUrl = member.user.displayAvatarURL({ extension: "png", size: 256 });
+  const headerAndBody = [
+    "### ˚₊‧꒰ა <a:PinkCrown:1549417235393683681> 𝐿𝐸𝑉𝐸𝐿 𝑈𝑃! <a:PinkCrown:1549417235393683681> ໒꒱‧₊˚",
+    `<a:a_sparkle7:1563423627263877200> ╰┈➤ Congratulations ${member}! You just advanced to Level ${newLevel} with ${totalExp.toLocaleString()} XP!`,
+  ].join(NL);
+
+  const section = new SectionBuilder()
+    .addTextDisplayComponents(txt(headerAndBody))
+    .setThumbnailAccessory(new ThumbnailBuilder().setURL(avatarUrl));
+
+  return new ContainerBuilder()
+    .addSectionComponents(section)
+    .addSeparatorComponents(sep())
+    .addTextDisplayComponents(
+      txt("-# ⋆˚࿔ <:pinkbow:1563423584624582779> Keep being active in the Plato MY community! <:HrtPinkYellow:1549418195516129291> 𝜗𝜚˚⋆")
+    );
+}
+
+// ================= BIRTHDAY CORNER =================
+const BIRTHDAY_DATA_PATH = "./birthdays.json";
+const BIRTHDAY_ROLE_KEYWORD = "it's my birthday";
+const PARTY_ROLE_KEYWORD = "mypartycrashers";
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function loadBirthdayData() {
+  if (!fs.existsSync(BIRTHDAY_DATA_PATH)) {
+    return { config: null, users: {} };
+  }
+  try {
+    const raw = JSON.parse(fs.readFileSync(BIRTHDAY_DATA_PATH, "utf8"));
+    return { config: raw?.config || null, users: raw?.users || {} };
+  } catch {
+    return { config: null, users: {} };
+  }
+}
+
+function saveBirthdayData(data) {
+  fs.writeFileSync(BIRTHDAY_DATA_PATH, JSON.stringify(data, null, 2));
+}
+
+function formatDayMonth(day, month) {
+  return `${String(day).padStart(2, "0")} ${MONTH_NAMES[month - 1] || ""}`;
+}
+
+function getBirthdayDiffDays(day, month, today) {
+  const todayUtc = Date.UTC(today.year, today.month - 1, today.day);
+  const thisYearUtc = Date.UTC(today.year, month - 1, day);
+  const diffThisYear = Math.round((thisYearUtc - todayUtc) / 86400000);
+
+  let daysUntil = diffThisYear;
+  if (daysUntil < 0) {
+    const nextYearUtc = Date.UTC(today.year + 1, month - 1, day);
+    daysUntil = Math.round((nextYearUtc - todayUtc) / 86400000);
+  }
+
+  let daysAgo = -diffThisYear;
+  if (daysAgo < 0) {
+    const prevYearUtc = Date.UTC(today.year - 1, month - 1, day);
+    daysAgo = Math.round((todayUtc - prevYearUtc) / 86400000);
+  }
+
+  return { isToday: diffThisYear === 0, daysUntil, daysAgo };
+}
+
+function buildBirthdayCornerBox(data) {
+  const today = getMalaysiaDateParts();
+  const chatChannelId = data.config?.chatChannelId || data.config?.channelId || "1552249117621747782";
+
+  const todayList = [];
+  const upcomingList = [];
+  const recentList = [];
+
+  for (const [userId, b] of Object.entries(data.users || {})) {
+    const { isToday, daysUntil, daysAgo } = getBirthdayDiffDays(b.day, b.month, today);
+    if (isToday) {
+      todayList.push(`<@${userId}> 🌸`);
+    } else {
+      if (daysUntil > 0 && daysUntil <= 30) {
+        upcomingList.push({ userId, day: b.day, month: b.month, daysUntil });
+      }
+      if (daysAgo > 0 && daysAgo <= 14) {
+        recentList.push({ userId, day: b.day, month: b.month, daysAgo });
+      }
+    }
+  }
+
+  upcomingList.sort((a, b) => a.daysUntil - b.daysUntil);
+  recentList.sort((a, b) => a.daysAgo - b.daysAgo);
+
+  const todayText =
+    todayList.length > 0
+      ? todayList.map((u) => `<a:PinkArrow:1549417772726095973> ${u}`).join(NL)
+      : "<a:PinkArrow:1549417772726095973> No birthdays today — check back tomorrow!";
+
+  const upcomingText =
+    upcomingList.length > 0
+      ? upcomingList
+          .slice(0, 5)
+          .map((u) => `• ${formatDayMonth(u.day, u.month)} — <@${u.userId}> (in ${u.daysUntil} day${u.daysUntil === 1 ? "" : "s"})`)
+          .join(NL)
+      : "• No upcoming birthdays in the next 30 days.";
+
+  const recentText =
+    recentList.length > 0
+      ? recentList
+          .slice(0, 5)
+          .map((u) => `• ${formatDayMonth(u.day, u.month)} — <@${u.userId}> (${u.daysAgo} day${u.daysAgo === 1 ? "" : "s"} ago)`)
+          .join(NL)
+      : "• No recent birthdays in the last 14 days.";
+
+  const headerBody = [
+    "### ˚₊‧꒰ა <a:PinkCrown:1549417235393683681> 𝑃𝐿𝐴𝑇𝑂𝑀𝑌 𝐵𝐼𝑅𝑇𝐻𝐷𝐴𝑌 𝐶𝑂𝑅𝑁𝐸𝑅 <a:PinkCrown:1549417235393683681> ໒꒱‧₊˚",
+    `<a:a_sparkle7:1563423627263877200> Every day is magical when we celebrate together! Spot a name below? Send them your sweetest wishes in <#${chatChannelId}>!`,
+  ].join(NL);
+
+  const listBody = [
+    "🎂 𝗧𝗢𝗗𝗔𝗬'𝗦 𝗕𝗜𝗥𝗧𝗛𝗗𝗔𝗬 𝗦𝗧𝗔𝗥",
+    todayText,
+    "",
+    "🎀 𝗨𝗣𝗖𝗢𝗠𝗜𝗡𝗚 𝗖𝗘𝗟𝗘𝗕𝗥𝗔𝗧𝗜𝗢𝗡𝗦",
+    upcomingText,
+    "",
+    "🌷 𝗥𝗘𝗖𝗘𝗡𝗧𝗟𝗬 𝗖𝗘𝗟𝗘𝗕𝗥𝗔𝗧𝗘𝗗",
+    recentText,
+  ].join(NL);
+
+  const registerBtn = new ButtonBuilder()
+    .setCustomId("open_birthday_modal")
+    .setLabel("Register Birthday")
+    .setEmoji("🎂")
+    .setStyle(ButtonStyle.Secondary);
+
+  return new ContainerBuilder()
+    .addTextDisplayComponents(txt(headerBody))
+    .addSeparatorComponents(sep())
+    .addTextDisplayComponents(txt(listBody))
+    .addSeparatorComponents(sep())
+    .addTextDisplayComponents(
+      txt("-# ⋆˚࿔ <:pinkbow:1563423584624582779> Click the button below to register your birthday! Auto-refreshes daily. 𝜗𝜚˚⋆")
+    )
+    .addActionRowComponents(new ActionRowBuilder().addComponents(registerBtn));
+}
+
+async function refreshBirthdayBoard(data = null) {
+  const bData = data || loadBirthdayData();
+  if (!bData.config?.channelId || !bData.config?.messageId) return;
+
+  const channel = await client.channels.fetch(bData.config.channelId).catch(() => null);
+  const message = await channel?.messages.fetch(bData.config.messageId).catch(() => null);
+  if (!message) return;
+
+  await message
+    .edit({
+      components: [buildBirthdayCornerBox(bData)],
+      flags: V2,
+      allowedMentions: NO_PING,
+    })
+    .catch(() => {});
+}
+
+async function runDailyBirthdayRoutine() {
+  const bData = loadBirthdayData();
+  if (!bData.config?.channelId) return;
+
+  const today = getMalaysiaDateParts();
+  const channel = await client.channels.fetch(bData.config.channelId).catch(() => null);
+  if (!channel?.guild) return;
+
+  const guild = channel.guild;
+  const birthdayRole = guild.roles.cache.find((r) => r.name.toLowerCase().includes(BIRTHDAY_ROLE_KEYWORD));
+  const partyRole = guild.roles.cache.find((r) => r.name.toLowerCase().includes(PARTY_ROLE_KEYWORD));
+
+  const todayBirthdayIds = new Set();
+  for (const [userId, b] of Object.entries(bData.users || {})) {
+    if (b.day === today.day && b.month === today.month) {
+      todayBirthdayIds.add(userId);
+    }
+  }
+
+  // 1. Buang role Birthday daripada ahli yang hari jadinya sudah tamat
+  if (birthdayRole) {
+    await guild.members.fetch().catch(() => {});
+    for (const [memberId, member] of birthdayRole.members) {
+      if (!todayBirthdayIds.has(memberId)) {
+        await member.roles.remove(birthdayRole).catch(() => {});
+      }
+    }
+  }
+
+  // 2. Beri role Birthday + Auto-Buka Thread Ucapan untuk setiap Birthday Star hari ini
+  let changed = false;
+  for (const userId of todayBirthdayIds) {
+    const member = await guild.members.fetch(userId).catch(() => null);
+    if (!member) continue;
+
+    if (birthdayRole && !member.roles.cache.has(birthdayRole.id)) {
+      await member.roles.add(birthdayRole).catch(() => {});
+    }
+
+    const userRecord = bData.users[userId];
+    if (userRecord && userRecord.celebratedYear !== today.year) {
+      try {
+        const threadName = `🎂・Happy Birthday ${member.user.username}!`.slice(0, 100);
+        const thread = await channel.threads.create({
+          name: threadName,
+          autoArchiveDuration: 1440,
+          type: ChannelType.PublicThread,
+          reason: `Birthday celebration for ${member.user.tag}`,
+        });
+
+        const pingLine = partyRole ? `<@&${partyRole.id}> <@${userId}>` : `<@${userId}>`;
+        const wishBox = new ContainerBuilder()
+          .addTextDisplayComponents(
+            txt(
+              [
+                "### ˚₊‧꒰ა <a:PinkCrown:1549417235393683681> 𝐻𝐴𝑃𝑃𝑌 𝐵𝐼𝑅𝑇𝐻𝐷𝐴𝑌! <a:PinkCrown:1549417235393683681> ໒꒱‧₊˚",
+                `<a:a_sparkle7:1563423627263877200> Wishing the happiest birthday to <@${userId}>! Drop your sweetest wishes below! 🎂🌸`,
+              ].join(NL)
+            )
+          )
+          .addSeparatorComponents(sep())
+          .addTextDisplayComponents(
+            txt("-# ⋆˚࿔ <:pinkbow:1563423584624582779> PlatoMy Birthday Celebration <:HrtPinkYellow:1549418195516129291> 𝜗𝜚˚⋆")
+          );
+
+        await thread.send({
+          components: [txt(pingLine), wishBox],
+          flags: V2,
+          allowedMentions: {
+            users: [userId],
+            roles: partyRole ? [partyRole.id] : [],
+          },
+        });
+
+        userRecord.celebratedYear = today.year;
+        changed = true;
+      } catch (err) {
+        console.error(`Gagal buka thread birthday untuk ${userId}:`, err);
+      }
+    }
+  }
+
+  if (changed) saveBirthdayData(bData);
+  await refreshBirthdayBoard(bData);
 }
 
 // ================= WALLET =================
@@ -476,7 +862,68 @@ async function runRumbleBattle(channel, msgId) {
   }
 }
 
-// ================= LEADERBOARD GENERATOR (@napi-rs/canvas) =================
+// ================= LEADERBOARD & RANK CARD (@napi-rs/canvas) =================
+const LEADERBOARD_CONFIG_PATH = "./leaderboard-config.json";
+
+const LEADERBOARD_CATEGORIES = {
+  exp: {
+    label: "Monthly EXP Leaderboard",
+    title: "EXP & LEVELS LEADERBOARD",
+    subtitle: "TOP 10 COMMUNITY ACTIVITY RANKINGS",
+    field: "exp",
+    barLabel: "XP Progress",
+    subText: (val) => `${val.toLocaleString()} EXP`,
+    badgeText: (val, hasUser) => `LVL ${String(hasUser ? getLevelInfo(val).level : 0).padStart(2, "0")}`,
+    progressPct: (val) => getLevelInfo(val).progressPct,
+  },
+  sponsor: {
+    label: "Monthly Sponsor Leaderboard",
+    title: "SPONSOR LEADERBOARD",
+    subtitle: "TOP 10 COMMUNITY SPONSORS",
+    field: "sponsorTotal",
+    barLabel: "Contribution",
+    subText: (val) => `${val.toLocaleString()} Sponsor`,
+    badgeText: (val) => `${val.toLocaleString()}`,
+    progressPct: (val, topVal) => (val > 0 ? Math.min(100, Math.round((val / Math.max(1, topVal)) * 100)) : 0),
+  },
+  coins: {
+    label: "Plato Coins Leaderboard",
+    title: "PLATO COINS LEADERBOARD",
+    subtitle: "TOP 10 RICHEST COIN HOLDERS",
+    field: "coins",
+    barLabel: "Coin Share",
+    subText: (val) => `${val.toLocaleString()} Coins`,
+    badgeText: (val) => `${val.toLocaleString()}`,
+    progressPct: (val, topVal) => (val > 0 ? Math.min(100, Math.round((val / Math.max(1, topVal)) * 100)) : 0),
+  },
+  pips: {
+    label: "Pips Leaderboard",
+    title: "PIPS LEADERBOARD",
+    subtitle: "TOP 10 RICHEST PIPS HOLDERS",
+    field: "pips",
+    barLabel: "Pips Share",
+    subText: (val) => `${val.toLocaleString()} Pips`,
+    badgeText: (val) => `${val.toLocaleString()}`,
+    progressPct: (val, topVal) => (val > 0 ? Math.min(100, Math.round((val / Math.max(1, topVal)) * 100)) : 0),
+  },
+};
+
+function loadLeaderboardConfigs() {
+  if (!fs.existsSync(LEADERBOARD_CONFIG_PATH)) return {};
+  try {
+    const raw = JSON.parse(fs.readFileSync(LEADERBOARD_CONFIG_PATH, "utf8"));
+    if (raw && raw.channelId && raw.messageId) {
+      return { exp: { channelId: raw.channelId, messageId: raw.messageId } };
+    }
+    return raw || {};
+  } catch {
+    return {};
+  }
+}
+
+function saveLeaderboardConfigs(configs) {
+  fs.writeFileSync(LEADERBOARD_CONFIG_PATH, JSON.stringify(configs, null, 2));
+}
 
 function drawRoundRect(ctx, x, y, w, h, r, fill = true, stroke = false) {
   ctx.beginPath();
@@ -486,74 +933,70 @@ function drawRoundRect(ctx, x, y, w, h, r, fill = true, stroke = false) {
   if (stroke) ctx.stroke();
 }
 
-async function generateLeaderboardImage() {
-  const width = 1200;
-  const height = 860;
+async function generateLeaderboardImage(category = "exp") {
+  const meta = LEADERBOARD_CATEGORIES[category] || LEADERBOARD_CATEGORIES.exp;
+  const width = 680;
+  const height = 840;
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext("2d");
 
-  // 1. Base Dark Glassmorphic Card Background
   const bgGrad = ctx.createLinearGradient(0, 0, width, height);
   bgGrad.addColorStop(0, "#12121a");
   bgGrad.addColorStop(1, "#09090d");
   ctx.fillStyle = bgGrad;
-  drawRoundRect(ctx, 10, 10, width - 20, height - 20, 28, true, false);
+  drawRoundRect(ctx, 10, 10, width - 20, height - 20, 26, true, false);
 
-  // 2. Ambient Pink Glow Orbs
-  const orb1 = ctx.createRadialGradient(200, 130, 10, 200, 130, 320);
-  orb1.addColorStop(0, "rgba(249, 150, 177, 0.18)");
+  const orb1 = ctx.createRadialGradient(width - 90, 90, 10, width - 90, 90, 260);
+  orb1.addColorStop(0, "rgba(249, 150, 177, 0.2)");
   orb1.addColorStop(1, "rgba(249, 150, 177, 0)");
   ctx.fillStyle = orb1;
   ctx.fillRect(10, 10, width - 20, height - 20);
 
-  const orb2 = ctx.createRadialGradient(width - 200, height - 130, 10, width - 200, height - 130, 320);
-  orb2.addColorStop(0, "rgba(249, 150, 177, 0.15)");
+  const orb2 = ctx.createRadialGradient(90, height - 90, 10, 90, height - 90, 240);
+  orb2.addColorStop(0, "rgba(249, 150, 177, 0.14)");
   orb2.addColorStop(1, "rgba(249, 150, 177, 0)");
   ctx.fillStyle = orb2;
   ctx.fillRect(10, 10, width - 20, height - 20);
 
-  // Outer Glowing Pink Border
   ctx.strokeStyle = "rgba(249, 150, 177, 0.4)";
   ctx.lineWidth = 2;
-  drawRoundRect(ctx, 10, 10, width - 20, height - 20, 28, false, true);
+  drawRoundRect(ctx, 10, 10, width - 20, height - 20, 26, false, true);
 
-  // 3. Header Section
-  ctx.fillStyle = "rgba(249, 150, 177, 0.12)";
-  ctx.strokeStyle = "rgba(249, 150, 177, 0.45)";
-  ctx.lineWidth = 1;
-  drawRoundRect(ctx, width / 2 - 75, 32, 150, 24, 12, true, true);
-
-  ctx.fillStyle = "#F996B1";
-  ctx.font = "bold 12px sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText("✦ PLATOMY ✦", width / 2, 48);
-
+  // Header bersih (tanpa logo/badge atas)
   const titleGrad = ctx.createLinearGradient(width / 2 - 220, 0, width / 2 + 220, 0);
   titleGrad.addColorStop(0, "#FFFFFF");
   titleGrad.addColorStop(0.5, "#F996B1");
   titleGrad.addColorStop(1, "#FFFFFF");
   ctx.fillStyle = titleGrad;
-  ctx.font = "900 32px serif";
-  ctx.fillText("MONTHLY LEADERBOARD", width / 2, 88);
+  ctx.font = "900 28px serif";
+  ctx.textAlign = "center";
+  ctx.fillText(meta.title, width / 2, 62);
 
-  const divGrad = ctx.createLinearGradient(100, 0, width - 100, 0);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.58)";
+  ctx.font = "bold 11px sans-serif";
+  ctx.fillText(meta.subtitle, width / 2, 84);
+
+  const divGrad = ctx.createLinearGradient(60, 0, width - 60, 0);
   divGrad.addColorStop(0, "rgba(249, 150, 177, 0)");
   divGrad.addColorStop(0.5, "rgba(249, 150, 177, 0.55)");
   divGrad.addColorStop(1, "rgba(249, 150, 177, 0)");
   ctx.strokeStyle = divGrad;
   ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.moveTo(100, 108);
-  ctx.lineTo(width - 100, 108);
+  ctx.moveTo(60, 102);
+  ctx.lineTo(width - 60, 102);
   ctx.stroke();
 
-  // 4. Prepare Data from Wallets Map
   const allWallets = [...wallets.entries()].map(([id, data]) => ({ id, ...data }));
-  const sortedXp = [...allWallets].sort((a, b) => b.exp - a.exp).slice(0, 10);
-  const sortedSponsor = [...allWallets].sort((a, b) => b.sponsorTotal - a.sponsorTotal).slice(0, 10);
+  const sorted = [...allWallets]
+    .sort((a, b) => (b[meta.field] || 0) - (a[meta.field] || 0))
+    .slice(0, 10);
 
-  while (sortedXp.length < 10) sortedXp.push({ id: null, exp: 0, sponsorTotal: 0 });
-  while (sortedSponsor.length < 10) sortedSponsor.push({ id: null, exp: 0, sponsorTotal: 0 });
+  while (sorted.length < 10) {
+    sorted.push({ id: null, coins: 0, pips: 0, exp: 0, sponsorTotal: 0 });
+  }
+
+  const topVal = Math.max(1, sorted[0]?.[meta.field] || 1);
 
   const fetchPlayerInfo = async (entry) => {
     if (!entry.id) return { username: "Empty Slot", initials: "--", avatarUrl: null };
@@ -570,186 +1013,261 @@ async function generateLeaderboardImage() {
     }
   };
 
-  // 5. Helper to Draw Each Column (Left = EXP, Right = Sponsor)
-  const drawColumn = async (title, entries, startX, type) => {
-    const colWidth = 540;
+  const startX = 36;
+  const rowW = width - 72;
+  const rowH = 58;
+  let y = 122;
+
+  for (let i = 0; i < 10; i++) {
+    const rank = i + 1;
+    const entry = sorted[i];
+    const val = entry[meta.field] || 0;
+    const infoData = await fetchPlayerInfo(entry);
+
+    if (rank === 1) {
+      const r1Grad = ctx.createLinearGradient(startX, y, startX + rowW, y);
+      r1Grad.addColorStop(0, "rgba(249, 150, 177, 0.22)");
+      r1Grad.addColorStop(0.65, "rgba(20, 20, 28, 0.78)");
+      ctx.fillStyle = r1Grad;
+      ctx.strokeStyle = "#F996B1";
+      ctx.lineWidth = 1.5;
+    } else if (rank <= 3) {
+      ctx.fillStyle = "rgba(24, 24, 34, 0.7)";
+      ctx.strokeStyle = "rgba(249, 150, 177, 0.35)";
+      ctx.lineWidth = 1;
+    } else {
+      ctx.fillStyle = "rgba(20, 20, 28, 0.55)";
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+      ctx.lineWidth = 1;
+    }
+    drawRoundRect(ctx, startX, y, rowW, rowH, 13, true, true);
+
+    ctx.font = rank === 1 ? "900 18px sans-serif" : "bold 15px sans-serif";
+    ctx.fillStyle = rank === 1 ? "#F996B1" : rank <= 3 ? "#FFFFFF" : "rgba(255, 255, 255, 0.45)";
+    ctx.textAlign = "center";
+    ctx.fillText(`#${rank}`, startX + 30, y + 35);
+
+    const avX = startX + 76;
+    const avY = y + rowH / 2;
+    const avR = 19;
+
+    ctx.beginPath();
+    ctx.arc(avX, avY, avR + 1.5, 0, Math.PI * 2);
+    ctx.fillStyle = "#F996B1";
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(avX, avY, avR, 0, Math.PI * 2);
+    ctx.fillStyle = "#181822";
+    ctx.fill();
+
+    let drewAvatar = false;
+    if (infoData.avatarUrl) {
+      try {
+        const img = await loadImage(infoData.avatarUrl);
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(avX, avY, avR, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(img, avX - avR, avY - avR, avR * 2, avR * 2);
+        ctx.restore();
+        drewAvatar = true;
+      } catch {}
+    }
+
+    if (!drewAvatar) {
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = "bold 12px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(infoData.initials, avX, avY + 4);
+    }
+
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#FFFFFF";
+    ctx.font = "bold 15px sans-serif";
+    const displayName = infoData.username.length > 15 ? infoData.username.slice(0, 15) + "..." : infoData.username;
+    ctx.fillText(displayName, startX + 108, y + 25);
 
     ctx.fillStyle = "#F996B1";
-    ctx.fillRect(startX, 126, 4, 18);
-    ctx.font = "bold 15px sans-serif";
-    ctx.textAlign = "left";
-    ctx.fillText(title, startX + 12, 140);
+    ctx.font = "bold 12px sans-serif";
+    ctx.fillText(meta.subText(val), startX + 108, y + 43);
 
-    let y = 156;
-    const rowH = 56;
+    const pct = meta.progressPct(val, topVal);
+    const barX = startX + 275;
+    const barW = 195;
+    const barY = y + 32;
 
-    for (let i = 0; i < 10; i++) {
-      const rank = i + 1;
-      const entry = entries[i];
-      const infoData = await fetchPlayerInfo(entry);
+    ctx.fillStyle = "rgba(255, 255, 255, 0.62)";
+    ctx.font = "11px sans-serif";
+    ctx.fillText(meta.barLabel, barX, y + 23);
+    ctx.textAlign = "right";
+    ctx.fillText(`${pct}%`, barX + barW, y + 23);
 
-      if (rank === 1) {
-        const r1Grad = ctx.createLinearGradient(startX, y, startX + colWidth, y);
-        r1Grad.addColorStop(0, "rgba(249, 150, 177, 0.22)");
-        r1Grad.addColorStop(0.65, "rgba(20, 20, 28, 0.78)");
-        ctx.fillStyle = r1Grad;
-        ctx.strokeStyle = "#F996B1";
-        ctx.lineWidth = 1.5;
-      } else if (rank <= 3) {
-        ctx.fillStyle = "rgba(24, 24, 34, 0.7)";
-        ctx.strokeStyle = "rgba(249, 150, 177, 0.35)";
-        ctx.lineWidth = 1;
-      } else {
-        ctx.fillStyle = "rgba(20, 20, 28, 0.55)";
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
-        ctx.lineWidth = 1;
-      }
-      drawRoundRect(ctx, startX, y, colWidth, rowH, 12, true, true);
+    ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+    drawRoundRect(ctx, barX, barY, barW, 8, 4, true, false);
 
-      // Rank #
-      ctx.font = rank === 1 ? "900 17px sans-serif" : "bold 15px sans-serif";
-      ctx.fillStyle = rank === 1 ? "#F996B1" : rank <= 3 ? "#FFFFFF" : "rgba(255, 255, 255, 0.45)";
-      ctx.textAlign = "center";
-      ctx.fillText(`#${rank}`, startX + 28, y + 34);
-
-      // Avatar Circle + Crystal Border
-      const avX = startX + 72;
-      const avY = y + rowH / 2;
-      const avR = 18;
-
-      ctx.beginPath();
-      ctx.arc(avX, avY, avR + 1.5, 0, Math.PI * 2);
-      ctx.fillStyle = "#F996B1";
-      ctx.fill();
-
-      ctx.beginPath();
-      ctx.arc(avX, avY, avR, 0, Math.PI * 2);
-      ctx.fillStyle = "#181822";
-      ctx.fill();
-
-      let drewAvatar = false;
-      if (infoData.avatarUrl) {
-        try {
-          const img = await loadImage(infoData.avatarUrl);
-          ctx.save();
-          ctx.beginPath();
-          ctx.arc(avX, avY, avR, 0, Math.PI * 2);
-          ctx.clip();
-          ctx.drawImage(img, avX - avR, avY - avR, avR * 2, avR * 2);
-          ctx.restore();
-          drewAvatar = true;
-        } catch {}
-      }
-
-      if (!drewAvatar) {
-        ctx.fillStyle = "#FFFFFF";
-        ctx.font = "bold 12px sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText(infoData.initials, avX, avY + 4);
-      }
-
-      // Player Name & Subtitle
-      ctx.textAlign = "left";
-      ctx.fillStyle = "#FFFFFF";
-      ctx.font = "bold 14px sans-serif";
-      const displayName = infoData.username.length > 14 ? infoData.username.slice(0, 14) + "…" : infoData.username;
-      ctx.fillText(displayName, startX + 102, y + 24);
-
-      ctx.fillStyle = "#F996B1";
-      ctx.font = "bold 11px sans-serif";
-      if (type === "xp") {
-        ctx.fillText(`${entry.exp.toLocaleString()} EXP`, startX + 102, y + 41);
-
-        const xpPct = Math.min(100, Math.floor(((entry.exp % 1000) / 1000) * 100));
-        const barX = startX + 245;
-        const barW = 175;
-        const barY = y + 31;
-
-        ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
-        ctx.font = "10px sans-serif";
-        ctx.fillText("XP Progress", barX, y + 23);
-        ctx.textAlign = "right";
-        ctx.fillText(`${xpPct}%`, barX + barW, y + 23);
-
-        ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
-        drawRoundRect(ctx, barX, barY, barW, 7, 4, true, false);
-
-        if (xpPct > 0) {
-          const fillGrad = ctx.createLinearGradient(barX, 0, barX + barW, 0);
-          fillGrad.addColorStop(0, "#F996B1");
-          fillGrad.addColorStop(1, "#ffd1df");
-          ctx.fillStyle = fillGrad;
-          drawRoundRect(ctx, barX, barY, Math.max(8, (barW * xpPct) / 100), 7, 4, true, false);
-        }
-
-        const level = entry.id ? Math.floor(entry.exp / 1000) + 1 : 0;
-        const badgeX = startX + colWidth - 88;
-        ctx.fillStyle = "rgba(249, 150, 177, 0.14)";
-        ctx.strokeStyle = "rgba(249, 150, 177, 0.45)";
-        ctx.lineWidth = 1;
-        drawRoundRect(ctx, badgeX, y + 14, 74, 28, 8, true, true);
-
-        ctx.fillStyle = "#FFFFFF";
-        ctx.font = "bold 12px sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText(`LVL ${String(level).padStart(2, "0")}`, badgeX + 37, y + 32);
-      } else {
-        ctx.fillText("Community Sponsor", startX + 102, y + 41);
-
-        const maxSponsor = Math.max(1, entries[0]?.sponsorTotal || 1);
-        const spPct = entry.sponsorTotal > 0 ? Math.min(100, Math.round((entry.sponsorTotal / maxSponsor) * 100)) : 0;
-        const barX = startX + 245;
-        const barW = 165;
-        const barY = y + 31;
-
-        ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
-        ctx.font = "10px sans-serif";
-        ctx.fillText("Contribution", barX, y + 23);
-        ctx.textAlign = "right";
-        ctx.fillText(`${spPct}%`, barX + barW, y + 23);
-
-        ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
-        drawRoundRect(ctx, barX, barY, barW, 7, 4, true, false);
-
-        if (spPct > 0) {
-          const fillGrad = ctx.createLinearGradient(barX, 0, barX + barW, 0);
-          fillGrad.addColorStop(0, "#F996B1");
-          fillGrad.addColorStop(1, "#ffd1df");
-          ctx.fillStyle = fillGrad;
-          drawRoundRect(ctx, barX, barY, Math.max(8, (barW * spPct) / 100), 7, 4, true, false);
-        }
-
-        const badgeX = startX + colWidth - 98;
-        ctx.fillStyle = "rgba(249, 150, 177, 0.14)";
-        ctx.strokeStyle = "rgba(249, 150, 177, 0.45)";
-        ctx.lineWidth = 1;
-        drawRoundRect(ctx, badgeX, y + 14, 84, 28, 8, true, true);
-
-        ctx.fillStyle = "#FFFFFF";
-        ctx.font = "bold 12px sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText(`🌸 ${entry.sponsorTotal.toLocaleString()}`, badgeX + 42, y + 32);
-      }
-
-      y += rowH + 8;
+    if (pct > 0) {
+      const fillGrad = ctx.createLinearGradient(barX, 0, barX + barW, 0);
+      fillGrad.addColorStop(0, "#F996B1");
+      fillGrad.addColorStop(1, "#ffd1df");
+      ctx.fillStyle = fillGrad;
+      drawRoundRect(ctx, barX, barY, Math.max(8, (barW * pct) / 100), 8, 4, true, false);
     }
-  };
 
-  await drawColumn("XP & LEVELS RANKINGS", sortedXp, 42, "xp");
-  await drawColumn("SPONSOR TOTAL RANKINGS", sortedSponsor, 618, "sponsor");
+    const badgeW = 108;
+    const badgeX = startX + rowW - badgeW - 14;
+    ctx.fillStyle = "rgba(249, 150, 177, 0.14)";
+    ctx.strokeStyle = "rgba(249, 150, 177, 0.45)";
+    ctx.lineWidth = 1;
+    drawRoundRect(ctx, badgeX, y + 15, badgeW, 28, 8, true, true);
 
-  // 6. Footer
+    ctx.fillStyle = "#FFFFFF";
+    ctx.font = "bold 12px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(meta.badgeText(val, Boolean(entry.id)), badgeX + badgeW / 2, y + 33);
+
+    y += rowH + 8;
+  }
+
   ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
   ctx.font = "bold 11px sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText("AUTO-UPDATE SETIAP 10 MINIT", 42, height - 28);
+  ctx.fillText("AUTO-UPDATE SETIAP 10 MINIT", 36, height - 24);
 
   ctx.textAlign = "right";
   ctx.fillStyle = "#F996B1";
-  ctx.fillText("POWERED BY PLATOMY", width - 42, height - 28);
+  ctx.fillText("POWERED BY PLATOMY", width - 36, height - 24);
 
   const imageBuffer = canvas.toBuffer("image/png");
-  return new AttachmentBuilder(imageBuffer, { name: "leaderboard.png" });
+  return new AttachmentBuilder(imageBuffer, { name: `leaderboard-${category}.png` });
+}
+
+// ================= RANK CARD GENERATOR (/myrank) =================
+async function generateRankCard(user) {
+  const w = getWallet(user.id);
+  const lvl = getLevelInfo(w.exp);
+
+  const allSorted = [...wallets.entries()]
+    .map(([id, data]) => ({ id, exp: data.exp || 0 }))
+    .sort((a, b) => b.exp - a.exp);
+  const rankIdx = allSorted.findIndex((x) => x.id === user.id);
+  const rankNum = rankIdx >= 0 ? rankIdx + 1 : allSorted.length + 1;
+
+  const width = 760;
+  const height = 250;
+  const canvas = createCanvas(width, height);
+  const ctx = canvas.getContext("2d");
+
+  const bgGrad = ctx.createLinearGradient(0, 0, width, height);
+  bgGrad.addColorStop(0, "#12121a");
+  bgGrad.addColorStop(1, "#09090d");
+  ctx.fillStyle = bgGrad;
+  drawRoundRect(ctx, 8, 8, width - 16, height - 16, 24, true, false);
+
+  const orb1 = ctx.createRadialGradient(width - 80, 60, 10, width - 80, 60, 200);
+  orb1.addColorStop(0, "rgba(249, 150, 177, 0.25)");
+  orb1.addColorStop(1, "rgba(249, 150, 177, 0)");
+  ctx.fillStyle = orb1;
+  ctx.fillRect(8, 8, width - 16, height - 16);
+
+  ctx.strokeStyle = "rgba(249, 150, 177, 0.5)";
+  ctx.lineWidth = 2;
+  drawRoundRect(ctx, 8, 8, width - 16, height - 16, 24, false, true);
+
+  const avX = 105;
+  const avY = height / 2;
+  const avR = 58;
+
+  ctx.beginPath();
+  ctx.arc(avX, avY, avR + 4, 0, Math.PI * 2);
+  ctx.fillStyle = "#F996B1";
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(avX, avY, avR, 0, Math.PI * 2);
+  ctx.fillStyle = "#181822";
+  ctx.fill();
+
+  try {
+    const avUrl = user.displayAvatarURL({ extension: "png", size: 256 });
+    const img = await loadImage(avUrl);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(avX, avY, avR, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.drawImage(img, avX - avR, avY - avR, avR * 2, avR * 2);
+    ctx.restore();
+  } catch {
+    ctx.fillStyle = "#FFFFFF";
+    ctx.font = "bold 30px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText((user.username || "U").substring(0, 2).toUpperCase(), avX, avY + 10);
+  }
+
+  const infoX = 195;
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#FFFFFF";
+  ctx.font = "bold 26px sans-serif";
+  const uName = (user.username || "User").length > 18 ? user.username.slice(0, 18) + "..." : user.username;
+  ctx.fillText(uName, infoX, 74);
+
+  ctx.fillStyle = "#F996B1";
+  ctx.font = "bold 14px sans-serif";
+  ctx.fillText(`TIER: ${lvl.tier.toUpperCase()}  |  TOTAL: ${w.exp.toLocaleString()} EXP`, infoX, 100);
+
+  ctx.textAlign = "right";
+  ctx.fillStyle = "rgba(255, 255, 255, 0.65)";
+  ctx.font = "bold 14px sans-serif";
+  ctx.fillText("RANK", width - 165, 58);
+  ctx.fillStyle = "#FFFFFF";
+  ctx.font = "900 26px sans-serif";
+  ctx.fillText(`#${rankNum}`, width - 165, 88);
+
+  ctx.fillStyle = "rgba(249, 150, 177, 0.85)";
+  ctx.font = "bold 14px sans-serif";
+  ctx.fillText("LEVEL", width - 45, 58);
+  ctx.fillStyle = "#F996B1";
+  ctx.font = "900 26px sans-serif";
+  ctx.fillText(`${lvl.level}/${MAX_LEVEL}`, width - 45, 88);
+
+  const barX = infoX;
+  const barW = width - infoX - 45;
+  const barY = 152;
+  const barH = 18;
+
+  ctx.textAlign = "left";
+  ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+  ctx.font = "bold 13px sans-serif";
+  const nextText = lvl.isMax
+    ? "MAX LEVEL REACHED!"
+    : `${lvl.expToNext.toLocaleString()} EXP to Level ${lvl.level + 1}`;
+  ctx.fillText(nextText, barX, barY - 12);
+
+  ctx.textAlign = "right";
+  ctx.fillStyle = "#F996B1";
+  ctx.fillText(
+    `${lvl.currentLevelExp.toLocaleString()} / ${lvl.neededForNext.toLocaleString()} EXP (${lvl.progressPct}%)`,
+    barX + barW,
+    barY - 12
+  );
+
+  ctx.fillStyle = "rgba(255, 255, 255, 0.09)";
+  drawRoundRect(ctx, barX, barY, barW, barH, 9, true, false);
+
+  if (lvl.progressPct > 0) {
+    const fillGrad = ctx.createLinearGradient(barX, 0, barX + barW, 0);
+    fillGrad.addColorStop(0, "#F996B1");
+    fillGrad.addColorStop(1, "#ffd1df");
+    ctx.fillStyle = fillGrad;
+    drawRoundRect(ctx, barX, barY, Math.max(18, (barW * lvl.progressPct) / 100), barH, 9, true, false);
+  }
+
+  ctx.textAlign = "right";
+  ctx.fillStyle = "rgba(255, 255, 255, 0.45)";
+  ctx.font = "bold 11px sans-serif";
+  ctx.fillText("PLATOMY RANK SYSTEM", width - 45, height - 26);
+
+  return new AttachmentBuilder(canvas.toBuffer("image/png"), { name: "myrank.png" });
 }
 
 // --- WEB DASHBOARD & PASSPORT ---
@@ -817,6 +1335,11 @@ const commands = [
   new SlashCommandBuilder().setName("wallet").setDescription("Semak baki akaun PlatoMy • Wallet anda! 🏦"),
 
   new SlashCommandBuilder()
+    .setName("myrank")
+    .setDescription("Semak kad rank, level & baki EXP ke level seterusnya! 👑")
+    .addUserOption((opt) => opt.setName("user").setDescription("Semak rank ahli lain (pilihan)").setRequired(false)),
+
+  new SlashCommandBuilder()
     .setName("admin-wallet")
     .setDescription("Urus baki akaun PlatoMy • Wallet ahli (Admin sahaja)")
     .addStringOption((opt) =>
@@ -839,7 +1362,28 @@ const commands = [
 
   new SlashCommandBuilder().setName("setup-trading").setDescription("Hantar panel PlatoMy Trading (Admin sahaja)"),
 
-  new SlashCommandBuilder().setName("setup-leaderboard").setDescription("Hantar mesej tapak Leaderboard (Admin sahaja)"),
+  new SlashCommandBuilder()
+    .setName("setup-birthday")
+    .setDescription("Hantar panel PlatoMy Birthday Corner di channel ini (Admin sahaja)")
+    .addChannelOption((opt) =>
+      opt.setName("chat_channel").setDescription("Channel chat untuk ahli hantar ucapan (pilihan)").setRequired(false)
+    ),
+
+  new SlashCommandBuilder()
+    .setName("setup-leaderboard")
+    .setDescription("Hantar papan Leaderboard mengikut kategori di channel ini (Admin sahaja)")
+    .addStringOption((opt) =>
+      opt
+        .setName("category")
+        .setDescription("Pilih kategori leaderboard")
+        .setRequired(true)
+        .addChoices(
+          { name: "✨ EXP & Levels", value: "exp" },
+          { name: "🌸 Total Sponsor", value: "sponsor" },
+          { name: "🪙 Plato Coins", value: "coins" },
+          { name: "💠 Pips", value: "pips" }
+        )
+    ),
 
   new SlashCommandBuilder().setName("reset-leaderboard").setDescription("Set semula (reset) semua EXP ahli kepada 0 (Admin sahaja)"),
 
@@ -885,68 +1429,161 @@ client.once(Events.ClientReady, async (c) => {
     console.error("Gagal mendaftarkan slash commands:", error);
   }
 
-  // --- AUTO-UPDATE LEADERBOARD (Setiap 10 minit) ---
+  // --- AUTO-UPDATE SEMUA CHANNEL LEADERBOARD (Setiap 10 minit) ---
   cron.schedule("*/10 * * * *", async () => {
-    try {
-      if (fs.existsSync("./leaderboard-config.json")) {
-        const config = JSON.parse(fs.readFileSync("./leaderboard-config.json", "utf8"));
-        const channel = await client.channels.fetch(config.channelId).catch(() => null);
-        if (channel) {
-          const message = await channel.messages.fetch(config.messageId).catch(() => null);
-          if (message) {
-            console.log("Mengemas kini automatic leaderboard...");
-            const attachment = await generateLeaderboardImage();
-            await message.edit({
-              content: `**Monthly Leaderboard**${NL}Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
-              files: [attachment],
-            });
-            console.log("✅ Automatic Leaderboard berjaya dikemas kini!");
-          }
-        }
+    const configs = loadLeaderboardConfigs();
+    for (const [category, cfg] of Object.entries(configs)) {
+      if (!cfg?.channelId || !cfg?.messageId) continue;
+      try {
+        const channel = await client.channels.fetch(cfg.channelId).catch(() => null);
+        const message = await channel?.messages.fetch(cfg.messageId).catch(() => null);
+        if (!message) continue;
+
+        const meta = LEADERBOARD_CATEGORIES[category] || LEADERBOARD_CATEGORIES.exp;
+        const attachment = await generateLeaderboardImage(category);
+        await message.edit({
+          content: `**${meta.label}**${NL}👑Latest updated: <t:${Math.floor(Date.now() / 1000)}:R>`,
+          files: [attachment],
+        });
+        console.log(`✅ Auto-update leaderboard [${category}] berjaya!`);
+      } catch (err) {
+        console.error(`Ralat auto-update leaderboard [${category}]:`, err);
       }
-    } catch (err) {
-      console.error("Ralat semasa auto-update leaderboard:", err);
     }
   });
 
-  // --- AUTO-RESET EXP BULANAN (Setiap 1 hari bulan jam 12:00 malam) ---
-  cron.schedule("0 0 1 * *", async () => {
-    try {
-      console.log("Memulakan proses auto-reset EXP bulanan...");
-      for (const [, data] of wallets.entries()) {
-        data.exp = 0;
-      }
-      console.log("✅ Semua EXP ahli dalam memori berjaya di-reset ke 0!");
+  // --- AUTO-REMOVE ROLE MURAI YAPPERS BILA 3 HARI TAK AKTIF (Semak setiap 1 jam) ---
+  cron.schedule("0 * * * *", async () => {
+    const now = Date.now();
+    let modified = false;
 
-      if (fs.existsSync("./leaderboard-config.json")) {
-        const config = JSON.parse(fs.readFileSync("./leaderboard-config.json", "utf8"));
-        const channel = await client.channels.fetch(config.channelId).catch(() => null);
-        if (channel) {
-          await channel.send(
-            "🎉 **Monthly Leaderboard telah tamat! Semua EXP ahli telah diset semula ke 0 untuk bulan baharu. Semoga berjaya!** 🌸"
-          );
-          const attachment = await generateLeaderboardImage();
-          const message = await channel.messages.fetch(config.messageId).catch(() => null);
-          if (message) {
-            await message.edit({
-              content: `**Monthly Leaderboard (Bulan Baharu)**${NL}Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
-              files: [attachment],
-            });
+    for (const [userId, data] of yapperActivity.entries()) {
+      if (now - (data.lastActive || 0) >= YAPPER_INACTIVE_MS) {
+        try {
+          const guild = client.guilds.cache.get(data.guildId);
+          if (guild) {
+            const yapperRole = guild.roles.cache.find((r) =>
+              r.name.toLowerCase().includes(YAPPER_ROLE_KEYWORD)
+            );
+            if (yapperRole) {
+              const member = await guild.members.fetch(userId).catch(() => null);
+              if (member && member.roles.cache.has(yapperRole.id)) {
+                await member.roles.remove(yapperRole).catch(() => {});
+              }
+            }
+          }
+        } catch {}
+        yapperActivity.delete(userId);
+        modified = true;
+      }
+    }
+
+    if (modified) scheduleSaveYapperActivity();
+  });
+
+  // --- AUTO-REFRESH BIRTHDAY CORNER + ROLE + THREAD HARIAN (12:00 malam waktu Malaysia) ---
+  cron.schedule(
+    "0 0 * * *",
+    async () => {
+      try {
+        console.log("Menjalankan semakan harian Birthday Corner...");
+        await runDailyBirthdayRoutine();
+      } catch (err) {
+        console.error("Ralat semakan harian Birthday Corner:", err);
+      }
+    },
+    { timezone: "Asia/Kuala_Lumpur" }
+  );
+
+  // --- AUTO-RESET EXP BULANAN (Setiap 1 hari bulan jam 12:00 malam waktu Malaysia) ---
+  cron.schedule(
+    "0 0 1 * *",
+    async () => {
+      try {
+        console.log("Memulakan proses auto-reset EXP bulanan...");
+        for (const [, data] of wallets.entries()) {
+          data.exp = 0;
+        }
+        console.log("✅ Semua EXP ahli dalam memori berjaya di-reset ke 0!");
+
+        const configs = loadLeaderboardConfigs();
+        const expCfg = configs.exp;
+        if (expCfg?.channelId && expCfg?.messageId) {
+          const channel = await client.channels.fetch(expCfg.channelId).catch(() => null);
+          if (channel) {
+            await channel.send(
+              "🎉 **Monthly EXP Leaderboard telah tamat! Semua EXP ahli telah diset semula ke 0 untuk bulan baharu. Semoga berjaya!** 🌸"
+            );
+            const attachment = await generateLeaderboardImage("exp");
+            const message = await channel.messages.fetch(expCfg.messageId).catch(() => null);
+            if (message) {
+              await message.edit({
+                content: `**Monthly EXP Leaderboard (Bulan Baharu)**${NL}👑Latest updated: <t:${Math.floor(Date.now() / 1000)}:R>`,
+                files: [attachment],
+              });
+            }
           }
         }
+      } catch (err) {
+        console.error("Ralat semasa auto-reset bulanan:", err);
       }
-    } catch (err) {
-      console.error("Ralat semasa auto-reset bulanan:", err);
-    }
-  });
+    },
+    { timezone: "Asia/Kuala_Lumpur" }
+  );
 });
 
-// --- !wallet / !bank ---
+// --- MESSAGE CREATE: !wallet, EXP + LEVEL UP + ROLES, & MURAI YAPPERS ---
 client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot || !message.guild) return;
   const content = message.content.trim().toLowerCase();
+
   if (content === "!wallet" || content === "!bank") {
     await message.reply({ components: [walletBox(getWallet(message.author.id))], flags: V2 });
+    return;
+  }
+
+  const isLowExpChannel = LOW_EXP_CHANNEL_IDS.has(message.channel.id);
+
+  // 1. Track aktiviti untuk role Murai Yappers (kecualikan channel bot/game supaya tak spam)
+  if (message.member && !isLowExpChannel) {
+    handleYapperActivity(message.member).catch(() => {});
+  }
+
+  // 2. Tambah EXP & semak Level Up / Level Roles
+  const now = Date.now();
+  const cooldownMs = isLowExpChannel ? LOW_EXP_COOLDOWN_MS : NORMAL_EXP_COOLDOWN_MS;
+  const lastExp = expCooldowns.get(message.author.id) || 0;
+
+  if (now - lastExp >= cooldownMs) {
+    expCooldowns.set(message.author.id, now);
+    const w = getWallet(message.author.id);
+    const oldLvl = getLevelInfo(w.exp).level;
+
+    // Channel bot/game dapat 3-6 EXP, channel biasa dapat 15-25 EXP
+    const gain = isLowExpChannel
+      ? Math.floor(Math.random() * 4) + 3
+      : Math.floor(Math.random() * 11) + 15;
+
+    w.exp += gain;
+    const newLvl = getLevelInfo(w.exp).level;
+
+    if (newLvl > oldLvl && message.member) {
+      if (newLvl >= 10) {
+        syncLevelRoles(message.member, newLvl).catch(() => {});
+      }
+
+      // Hantar notifikasi Level Up ke channel khusus
+      const lvlChannel = await client.channels.fetch(LEVEL_UP_CHANNEL_ID).catch(() => null);
+      if (lvlChannel?.isTextBased()) {
+        await lvlChannel
+          .send({
+            components: [buildLevelUpBox(message.member, newLvl, w.exp)],
+            flags: V2,
+            allowedMentions: { users: [message.author.id] },
+          })
+          .catch(() => {});
+      }
+    }
   }
 });
 
@@ -958,6 +1595,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       if (name === "wallet") {
         await interaction.reply({ components: [walletBox(getWallet(interaction.user.id))], flags: V2_EPHEMERAL });
+        return;
+      }
+
+      if (name === "myrank") {
+        await interaction.deferReply();
+        const target = interaction.options.getUser("user") || interaction.user;
+        const card = await generateRankCard(target);
+        await interaction.editReply({ files: [card] });
         return;
       }
 
@@ -1039,31 +1684,67 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return;
       }
 
+      if (name === "setup-birthday") {
+        if (!isAdmin(interaction)) {
+          return interaction.reply({ content: "❌ Anda tidak mempunyai kebenaran Administrator!", ephemeral: true });
+        }
+        await interaction.deferReply({ ephemeral: true });
+
+        const chatChannel = interaction.options.getChannel("chat_channel") || interaction.channel;
+        const bData = loadBirthdayData();
+        bData.config = {
+          channelId: interaction.channel.id,
+          chatChannelId: chatChannel.id,
+          messageId: null,
+        };
+
+        const msg = await interaction.channel.send({
+          components: [buildBirthdayCornerBox(bData)],
+          flags: V2,
+          allowedMentions: NO_PING,
+        });
+
+        bData.config.messageId = msg.id;
+        saveBirthdayData(bData);
+
+        // Semak terus kalau ada birthday hari ini
+        await runDailyBirthdayRoutine().catch(() => {});
+
+        await interaction.editReply({
+          content: `✅ **PlatoMy Birthday Corner** berjaya ditetapkan di <#${interaction.channel.id}>! Ia akan auto-refresh dan auto-buka thread setiap jam 12:00 malam.`,
+        });
+        return;
+      }
+
       if (name === "setup-leaderboard") {
         if (!isAdmin(interaction)) {
           return interaction.reply({ content: "❌ Anda tidak mempunyai kebenaran Administrator!", ephemeral: true });
         }
         await interaction.deferReply({ ephemeral: true });
 
+        const category = interaction.options.getString("category");
+        const meta = LEADERBOARD_CATEGORIES[category] || LEADERBOARD_CATEGORIES.exp;
+
         const msg = await interaction.channel.send({
-          content: "📊 **Leaderboard PlatoMy sedang dijana... Sila tunggu sebentar.**",
+          content: `📊 **${meta.label} sedang dijana... Sila tunggu sebentar.**`,
         });
 
-        fs.writeFileSync(
-          "./leaderboard-config.json",
-          JSON.stringify({
-            channelId: interaction.channel.id,
-            messageId: msg.id,
-          })
-        );
+        const configs = loadLeaderboardConfigs();
+        configs[category] = {
+          channelId: interaction.channel.id,
+          messageId: msg.id,
+        };
+        saveLeaderboardConfigs(configs);
 
         try {
-          const attachment = await generateLeaderboardImage();
+          const attachment = await generateLeaderboardImage(category);
           await msg.edit({
-            content: `**Monthly Leaderboard**${NL}Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
+            content: `**${meta.label}**${NL}👑Latest updated: <t:${Math.floor(Date.now() / 1000)}:R>`,
             files: [attachment],
           });
-          await interaction.editReply({ content: "✅ Leaderboard berjaya ditubuhkan dan dikemas kini!" });
+          await interaction.editReply({
+            content: `✅ **${meta.label}** berjaya ditetapkan di <#${interaction.channel.id}> dan akan auto-update setiap 10 minit!`,
+          });
         } catch (err) {
           console.error("Leaderboard generation error:", err);
           await interaction.editReply({
@@ -1083,23 +1764,22 @@ client.on(Events.InteractionCreate, async (interaction) => {
           data.exp = 0;
         }
 
-        if (fs.existsSync("./leaderboard-config.json")) {
-          const config = JSON.parse(fs.readFileSync("./leaderboard-config.json", "utf8"));
-          const channel = await client.channels.fetch(config.channelId).catch(() => null);
-          if (channel) {
-            const message = await channel.messages.fetch(config.messageId).catch(() => null);
-            if (message) {
-              const attachment = await generateLeaderboardImage();
-              await message.edit({
-                content: `**Monthly Leaderboard (Telah Di-reset)**${NL}Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
-                files: [attachment],
-              });
-            }
+        const configs = loadLeaderboardConfigs();
+        const expCfg = configs.exp;
+        if (expCfg?.channelId && expCfg?.messageId) {
+          const channel = await client.channels.fetch(expCfg.channelId).catch(() => null);
+          const message = await channel?.messages.fetch(expCfg.messageId).catch(() => null);
+          if (message) {
+            const attachment = await generateLeaderboardImage("exp");
+            await message.edit({
+              content: `**Monthly EXP Leaderboard (Telah Di-reset)**${NL}👑Latest updated: <t:${Math.floor(Date.now() / 1000)}:R>`,
+              files: [attachment],
+            });
           }
         }
 
         await interaction.editReply({
-          content: "✅ Berjaya mereset semua EXP ahli kepada 0 dan mengemaskini paparan Leaderboard!",
+          content: "✅ Berjaya mereset semua EXP ahli kepada 0 dan mengemaskini paparan EXP Leaderboard!",
         });
         return;
       }
@@ -1200,6 +1880,35 @@ client.on(Events.InteractionCreate, async (interaction) => {
     // ===== BUTANG =====
     if (interaction.isButton()) {
       const id = interaction.customId;
+
+      if (id === "open_birthday_modal") {
+        const modal = new ModalBuilder()
+          .setCustomId("birthday_modal")
+          .setTitle("🎂 Register Your Birthday");
+
+        const dayInput = new TextInputBuilder()
+          .setCustomId("bday_day")
+          .setLabel("Day (1 - 31)")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setMaxLength(2)
+          .setPlaceholder("cth: 20");
+
+        const monthInput = new TextInputBuilder()
+          .setCustomId("bday_month")
+          .setLabel("Month (1 - 12)")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setMaxLength(2)
+          .setPlaceholder("cth: 11");
+
+        modal.addComponents(
+          new ActionRowBuilder().addComponents(dayInput),
+          new ActionRowBuilder().addComponents(monthInput)
+        );
+        await interaction.showModal(modal);
+        return;
+      }
 
       if (id.startsWith("join_rumble_")) {
         await interaction.deferReply({ ephemeral: true });
@@ -1348,6 +2057,36 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     // ===== MODAL =====
     if (interaction.isModalSubmit()) {
+      if (interaction.customId === "birthday_modal") {
+        const day = parseInt(interaction.fields.getTextInputValue("bday_day").trim(), 10);
+        const month = parseInt(interaction.fields.getTextInputValue("bday_month").trim(), 10);
+
+        const maxDaysInMonth = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+        if (isNaN(month) || month < 1 || month > 12 || isNaN(day) || day < 1 || day > maxDaysInMonth[month - 1]) {
+          return interaction.reply({
+            content: "❌ Tarikh tidak sah! Sila masukkan Day (1–31) dan Month (1–12) yang betul.",
+            ephemeral: true,
+          });
+        }
+
+        const bData = loadBirthdayData();
+        const prev = bData.users[interaction.user.id];
+        bData.users[interaction.user.id] = {
+          day,
+          month,
+          celebratedYear: prev?.day === day && prev?.month === month ? prev.celebratedYear : null,
+        };
+        saveBirthdayData(bData);
+
+        await interaction.reply({
+          content: `🎂 Hari lahir anda telah didaftarkan pada **${formatDayMonth(day, month)}**!`,
+          ephemeral: true,
+        });
+
+        await runDailyBirthdayRoutine().catch(() => refreshBirthdayBoard(bData));
+        return;
+      }
+
       if (interaction.customId === "trading_modal") {
         const details = interaction.fields.getTextInputValue("trading_text").trim();
         if (!details) {
