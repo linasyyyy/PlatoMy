@@ -40,6 +40,9 @@ import {
   startAutosave,
   loadLeaderboardConfigsDB,
   saveLeaderboardConfigDB,
+  loadBirthdayDataDB,
+  saveBirthdayConfigDB,
+  saveUserBirthdayDB,
 } from "./db.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -302,16 +305,14 @@ function buildLevelUpBox(member, newLevel, totalExp) {
     );
 }
 
-// ================= BIRTHDAY CORNER =================
+// ================= BIRTHDAY CORNER (PostgreSQL + Local Backup) =================
 const BIRTHDAY_DATA_PATH = "./birthdays.json";
 const BIRTHDAY_ROLE_KEYWORD = "it's my birthday";
 const PARTY_ROLE_KEYWORD = "mypartycrashers";
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-function loadBirthdayData() {
-  if (!fs.existsSync(BIRTHDAY_DATA_PATH)) {
-    return { config: null, users: {} };
-  }
+function loadBirthdayLocal() {
+  if (!fs.existsSync(BIRTHDAY_DATA_PATH)) return { config: null, users: {} };
   try {
     const raw = JSON.parse(fs.readFileSync(BIRTHDAY_DATA_PATH, "utf8"));
     return { config: raw?.config || null, users: raw?.users || {} };
@@ -320,8 +321,33 @@ function loadBirthdayData() {
   }
 }
 
-function saveBirthdayData(data) {
-  fs.writeFileSync(BIRTHDAY_DATA_PATH, JSON.stringify(data, null, 2));
+function saveBirthdayLocal(data) {
+  try {
+    fs.writeFileSync(BIRTHDAY_DATA_PATH, JSON.stringify(data, null, 2));
+  } catch {}
+}
+
+async function getBirthdayData() {
+  const local = loadBirthdayLocal();
+  const db = await loadBirthdayDataDB().catch(() => ({ config: null, users: {} }));
+  return {
+    config: db.config || local.config || null,
+    users: { ...local.users, ...db.users },
+  };
+}
+
+async function saveBirthdayConfig(channelId, chatChannelId, messageId) {
+  await saveBirthdayConfigDB(channelId, chatChannelId, messageId).catch(() => {});
+  const data = await getBirthdayData();
+  data.config = { channelId, chatChannelId, messageId };
+  saveBirthdayLocal(data);
+}
+
+async function saveUserBirthday(userId, day, month, celebratedYear = null) {
+  await saveUserBirthdayDB(userId, day, month, celebratedYear).catch(() => {});
+  const data = await getBirthdayData();
+  data.users[userId] = { day, month, celebratedYear };
+  saveBirthdayLocal(data);
 }
 
 function formatDayMonth(day, month) {
@@ -412,7 +438,7 @@ function buildBirthdayCornerBox(data) {
 
   const registerBtn = new ButtonBuilder()
     .setCustomId("open_birthday_modal")
-    .setLabel("Register Birthday")
+    .setLabel("Register / Update Birthday")
     .setEmoji("🎂")
     .setStyle(ButtonStyle.Secondary);
 
@@ -422,13 +448,13 @@ function buildBirthdayCornerBox(data) {
     .addTextDisplayComponents(txt(listBody))
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(
-      txt("-# ⋆˚࿔ <:pinkbow:1563423584624582779> Click the button below to register your birthday! Auto-refreshes daily. 𝜗𝜚˚⋆")
+      txt("-# ⋆˚࿔ <:pinkbow:1563423584624582779> Click the button below to register or update your birthday! Auto-refreshes daily. 𝜗𝜚˚⋆")
     )
     .addActionRowComponents(new ActionRowBuilder().addComponents(registerBtn));
 }
 
 async function refreshBirthdayBoard(data = null) {
-  const bData = data || loadBirthdayData();
+  const bData = data || (await getBirthdayData());
   if (!bData.config?.channelId || !bData.config?.messageId) return;
 
   const channel = await client.channels.fetch(bData.config.channelId).catch(() => null);
@@ -445,7 +471,7 @@ async function refreshBirthdayBoard(data = null) {
 }
 
 async function runDailyBirthdayRoutine() {
-  const bData = loadBirthdayData();
+  const bData = await getBirthdayData();
   if (!bData.config?.channelId) return;
 
   const today = getMalaysiaDateParts();
@@ -472,7 +498,6 @@ async function runDailyBirthdayRoutine() {
     }
   }
 
-  let changed = false;
   for (const userId of todayBirthdayIds) {
     const member = await guild.members.fetch(userId).catch(() => null);
     if (!member) continue;
@@ -517,14 +542,13 @@ async function runDailyBirthdayRoutine() {
         });
 
         userRecord.celebratedYear = today.year;
-        changed = true;
+        await saveUserBirthday(userId, userRecord.day, userRecord.month, today.year);
       } catch (err) {
         console.error(`Gagal buka thread birthday untuk ${userId}:`, err);
       }
     }
   }
 
-  if (changed) saveBirthdayData(bData);
   await refreshBirthdayBoard(bData);
 }
 
@@ -1732,7 +1756,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await interaction.deferReply({ ephemeral: true });
 
         const chatChannel = interaction.options.getChannel("chat_channel") || interaction.channel;
-        const bData = loadBirthdayData();
+        const bData = await getBirthdayData();
         bData.config = {
           channelId: interaction.channel.id,
           chatChannelId: chatChannel.id,
@@ -1745,13 +1769,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
           allowedMentions: NO_PING,
         });
 
-        bData.config.messageId = msg.id;
-        saveBirthdayData(bData);
-
+        await saveBirthdayConfig(interaction.channel.id, chatChannel.id, msg.id);
         await runDailyBirthdayRoutine().catch(() => {});
 
         await interaction.editReply({
-          content: `✅ **PlatoMy Birthday Corner** berjaya ditetapkan di <#${interaction.channel.id}>! Ia akan auto-refresh dan auto-buka thread setiap jam 12:00 malam.`,
+          content: `✅ **PlatoMy Birthday Corner** berjaya ditetapkan di <#${interaction.channel.id}> (disimpan ke Neon) dan akan auto-refresh setiap jam 12:00 malam!`,
         });
         return;
       }
@@ -1924,7 +1946,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (id === "open_birthday_modal") {
         const modal = new ModalBuilder()
           .setCustomId("birthday_modal")
-          .setTitle("🎂 Register Your Birthday");
+          .setTitle("🎂 Register / Update Birthday");
 
         const dayInput = new TextInputBuilder()
           .setCustomId("bday_day")
@@ -2109,21 +2131,20 @@ client.on(Events.InteractionCreate, async (interaction) => {
           });
         }
 
-        const bData = loadBirthdayData();
+        const bData = await getBirthdayData();
         const prev = bData.users[interaction.user.id];
-        bData.users[interaction.user.id] = {
-          day,
-          month,
-          celebratedYear: prev?.day === day && prev?.month === month ? prev.celebratedYear : null,
-        };
-        saveBirthdayData(bData);
+        const isSameDate = prev && prev.day === day && prev.month === month;
+        const celebratedYear = isSameDate ? prev.celebratedYear : null;
 
-        await interaction.reply({
-          content: `🎂 Hari lahir anda telah didaftarkan pada **${formatDayMonth(day, month)}**!`,
-          ephemeral: true,
-        });
+        await saveUserBirthday(interaction.user.id, day, month, celebratedYear);
 
-        await runDailyBirthdayRoutine().catch(() => refreshBirthdayBoard(bData));
+        const replyMsg = prev
+          ? `🎂 Tarikh hari lahir anda telah dikemas kini dari **${formatDayMonth(prev.day, prev.month)}** kepada **${formatDayMonth(day, month)}**!`
+          : `🎂 Hari lahir anda telah didaftarkan pada **${formatDayMonth(day, month)}**!`;
+
+        await interaction.reply({ content: replyMsg, ephemeral: true });
+
+        await runDailyBirthdayRoutine().catch(() => refreshBirthdayBoard());
         return;
       }
 
