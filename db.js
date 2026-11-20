@@ -10,10 +10,9 @@ const pool = url
 
 const lastSaved = new Map();
 
-// Muat wallet dari PostgreSQL bila bot hidup (guna kolum discord_id)
 export async function loadWallets(wallets) {
   if (!pool) {
-    console.warn("DATABASE_URL tiada: data wallet TIDAK akan disimpan selepas restart.");
+    console.warn("DATABASE_URL tiada: data TIDAK akan disimpan selepas restart.");
     return;
   }
   try {
@@ -28,16 +27,35 @@ export async function loadWallets(wallets) {
       )
     `);
 
-    // Tambah kolum exp & sponsor_total secara automatik jika belum ada
     await pool.query(`ALTER TABLE platomy_wallets ADD COLUMN IF NOT EXISTS exp BIGINT NOT NULL DEFAULT 0`);
     await pool.query(`ALTER TABLE platomy_wallets ADD COLUMN IF NOT EXISTS sponsor_total BIGINT NOT NULL DEFAULT 0`);
 
-    // Jadual untuk simpan tetapan leaderboard (channelId & messageId)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS platomy_leaderboard_config (
         category TEXT PRIMARY KEY,
         channel_id TEXT NOT NULL,
         message_id TEXT NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    // Jadual Birthday Corner (Config & Tarikh Lahir Ahli)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS platomy_birthday_config (
+        id INT PRIMARY KEY DEFAULT 1,
+        channel_id TEXT NOT NULL,
+        chat_channel_id TEXT NOT NULL,
+        message_id TEXT NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS platomy_birthdays (
+        discord_id TEXT PRIMARY KEY,
+        day INT NOT NULL,
+        month INT NOT NULL,
+        celebrated_year INT,
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
@@ -59,7 +77,6 @@ export async function loadWallets(wallets) {
   }
 }
 
-// Simpan hanya wallet yang berubah
 async function saveChanged(wallets) {
   if (!pool) return;
   for (const [id, w] of wallets) {
@@ -84,7 +101,6 @@ async function saveChanged(wallets) {
   }
 }
 
-// Muat tetapan leaderboard dari PostgreSQL
 export async function loadLeaderboardConfigsDB() {
   if (!pool) return {};
   try {
@@ -100,7 +116,6 @@ export async function loadLeaderboardConfigsDB() {
   }
 }
 
-// Simpan tetapan leaderboard ke PostgreSQL
 export async function saveLeaderboardConfigDB(category, channelId, messageId) {
   if (!pool) return;
   try {
@@ -118,7 +133,72 @@ export async function saveLeaderboardConfigDB(category, channelId, messageId) {
   }
 }
 
-// Autosave setiap 15 saat + simpan terakhir bila bot restart/deploy
+// --- BIRTHDAY DB ---
+export async function loadBirthdayDataDB() {
+  if (!pool) return { config: null, users: {} };
+  try {
+    const cfgRes = await pool.query("SELECT channel_id, chat_channel_id, message_id FROM platomy_birthday_config WHERE id = 1");
+    const usersRes = await pool.query("SELECT discord_id, day, month, celebrated_year FROM platomy_birthdays");
+
+    const config = cfgRes.rows[0]
+      ? {
+          channelId: cfgRes.rows[0].channel_id,
+          chatChannelId: cfgRes.rows[0].chat_channel_id,
+          messageId: cfgRes.rows[0].message_id,
+        }
+      : null;
+
+    const users = {};
+    for (const r of usersRes.rows) {
+      users[r.discord_id] = {
+        day: Number(r.day),
+        month: Number(r.month),
+        celebratedYear: r.celebrated_year ? Number(r.celebrated_year) : null,
+      };
+    }
+    return { config, users };
+  } catch (e) {
+    console.error("Gagal memuat data birthday:", e.message);
+    return { config: null, users: {} };
+  }
+}
+
+export async function saveBirthdayConfigDB(channelId, chatChannelId, messageId) {
+  if (!pool) return;
+  try {
+    await pool.query(
+      `INSERT INTO platomy_birthday_config (id, channel_id, chat_channel_id, message_id, updated_at)
+       VALUES (1, $1, $2, $3, NOW())
+       ON CONFLICT (id) DO UPDATE SET
+         channel_id = EXCLUDED.channel_id,
+         chat_channel_id = EXCLUDED.chat_channel_id,
+         message_id = EXCLUDED.message_id,
+         updated_at = NOW()`,
+      [channelId, chatChannelId, messageId]
+    );
+  } catch (e) {
+    console.error("Gagal simpan birthday config:", e.message);
+  }
+}
+
+export async function saveUserBirthdayDB(discordId, day, month, celebratedYear = null) {
+  if (!pool) return;
+  try {
+    await pool.query(
+      `INSERT INTO platomy_birthdays (discord_id, day, month, celebrated_year, updated_at)
+       VALUES ($1, $2, $3, $4, NOW())
+       ON CONFLICT (discord_id) DO UPDATE SET
+         day = EXCLUDED.day,
+         month = EXCLUDED.month,
+         celebrated_year = EXCLUDED.celebrated_year,
+         updated_at = NOW()`,
+      [discordId, day, month, celebratedYear]
+    );
+  } catch (e) {
+    console.error("Gagal simpan birthday user:", e.message);
+  }
+}
+
 export function startAutosave(wallets) {
   if (!pool) return;
   setInterval(() => saveChanged(wallets), 15000);
