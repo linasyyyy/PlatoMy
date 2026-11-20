@@ -110,7 +110,6 @@ const LEVEL_ROLES = [
   { level: 10, keyword: "amethyst", label: "Amethyst" },
 ];
 
-// EXP diperlukan untuk naik dari level semasa ke level seterusnya
 function getExpNeededForLevel(lvl) {
   if (lvl <= 10) return 300;   // Senang (Lvl 1-10)
   if (lvl <= 40) return 800;   // Sederhana (Lvl 11-40)
@@ -459,7 +458,6 @@ async function runDailyBirthdayRoutine() {
     }
   }
 
-  // 1. Buang role Birthday daripada ahli yang hari jadinya sudah tamat
   if (birthdayRole) {
     await guild.members.fetch().catch(() => {});
     for (const [memberId, member] of birthdayRole.members) {
@@ -469,7 +467,6 @@ async function runDailyBirthdayRoutine() {
     }
   }
 
-  // 2. Beri role Birthday + Auto-Buka Thread Ucapan untuk setiap Birthday Star hari ini
   let changed = false;
   for (const userId of todayBirthdayIds) {
     const member = await guild.members.fetch(userId).catch(() => null);
@@ -868,6 +865,7 @@ const LEADERBOARD_CONFIG_PATH = "./leaderboard-config.json";
 const LEADERBOARD_CATEGORIES = {
   exp: {
     label: "Monthly EXP Leaderboard",
+    fancyTitle: "𝑀𝑂𝑁𝑇𝐻𝐿𝑌 𝐿𝐸𝐴𝐷𝐸𝑅𝐵𝑂𝐴𝑅𝐷",
     title: "EXP & LEVELS LEADERBOARD",
     subtitle: "TOP 10 COMMUNITY ACTIVITY RANKINGS",
     field: "exp",
@@ -878,6 +876,7 @@ const LEADERBOARD_CATEGORIES = {
   },
   sponsor: {
     label: "Monthly Sponsor Leaderboard",
+    fancyTitle: "𝑆𝑃𝑂𝑁𝑆𝑂𝑅 𝐿𝐸𝐴𝐷𝐸𝑅𝐵𝑂𝐴𝑅𝐷",
     title: "SPONSOR LEADERBOARD",
     subtitle: "TOP 10 COMMUNITY SPONSORS",
     field: "sponsorTotal",
@@ -888,6 +887,7 @@ const LEADERBOARD_CATEGORIES = {
   },
   coins: {
     label: "Plato Coins Leaderboard",
+    fancyTitle: "𝐶𝑂𝐼𝑁𝑆 𝐿𝐸𝐴𝐷𝐸𝑅𝐵𝑂𝐴𝑅𝐷",
     title: "PLATO COINS LEADERBOARD",
     subtitle: "TOP 10 RICHEST COIN HOLDERS",
     field: "coins",
@@ -898,6 +898,7 @@ const LEADERBOARD_CATEGORIES = {
   },
   pips: {
     label: "Pips Leaderboard",
+    fancyTitle: "𝑃𝐼𝑃𝑆 𝐿𝐸𝐴𝐷𝐸𝑅𝐵𝑂𝐴𝑅𝐷",
     title: "PIPS LEADERBOARD",
     subtitle: "TOP 10 RICHEST PIPS HOLDERS",
     field: "pips",
@@ -1140,6 +1141,28 @@ async function generateLeaderboardImage(category = "exp") {
 
   const imageBuffer = canvas.toBuffer("image/png");
   return new AttachmentBuilder(imageBuffer, { name: `leaderboard-${category}.png` });
+}
+
+// Container Components V2 tanpa warna untuk setiap Leaderboard
+function buildLeaderboardBox(category = "exp", extraNote = null) {
+  const meta = LEADERBOARD_CATEGORIES[category] || LEADERBOARD_CATEGORIES.exp;
+  const ts = Math.floor(Date.now() / 1000);
+  const fileName = `leaderboard-${category}.png`;
+
+  const lines = [
+    `### ˚₊‧꒰ა <a:PinkCrown:1549417235393683681> ${meta.fancyTitle} <a:PinkCrown:1549417235393683681> ໒꒱‧₊˚`,
+    `<a:a_sparkle7:1563423627263877200> ╰┈➤ **Last Update:** <t:${ts}:R>`,
+  ];
+  if (extraNote) lines.push(`-# ${extraNote}`);
+
+  return new ContainerBuilder()
+    .addTextDisplayComponents(txt(lines.join(NL)))
+    .addSeparatorComponents(sep())
+    .addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(
+        new MediaGalleryItemBuilder().setURL(`attachment://${fileName}`)
+      )
+    );
 }
 
 // ================= RANK CARD GENERATOR (/myrank) =================
@@ -1439,11 +1462,12 @@ client.once(Events.ClientReady, async (c) => {
         const message = await channel?.messages.fetch(cfg.messageId).catch(() => null);
         if (!message) continue;
 
-        const meta = LEADERBOARD_CATEGORIES[category] || LEADERBOARD_CATEGORIES.exp;
         const attachment = await generateLeaderboardImage(category);
         await message.edit({
-          content: `**${meta.label}**${NL}👑Latest updated: <t:${Math.floor(Date.now() / 1000)}:R>`,
+          components: [buildLeaderboardBox(category)],
           files: [attachment],
+          attachments: [],
+          flags: V2,
         });
         console.log(`✅ Auto-update leaderboard [${category}] berjaya!`);
       } catch (err) {
@@ -1518,8 +1542,10 @@ client.once(Events.ClientReady, async (c) => {
             const message = await channel.messages.fetch(expCfg.messageId).catch(() => null);
             if (message) {
               await message.edit({
-                content: `**Monthly EXP Leaderboard (Bulan Baharu)**${NL}👑Latest updated: <t:${Math.floor(Date.now() / 1000)}:R>`,
+                components: [buildLeaderboardBox("exp", "Bulan Baharu • Semua EXP telah diset semula ke 0")],
                 files: [attachment],
+                attachments: [],
+                flags: V2,
               });
             }
           }
@@ -1544,12 +1570,10 @@ client.on(Events.MessageCreate, async (message) => {
 
   const isLowExpChannel = LOW_EXP_CHANNEL_IDS.has(message.channel.id);
 
-  // 1. Track aktiviti untuk role Murai Yappers (kecualikan channel bot/game supaya tak spam)
   if (message.member && !isLowExpChannel) {
     handleYapperActivity(message.member).catch(() => {});
   }
 
-  // 2. Tambah EXP & semak Level Up / Level Roles
   const now = Date.now();
   const cooldownMs = isLowExpChannel ? LOW_EXP_COOLDOWN_MS : NORMAL_EXP_COOLDOWN_MS;
   const lastExp = expCooldowns.get(message.author.id) || 0;
@@ -1559,7 +1583,6 @@ client.on(Events.MessageCreate, async (message) => {
     const w = getWallet(message.author.id);
     const oldLvl = getLevelInfo(w.exp).level;
 
-    // Channel bot/game dapat 3-6 EXP, channel biasa dapat 15-25 EXP
     const gain = isLowExpChannel
       ? Math.floor(Math.random() * 4) + 3
       : Math.floor(Math.random() * 11) + 15;
@@ -1572,7 +1595,6 @@ client.on(Events.MessageCreate, async (message) => {
         syncLevelRoles(message.member, newLvl).catch(() => {});
       }
 
-      // Hantar notifikasi Level Up ke channel khusus
       const lvlChannel = await client.channels.fetch(LEVEL_UP_CHANNEL_ID).catch(() => null);
       if (lvlChannel?.isTextBased()) {
         await lvlChannel
@@ -1707,7 +1729,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         bData.config.messageId = msg.id;
         saveBirthdayData(bData);
 
-        // Semak terus kalau ada birthday hari ini
         await runDailyBirthdayRoutine().catch(() => {});
 
         await interaction.editReply({
@@ -1726,7 +1747,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const meta = LEADERBOARD_CATEGORIES[category] || LEADERBOARD_CATEGORIES.exp;
 
         const msg = await interaction.channel.send({
-          content: `📊 **${meta.label} sedang dijana... Sila tunggu sebentar.**`,
+          components: [txt(`📊 **${meta.label} sedang dijana... Sila tunggu sebentar.**`)],
+          flags: V2,
         });
 
         const configs = loadLeaderboardConfigs();
@@ -1739,11 +1761,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
         try {
           const attachment = await generateLeaderboardImage(category);
           await msg.edit({
-            content: `**${meta.label}**${NL}👑Latest updated: <t:${Math.floor(Date.now() / 1000)}:R>`,
+            components: [buildLeaderboardBox(category)],
             files: [attachment],
+            attachments: [],
+            flags: V2,
           });
           await interaction.editReply({
-            content: `✅ **${meta.label}** berjaya ditetapkan di <#${interaction.channel.id}> dan akan auto-update setiap 10 minit!`,
+            content: `✅ **${meta.label}** berjaya ditetapkan di <#${interaction.channel.id}> dalam Container V2 dan akan auto-update setiap 10 minit!`,
           });
         } catch (err) {
           console.error("Leaderboard generation error:", err);
@@ -1772,8 +1796,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
           if (message) {
             const attachment = await generateLeaderboardImage("exp");
             await message.edit({
-              content: `**Monthly EXP Leaderboard (Telah Di-reset)**${NL}👑Latest updated: <t:${Math.floor(Date.now() / 1000)}:R>`,
+              components: [buildLeaderboardBox("exp", "EXP telah diset semula ke 0")],
               files: [attachment],
+              attachments: [],
+              flags: V2,
             });
           }
         }
