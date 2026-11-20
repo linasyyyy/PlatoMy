@@ -37,6 +37,7 @@ import { loadWallets, startAutosave } from "./db.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const NL = String.fromCharCode(10);
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
@@ -65,7 +66,7 @@ function getWallet(id) {
 await loadWallets(wallets);
 startAutosave(wallets);
 
-// --- BOT SETTINGS ---
+// --- TETAPAN BOT ---
 const WALLET_LOG_CHANNEL_NAME = "wallet-log";
 const TRADING_LIST_CHANNEL_NAME = "trading-list";
 const TRADING_LOG_CHANNEL_NAME = "trading-log";
@@ -144,13 +145,11 @@ const BANK_FOOTER = "⋆˚࿔ 🎀 PlatoMy Bank 𝜗𝜚˚⋆";
 const bankFooter = () => `${BANK_FOOTER} • Today at ${getMalaysiaTime()}`;
 
 function balanceLines(w) {
-  return (
-    `╰┈➤ 🪙 Plato Coins: ${w.coins.toLocaleString()}
-` +
-    `╰┈➤ 💠 Pips: ${w.pips.toLocaleString()}
-` +
-    `╰┈➤ 🌸 Total Sponsor: ${w.sponsorTotal.toLocaleString()}`
-  );
+  return [
+    `╰┈➤ 🪙 Plato Coins: ${w.coins.toLocaleString()}`,
+    `╰┈➤ 💠 Pips: ${w.pips.toLocaleString()}`,
+    `╰┈➤ 🌸 Total Sponsor: ${w.sponsorTotal.toLocaleString()}`,
+  ].join(NL);
 }
 
 function walletBox(w) {
@@ -162,25 +161,20 @@ function walletBox(w) {
 }
 
 function walletLogBox({ actionTitle, target, admin, details, reason, w }) {
+  const logBody = [
+    `╰┈➤ 📌 **Action:** ${actionTitle}`,
+    `╰┈➤ 👤 **Target:** ${target} (\`${target.id}\`)`,
+    `╰┈➤ 🛡️ **Admin:** ${admin}`,
+    `╰┈➤ 📝 **Details:** ${details}`,
+    `╰┈➤ 💬 **Reason:** ${reason}`,
+  ].join(NL);
+
   return new ContainerBuilder()
     .addTextDisplayComponents(txt("# ˚₊‧꒰ാ 👛 𝑊𝐴𝐿𝐿𝐸𝑇 𝐿𝑂𝐺 ໒꒱‧₊˚"))
     .addSeparatorComponents(sep())
-    .addTextDisplayComponents(
-      txt(
-        `╰┈➤ 📌 **Action:** ${actionTitle}
-` +
-        `╰┈➤ 👤 **Target:** ${target} (\`${target.id}\`)
-` +
-        `╰┈➤ 🛡️ **Admin:** ${admin}
-` +
-        `╰┈➤ 📝 **Details:** ${details}
-` +
-        `╰┈➤ 💬 **Reason:** ${reason}`
-      )
-    )
+    .addTextDisplayComponents(txt(logBody))
     .addSeparatorComponents(sep())
-    .addTextDisplayComponents(txt(`**Current Balances**
-${balanceLines(w)}`))
+    .addTextDisplayComponents(txt(`**Current Balances**${NL}${balanceLines(w)}`))
     .addTextDisplayComponents(txt(`-# ${bankFooter()}`));
 }
 
@@ -200,16 +194,15 @@ function buildTradePanel(listRef) {
     );
   }
 
+  const panelBody = [
+    "╰┈➤ Click the **Trading Ticket** button below to look for or trade your Plato items.",
+    `╰┈➤ Your trade request will be posted automatically in ${listRef}.`,
+  ].join(NL);
+
   return box
     .addTextDisplayComponents(txt("# ˚₊‧꒰ാ 🛍️ 𝑃𝐿𝐴𝑇𝑂𝑀𝑌 𝑇𝑅𝐴𝐷𝐼𝑁𝐺 ໒꒱‧₊˚"))
     .addSeparatorComponents(sep())
-    .addTextDisplayComponents(
-      txt(
-        "╰┈➤ Click the **Trading Ticket** button below to look for or trade your Plato items.
-" +
-        `╰┈➤ Your trade request will be posted automatically in ${listRef}.`
-      )
-    )
+    .addTextDisplayComponents(txt(panelBody))
     .addActionRowComponents(new ActionRowBuilder().addComponents(btn));
 }
 
@@ -221,13 +214,15 @@ function buildTradeList({ requesterId, details, accepterId = null }) {
     .setStyle(ButtonStyle.Secondary)
     .setDisabled(accepted);
 
+  const listBody = [
+    `╰┈➤ **Requester:** <@${requesterId}>`,
+    `╰┈➤ **Item Details:** ${details}`,
+  ].join(NL);
+
   const box = new ContainerBuilder()
     .addTextDisplayComponents(txt("# ˚₊‧꒰ാ 📋 𝑇𝑅𝐴𝐷𝐼𝑁𝐺 𝐿𝐼𝑆𝑇 ໒꒱‧₊˚"))
     .addSeparatorComponents(sep())
-    .addTextDisplayComponents(
-      txt(`╰┈➤ **Requester:** <@${requesterId}>
-╰┈➤ **Item Details:** ${details}`)
-    )
+    .addTextDisplayComponents(txt(listBody))
     .addSeparatorComponents(sep());
 
   if (accepted) {
@@ -247,18 +242,16 @@ function buildTradeChatBox({ requesterId, accepterId, details }) {
     .setEmoji("🔒")
     .setStyle(ButtonStyle.Secondary);
 
+  const chatBody = [
+    `╰┈➤ **Requester:** <@${requesterId}>`,
+    `╰┈➤ **Accepted by:** <@${accepterId}>`,
+    `╰┈➤ **Item Details:** ${details}`,
+  ].join(NL);
+
   return new ContainerBuilder()
     .addTextDisplayComponents(txt("# ˚₊‧꒰ാ 🤝 𝑇𝑅𝐴𝐷𝐸 𝐶𝐻𝐴𝑇 ໒꒱‧₊˚"))
     .addSeparatorComponents(sep())
-    .addTextDisplayComponents(
-      txt(
-        `╰┈➤ **Requester:** <@${requesterId}>
-` +
-        `╰┈➤ **Accepted by:** <@${accepterId}>
-` +
-        `╰┈➤ **Item Details:** ${details}`
-      )
-    )
+    .addTextDisplayComponents(txt(chatBody))
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(
       txt(`╰┈➤ Discuss and complete your trade here. Only <@${accepterId}> (or an admin) can close this channel.`)
@@ -351,17 +344,17 @@ function rumbleOpenBox(game) {
     .setLabel("🎟️ Join Rumble")
     .setStyle(ButtonStyle.Secondary);
 
-  return info(
-    "🌸・PlatoMy Rumble Arena",
-    `🎁 **Total Prize:** ${game.totalPrize.toLocaleString()} ${rumbleLabel(game.currencyType)}
-` +
-    `🏆 **Winners:** ${game.winnersCount}
-` +
-    `⏳ **Ends:** <t:${game.endTimeSeconds}:R>
+  const body = [
+    `🎁 **Total Prize:** ${game.totalPrize.toLocaleString()} ${rumbleLabel(game.currencyType)}`,
+    `🏆 **Winners:** ${game.winnersCount}`,
+    `⏳ **Ends:** <t:${game.endTimeSeconds}:R>`,
+    "",
+    `👥 **Players:** ${game.participants.length}`,
+  ].join(NL);
 
-` +
-    `👥 **Players:** ${game.participants.length}`
-  ).addActionRowComponents(new ActionRowBuilder().addComponents(joinBtn));
+  return info("🌸・PlatoMy Rumble Arena", body).addActionRowComponents(
+    new ActionRowBuilder().addComponents(joinBtn)
+  );
 }
 
 async function createRumble(channel, currencyType, totalPrize, durationMins, winnersCount = 1) {
@@ -395,10 +388,10 @@ async function runRumbleBattle(channel, msgId) {
 
   if (players.length === 0) {
     await edit(
-      info("🌸・Rumble Ended", `🎁 **Prize:** ${prizeText}
-🏆 **Winners:** No participants
-
-👥 **Players:** 0`)
+      info(
+        "🌸・Rumble Ended",
+        [`🎁 **Prize:** ${prizeText}`, "🏆 **Winners:** No participants", "", "👥 **Players:** 0"].join(NL)
+      )
     );
     await channel.send("😢 Rumble ended with no participants.").catch(() => {});
     return;
@@ -407,15 +400,13 @@ async function runRumbleBattle(channel, msgId) {
   let alive = [...players];
 
   if (alive.length > winnersCount) {
-    await edit(
-      info(
-        "🌸・PlatoMy Rumble Arena",
-        `🔥 **The battle begins!**
-${players.length} players have entered the arena...` +
-        (winnersCount > 1 ? `
-🏆 Last **${winnersCount}** standing win!` : "")
-      )
-    );
+    const startLines = [
+      "🔥 **The battle begins!**",
+      `${players.length} players have entered the arena...`,
+    ];
+    if (winnersCount > 1) startLines.push(`🏆 Last **${winnersCount}** standing win!`);
+
+    await edit(info("🌸・PlatoMy Rumble Arena", startLines.join(NL)));
     await sleep(5000);
 
     let round = 0;
@@ -438,14 +429,15 @@ ${players.length} players have entered the arena...` +
       const shown = lines.slice(0, 8);
       if (lines.length > shown.length) shown.push(`...and ${lines.length - shown.length} more fell in the chaos.`);
 
-      await edit(
-        info("🌸・PlatoMy Rumble Arena", `⚔️ **Round ${round}**
+      const roundBody = [
+        `⚔️ **Round ${round}**`,
+        "",
+        shown.join(NL),
+        "",
+        `👥 **Players left:** ${alive.length}`,
+      ].join(NL);
 
-${shown.join("
-")}
-
-👥 **Players left:** ${alive.length}`)
-      );
+      await edit(info("🌸・PlatoMy Rumble Arena", roundBody));
       if (alive.length > winnersCount) await sleep(5000);
     }
     await sleep(2000);
@@ -468,22 +460,19 @@ ${shown.join("
       ? ` (${share.toLocaleString()} ${label} each${remainder > 0 ? `, +${remainder.toLocaleString()} to <@${winners[0]}>` : ""})`
       : "";
 
-  await edit(
-    info(
-      "🌸・Rumble Ended",
-      `🎁 **Prize:** ${prizeText}${shareText}
-🏆 **Winner${winners.length > 1 ? "s" : ""}:** ${winnerMentions}
+  const endBody = [
+    `🎁 **Prize:** ${prizeText}${shareText}`,
+    `🏆 **Winner${winners.length > 1 ? "s" : ""}:** ${winnerMentions}`,
+    "",
+    `👥 **Players:** ${players.length}`,
+  ].join(NL);
 
-👥 **Players:** ${players.length}`
-    )
-  );
+  await edit(info("🌸・Rumble Ended", endBody));
 
   if (winners.length === 1) {
     await channel.send(`🏆 <@${winners[0]}> won **${prizeText}** in PlatoMy Rumble!`).catch(() => {});
   } else {
-    await channel.send(
-      `🏆 ${winnerMentions} won **${prizeText}** in PlatoMy Rumble!${shareText}`
-    ).catch(() => {});
+    await channel.send(`🏆 ${winnerMentions} won **${prizeText}** in PlatoMy Rumble!${shareText}`).catch(() => {});
   }
 }
 
@@ -529,7 +518,6 @@ async function generateLeaderboardImage() {
   drawRoundRect(ctx, 10, 10, width - 20, height - 20, 28, false, true);
 
   // 3. Header Section
-  // Top Pill Badge
   ctx.fillStyle = "rgba(249, 150, 177, 0.12)";
   ctx.strokeStyle = "rgba(249, 150, 177, 0.45)";
   ctx.lineWidth = 1;
@@ -540,7 +528,6 @@ async function generateLeaderboardImage() {
   ctx.textAlign = "center";
   ctx.fillText("✦ PLATOMY ✦", width / 2, 48);
 
-  // Main Title with Pink-White Gradient
   const titleGrad = ctx.createLinearGradient(width / 2 - 220, 0, width / 2 + 220, 0);
   titleGrad.addColorStop(0, "#FFFFFF");
   titleGrad.addColorStop(0.5, "#F996B1");
@@ -549,7 +536,6 @@ async function generateLeaderboardImage() {
   ctx.font = "900 32px serif";
   ctx.fillText("MONTHLY LEADERBOARD", width / 2, 88);
 
-  // Divider Line
   const divGrad = ctx.createLinearGradient(100, 0, width - 100, 0);
   divGrad.addColorStop(0, "rgba(249, 150, 177, 0)");
   divGrad.addColorStop(0.5, "rgba(249, 150, 177, 0.55)");
@@ -566,7 +552,6 @@ async function generateLeaderboardImage() {
   const sortedXp = [...allWallets].sort((a, b) => b.exp - a.exp).slice(0, 10);
   const sortedSponsor = [...allWallets].sort((a, b) => b.sponsorTotal - a.sponsorTotal).slice(0, 10);
 
-  // Pad up to 10 rows so the board always looks full and balanced
   while (sortedXp.length < 10) sortedXp.push({ id: null, exp: 0, sponsorTotal: 0 });
   while (sortedSponsor.length < 10) sortedSponsor.push({ id: null, exp: 0, sponsorTotal: 0 });
 
@@ -589,7 +574,6 @@ async function generateLeaderboardImage() {
   const drawColumn = async (title, entries, startX, type) => {
     const colWidth = 540;
 
-    // Column Header Accent Bar + Title
     ctx.fillStyle = "#F996B1";
     ctx.fillRect(startX, 126, 4, 18);
     ctx.font = "bold 15px sans-serif";
@@ -602,9 +586,8 @@ async function generateLeaderboardImage() {
     for (let i = 0; i < 10; i++) {
       const rank = i + 1;
       const entry = entries[i];
-      const info = await fetchPlayerInfo(entry);
+      const infoData = await fetchPlayerInfo(entry);
 
-      // Row Card Background & Border
       if (rank === 1) {
         const r1Grad = ctx.createLinearGradient(startX, y, startX + colWidth, y);
         r1Grad.addColorStop(0, "rgba(249, 150, 177, 0.22)");
@@ -645,9 +628,9 @@ async function generateLeaderboardImage() {
       ctx.fill();
 
       let drewAvatar = false;
-      if (info.avatarUrl) {
+      if (infoData.avatarUrl) {
         try {
-          const img = await loadImage(info.avatarUrl);
+          const img = await loadImage(infoData.avatarUrl);
           ctx.save();
           ctx.beginPath();
           ctx.arc(avX, avY, avR, 0, Math.PI * 2);
@@ -662,14 +645,14 @@ async function generateLeaderboardImage() {
         ctx.fillStyle = "#FFFFFF";
         ctx.font = "bold 12px sans-serif";
         ctx.textAlign = "center";
-        ctx.fillText(info.initials, avX, avY + 4);
+        ctx.fillText(infoData.initials, avX, avY + 4);
       }
 
       // Player Name & Subtitle
       ctx.textAlign = "left";
       ctx.fillStyle = "#FFFFFF";
       ctx.font = "bold 14px sans-serif";
-      const displayName = info.username.length > 14 ? info.username.slice(0, 14) + "…" : info.username;
+      const displayName = infoData.username.length > 14 ? infoData.username.slice(0, 14) + "…" : infoData.username;
       ctx.fillText(displayName, startX + 102, y + 24);
 
       ctx.fillStyle = "#F996B1";
@@ -677,7 +660,6 @@ async function generateLeaderboardImage() {
       if (type === "xp") {
         ctx.fillText(`${entry.exp.toLocaleString()} EXP`, startX + 102, y + 41);
 
-        // Progress Bar (XP Column)
         const xpPct = Math.min(100, Math.floor(((entry.exp % 1000) / 1000) * 100));
         const barX = startX + 245;
         const barW = 175;
@@ -700,7 +682,6 @@ async function generateLeaderboardImage() {
           drawRoundRect(ctx, barX, barY, Math.max(8, (barW * xpPct) / 100), 7, 4, true, false);
         }
 
-        // Level Badge
         const level = entry.id ? Math.floor(entry.exp / 1000) + 1 : 0;
         const badgeX = startX + colWidth - 88;
         ctx.fillStyle = "rgba(249, 150, 177, 0.14)";
@@ -715,7 +696,6 @@ async function generateLeaderboardImage() {
       } else {
         ctx.fillText("Community Sponsor", startX + 102, y + 41);
 
-        // Sponsor Progress Bar (Visual relative to Top Sponsor)
         const maxSponsor = Math.max(1, entries[0]?.sponsorTotal || 1);
         const spPct = entry.sponsorTotal > 0 ? Math.min(100, Math.round((entry.sponsorTotal / maxSponsor) * 100)) : 0;
         const barX = startX + 245;
@@ -739,7 +719,6 @@ async function generateLeaderboardImage() {
           drawRoundRect(ctx, barX, barY, Math.max(8, (barW * spPct) / 100), 7, 4, true, false);
         }
 
-        // Sponsor Total Badge
         const badgeX = startX + colWidth - 98;
         ctx.fillStyle = "rgba(249, 150, 177, 0.14)";
         ctx.strokeStyle = "rgba(249, 150, 177, 0.45)";
@@ -906,7 +885,7 @@ client.once(Events.ClientReady, async (c) => {
     console.error("Gagal mendaftarkan slash commands:", error);
   }
 
-  // --- AUTO-UPDATE LEADERBOARD (Every 10 minutes) ---
+  // --- AUTO-UPDATE LEADERBOARD (Setiap 10 minit) ---
   cron.schedule("*/10 * * * *", async () => {
     try {
       if (fs.existsSync("./leaderboard-config.json")) {
@@ -918,8 +897,7 @@ client.once(Events.ClientReady, async (c) => {
             console.log("Mengemas kini automatic leaderboard...");
             const attachment = await generateLeaderboardImage();
             await message.edit({
-              content: `**Monthly Leaderboard**
-Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
+              content: `**Monthly Leaderboard**${NL}Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
               files: [attachment],
             });
             console.log("✅ Automatic Leaderboard berjaya dikemas kini!");
@@ -931,7 +909,7 @@ Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
     }
   });
 
-  // --- MONTHLY AUTO-RESET EXP (1st of every month at 00:00) ---
+  // --- AUTO-RESET EXP BULANAN (Setiap 1 hari bulan jam 12:00 malam) ---
   cron.schedule("0 0 1 * *", async () => {
     try {
       console.log("Memulakan proses auto-reset EXP bulanan...");
@@ -951,8 +929,7 @@ Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
           const message = await channel.messages.fetch(config.messageId).catch(() => null);
           if (message) {
             await message.edit({
-              content: `**Monthly Leaderboard (Bulan Baharu)**
-Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
+              content: `**Monthly Leaderboard (Bulan Baharu)**${NL}Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
               files: [attachment],
             });
           }
@@ -1083,8 +1060,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         try {
           const attachment = await generateLeaderboardImage();
           await msg.edit({
-            content: `**Monthly Leaderboard**
-Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
+            content: `**Monthly Leaderboard**${NL}Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
             files: [attachment],
           });
           await interaction.editReply({ content: "✅ Leaderboard berjaya ditubuhkan dan dikemas kini!" });
@@ -1115,8 +1091,7 @@ Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
             if (message) {
               const attachment = await generateLeaderboardImage();
               await message.edit({
-                content: `**Monthly Leaderboard (Telah Di-reset)**
-Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
+                content: `**Monthly Leaderboard (Telah Di-reset)**${NL}Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
                 files: [attachment],
               });
             }
@@ -1222,7 +1197,7 @@ Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
       }
     }
 
-    // ===== BUTTONS =====
+    // ===== BUTANG =====
     if (interaction.isButton()) {
       const id = interaction.customId;
 
@@ -1305,22 +1280,17 @@ Terakhir dikemas kini: <t:${Math.floor(Date.now() / 1000)}:R>`,
 
         const logChannel = findChannel(interaction.guild, TRADING_LOG_CHANNEL_NAME);
         if (logChannel) {
+          const logLines = [
+            `📥 **Requester:** <@${requesterId}> (\`${requesterId}\`)`,
+            `🤝 **Accepted by:** ${interaction.user} (\`${interaction.user.id}\`)`,
+          ];
+          if (tradeChannel) logLines.push(`📍 **Trade Channel:** ${tradeChannel}`);
+          logLines.push("", "📝 **Item:**", item);
+
           await logChannel
             .send({
               components: [
-                info(
-                  "🛍️ Trading Log: Trade Accepted",
-                  `📥 **Requester:** <@${requesterId}> (\`${requesterId}\`)
-` +
-                  `🤝 **Accepted by:** ${interaction.user} (\`${interaction.user.id}\`)
-` +
-                  (tradeChannel ? `📍 **Trade Channel:** ${tradeChannel}
-` : "") +
-                  `
-📝 **Item:**
-${item}`,
-                  `Trading Log • Today at ${getMalaysiaTime()}`
-                ),
+                info("🛍️ Trading Log: Trade Accepted", logLines.join(NL), `Trading Log • Today at ${getMalaysiaTime()}`),
               ],
               flags: V2,
               allowedMentions: NO_PING,
@@ -1351,18 +1321,16 @@ ${item}`,
 
         const logChannel = findChannel(interaction.guild, TRADING_LOG_CHANNEL_NAME);
         if (logChannel) {
+          const closeLines = [
+            `🔒 **Closed by:** ${interaction.user} (\`${interaction.user.id}\`)`,
+            `🤝 **Accepted by:** <@${accepterId}>`,
+            `📍 **Channel:** ${channelName}`,
+          ].join(NL);
+
           await logChannel
             .send({
               components: [
-                info(
-                  "🛍️ Trading Log: Trade Closed",
-                  `🔒 **Closed by:** ${interaction.user} (\`${interaction.user.id}\`)
-` +
-                  `🤝 **Accepted by:** <@${accepterId}>
-` +
-                  `📍 **Channel:** ${channelName}`,
-                  `Trading Log • Today at ${getMalaysiaTime()}`
-                ),
+                info("🛍️ Trading Log: Trade Closed", closeLines, `Trading Log • Today at ${getMalaysiaTime()}`),
               ],
               flags: V2,
               allowedMentions: NO_PING,
@@ -1378,7 +1346,7 @@ ${item}`,
       }
     }
 
-    // ===== MODALS =====
+    // ===== MODAL =====
     if (interaction.isModalSubmit()) {
       if (interaction.customId === "trading_modal") {
         const details = interaction.fields.getTextInputValue("trading_text").trim();
@@ -1414,17 +1382,17 @@ ${item}`,
 
         const logChannel = findChannel(interaction.guild, TRADING_LOG_CHANNEL_NAME);
         if (logChannel) {
+          const reqLines = [
+            `👤 **Requester:** ${interaction.user} (\`${interaction.user.id}\`)`,
+            "",
+            "📝 **Item:**",
+            details,
+          ].join(NL);
+
           await logChannel
             .send({
               components: [
-                info(
-                  "🛍️ Trading Log: New Request",
-                  `👤 **Requester:** ${interaction.user} (\`${interaction.user.id}\`)
-
-` + `📝 **Item:**
-${details}`,
-                  `Trading Log • Today at ${getMalaysiaTime()}`
-                ),
+                info("🛍️ Trading Log: New Request", reqLines, `Trading Log • Today at ${getMalaysiaTime()}`),
               ],
               flags: V2,
               allowedMentions: NO_PING,
