@@ -167,7 +167,7 @@ export function createLeaderboardSystem({ client, wallets, getWallet, getLevelIn
   async function generateLeaderboardImage(category = "exp") {
     const meta = LEADERBOARD_CATEGORIES[category] || LEADERBOARD_CATEGORIES.exp;
     const W = 740;
-    const H = 705;
+    const H = 760;
     const S = 2;
     const canvas = createCanvas(W * S, H * S);
     const ctx = canvas.getContext("2d");
@@ -384,7 +384,7 @@ export function createLeaderboardSystem({ client, wallets, getWallet, getLevelIn
     const listX = 18;
     const listW = W - 36;
     const listTop = 310;
-    const rowH = 51;
+    const rowH = 60;
 
     ctx.fillStyle = "rgba(255,255,255,0.045)";
     ctx.beginPath();
@@ -394,9 +394,9 @@ export function createLeaderboardSystem({ client, wallets, getWallet, getLevelIn
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    const barX = 130;
-    const barW = 340;
-    const rightX = W - 34;
+    const barX = 138;
+    const barW = 315;
+    const rightX = W - 32;
 
     for (let i = 3; i < 10; i++) {
       const p = players[i];
@@ -406,22 +406,26 @@ export function createLeaderboardSystem({ client, wallets, getWallet, getLevelIn
 
       ctx.globalAlpha = p.hasUser ? 1 : 0.45;
 
+      // nombor ranking
       ctx.textAlign = "center";
       ctx.fillStyle = PINK;
-      ctx.font = `italic 700 24px ${SERIF}`;
-      ctx.fillText(String(i + 1), 48, mid + 8);
+      ctx.font = `italic 700 28px ${SERIF}`;
+      ctx.fillText(String(i + 1), 50, mid + 10);
 
-      drawAvatarRing(ctx, 96, mid, 19, 2.5, p);
+      // avatar
+      drawAvatarRing(ctx, 102, mid, 22, 2.5, p);
 
+      // nama
       ctx.textAlign = "left";
       ctx.fillStyle = TEXT;
-      ctx.font = `700 17px ${SANS}`;
-      ctx.fillText(fitText(ctx, p.name, showBar ? 360 : 410), barX, showBar ? mid - 4 : mid + 6);
+      ctx.font = `700 21px ${SANS}`;
+      ctx.fillText(fitText(ctx, p.name, showBar ? 340 : 400), barX, showBar ? mid - 5 : mid + 7);
 
+      // bar progress & %
       if (showBar) {
         ctx.fillStyle = "rgba(255,255,255,0.1)";
         ctx.beginPath();
-        ctx.roundRect(barX, mid + 8, barW, 5, 2.5);
+        ctx.roundRect(barX, mid + 9, barW, 6.5, 3.25);
         ctx.fill();
 
         if (p.pct > 0) {
@@ -434,20 +438,21 @@ export function createLeaderboardSystem({ client, wallets, getWallet, getLevelIn
           ctx.shadowBlur = 6;
           ctx.fillStyle = fg;
           ctx.beginPath();
-          ctx.roundRect(barX, mid + 8, Math.max(4, (barW * p.pct) / 100), 5, 2.5);
+          ctx.roundRect(barX, mid + 9, Math.max(5, (barW * p.pct) / 100), 6.5, 3.25);
           ctx.fill();
           ctx.restore();
         }
 
         ctx.textAlign = "right";
         ctx.fillStyle = MUTED;
-        ctx.font = `600 13px ${SANS}`;
-        ctx.fillText(`${p.pct}%`, 515, mid + 14);
+        ctx.font = `600 15.5px ${SANS}`;
+        ctx.fillText(`${p.pct}%`, 508, mid + 16);
       }
 
-      const expY = showLevel ? mid - 3 : mid + 7;
+      // EXP / jumlah di kanan
+      const expY = showLevel ? mid - 4 : mid + 8;
       ctx.textAlign = "right";
-      ctx.font = `500 12px ${SANS}`;
+      ctx.font = `500 14px ${SANS}`;
       const wUnit = p.unit ? ctx.measureText(p.unit).width : 0;
       if (p.unit) {
         ctx.fillStyle = MUTED;
@@ -455,25 +460,26 @@ export function createLeaderboardSystem({ client, wallets, getWallet, getLevelIn
       }
 
       ctx.fillStyle = PINK_SOFT;
-      ctx.font = `italic 600 19px ${SERIF}`;
+      ctx.font = `italic 600 23px ${SERIF}`;
       ctx.fillText(p.num, rightX - (p.unit ? wUnit + 4 : 0), expY);
 
+      // pill LVL (EXP bulanan sahaja)
       if (showLevel) {
         const label = `LVL ${pad2(p.level)}`;
-        ctx.font = `700 12px ${SANS}`;
-        const pw = ctx.measureText(label).width + 18;
+        ctx.font = `700 14px ${SANS}`;
+        const pw = ctx.measureText(label).width + 20;
         const px = rightX - pw;
         const py = mid + 4;
 
         ctx.strokeStyle = "rgba(249,150,177,0.5)";
-        ctx.lineWidth = 1;
+        ctx.lineWidth = 1.2;
         ctx.beginPath();
-        ctx.roundRect(px, py, pw, 19, 9.5);
+        ctx.roundRect(px, py, pw, 22, 11);
         ctx.stroke();
 
         ctx.fillStyle = PINK;
         ctx.textAlign = "center";
-        ctx.fillText(label, px + pw / 2, py + 13.5);
+        ctx.fillText(label, px + pw / 2, py + 15.5);
       }
 
       ctx.globalAlpha = 1;
@@ -490,19 +496,19 @@ export function createLeaderboardSystem({ client, wallets, getWallet, getLevelIn
 
     // ---------- FOOTER ----------
     const part1 = "Auto-update setiap 10 minit  ·  ";
-    ctx.font = `500 13px ${SANS}`;
+    ctx.font = `500 13.5px ${SANS}`;
     const w1 = ctx.measureText(part1).width;
-    ctx.font = `700 13px ${SANS}`;
+    ctx.font = `700 13.5px ${SANS}`;
     const w2 = ctx.measureText("PlatoMy").width;
     const fx = W / 2 - (w1 + w2) / 2;
 
     ctx.textAlign = "left";
     ctx.fillStyle = MUTED;
-    ctx.font = `500 13px ${SANS}`;
-    ctx.fillText(part1, fx, 694);
+    ctx.font = `500 13.5px ${SANS}`;
+    ctx.fillText(part1, fx, 752);
     ctx.fillStyle = PINK;
-    ctx.font = `700 13px ${SANS}`;
-    ctx.fillText("PlatoMy", fx + w1, 694);
+    ctx.font = `700 13.5px ${SANS}`;
+    ctx.fillText("PlatoMy", fx + w1, 752);
 
     return new AttachmentBuilder(canvas.toBuffer("image/png"), { name: `leaderboard-${category}.png` });
   }
