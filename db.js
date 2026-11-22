@@ -29,6 +29,9 @@ export async function loadWallets(wallets) {
 
     await pool.query(`ALTER TABLE platomy_wallets ADD COLUMN IF NOT EXISTS exp BIGINT NOT NULL DEFAULT 0`);
     await pool.query(`ALTER TABLE platomy_wallets ADD COLUMN IF NOT EXISTS sponsor_total BIGINT NOT NULL DEFAULT 0`);
+    await pool.query(`ALTER TABLE platomy_wallets ADD COLUMN IF NOT EXISTS exp_total BIGINT NOT NULL DEFAULT 0`);
+    await pool.query(`ALTER TABLE platomy_wallets ADD COLUMN IF NOT EXISTS sponsor_monthly BIGINT NOT NULL DEFAULT 0`);
+    await pool.query(`UPDATE platomy_wallets SET exp_total = exp WHERE exp_total = 0 AND exp > 0`);
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS platomy_leaderboard_config (
@@ -66,7 +69,9 @@ export async function loadWallets(wallets) {
         coins: Number(r.coins || 0),
         pips: Number(r.pips || 0),
         exp: Number(r.exp || 0),
+        expTotal: Number(r.exp_total || 0),
         sponsorTotal: Number(r.sponsor_total || 0),
+        sponsorMonthly: Number(r.sponsor_monthly || 0),
       };
       wallets.set(r.discord_id, w);
       lastSaved.set(r.discord_id, JSON.stringify(w));
@@ -84,15 +89,17 @@ async function saveChanged(wallets) {
     if (lastSaved.get(id) === snap) continue;
     try {
       await pool.query(
-        `INSERT INTO platomy_wallets (discord_id, coins, pips, exp, sponsor_total, updated_at)
-         VALUES ($1, $2, $3, $4, $5, NOW())
+        `INSERT INTO platomy_wallets (discord_id, coins, pips, exp, exp_total, sponsor_total, sponsor_monthly, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
          ON CONFLICT (discord_id) DO UPDATE SET
            coins = EXCLUDED.coins,
            pips = EXCLUDED.pips,
            exp = EXCLUDED.exp,
+           exp_total = EXCLUDED.exp_total,
            sponsor_total = EXCLUDED.sponsor_total,
+           sponsor_monthly = EXCLUDED.sponsor_monthly,
            updated_at = NOW()`,
-        [id, w.coins, w.pips, w.exp, w.sponsorTotal]
+        [id, w.coins, w.pips, w.exp, w.expTotal || 0, w.sponsorTotal, w.sponsorMonthly || 0]
       );
       lastSaved.set(id, snap);
     } catch (e) {
