@@ -79,7 +79,6 @@ export const commands = [
     .addStringOption((opt) => opt.setName("image_url").setDescription("Link URL gambar").setRequired(true))
     .addStringOption((opt) => opt.setName("color").setDescription("Kod warna Hex (cth: #ffb6c1)").setRequired(false)),
   new SlashCommandBuilder()
-    new SlashCommandBuilder()
     .setName("plato-arena")
     .setDescription("Mula permainan Plato Arena dengan pilihan Bounty (Admin sahaja)")
     .addStringOption((opt) =>
