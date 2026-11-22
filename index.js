@@ -101,8 +101,8 @@ const TRADE_MEDIA_URLS = [URL_1, URL_2, URL_1];
 
 // --- TETAPAN LEVEL (MAX 100) & EXP BERPERINGKAT ---
 const MAX_LEVEL = 100;
-const NORMAL_EXP_COOLDOWN_MS = 30 * 1000;  // 30 saat (channel biasa)
-const LOW_EXP_COOLDOWN_MS = 60 * 1000;     // 60 saat (channel bot/game)
+const NORMAL_EXP_COOLDOWN_MS = 30 * 1000;
+const LOW_EXP_COOLDOWN_MS = 60 * 1000;
 const expCooldowns = new Map();
 
 const LEVEL_ROLES = [
@@ -114,16 +114,15 @@ const LEVEL_ROLES = [
 ];
 
 function getExpNeededForLevel(lvl) {
-  if (lvl <= 10) return 300;   // Senang (Lvl 1-10)
-  if (lvl <= 40) return 800;   // Sederhana (Lvl 11-40)
-  if (lvl <= 75) return 1500;  // Susah (Lvl 41-75)
-  return 2500;                 // Sangat Susah (Lvl 76-100)
+  if (lvl <= 10) return 300;
+  if (lvl <= 40) return 800;
+  if (lvl <= 75) return 1500;
+  return 2500;
 }
 
 function getLevelInfo(exp) {
   let remaining = Math.max(0, Number(exp) || 0);
   let level = 1;
-
   while (level < MAX_LEVEL) {
     const needed = getExpNeededForLevel(level);
     if (remaining >= needed) {
@@ -133,28 +132,23 @@ function getLevelInfo(exp) {
       break;
     }
   }
-
   const isMax = level >= MAX_LEVEL;
   const neededForNext = isMax ? getExpNeededForLevel(MAX_LEVEL - 1) : getExpNeededForLevel(level);
   const currentLevelExp = isMax ? neededForNext : remaining;
   const expToNext = isMax ? 0 : neededForNext - currentLevelExp;
   const progressPct = isMax ? 100 : Math.min(100, Math.floor((currentLevelExp / neededForNext) * 100));
   const tier = LEVEL_ROLES.find((r) => level >= r.level)?.label || "Unranked";
-
   return { level, isMax, currentLevelExp, neededForNext, expToNext, progressPct, tier };
 }
 
 async function syncLevelRoles(member, level) {
   if (!member?.guild) return;
   const targetTier = LEVEL_ROLES.find((r) => level >= r.level) || null;
-
   for (const tier of LEVEL_ROLES) {
     const role = member.guild.roles.cache.find((r) => r.name.toLowerCase().includes(tier.keyword));
     if (!role) continue;
-
     const shouldHave = targetTier && targetTier.keyword === tier.keyword;
     const hasRole = member.roles.cache.has(role.id);
-
     if (shouldHave && !hasRole) {
       await member.roles.add(role).catch(() => {});
     } else if (!shouldHave && hasRole) {
@@ -166,9 +160,9 @@ async function syncLevelRoles(member, level) {
 // --- TETAPAN MURAI YAPPERS (Aktif Seminggu, Auto-Remove 3 Hari Tak Aktif) ---
 const YAPPER_DATA_PATH = "./yapper-activity.json";
 const YAPPER_ROLE_KEYWORD = "murai yappers";
-const YAPPER_MSG_THRESHOLD = 50;                     // 50 mesej dalam 7 hari
-const YAPPER_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;    // 7 hari (1 minggu)
-const YAPPER_INACTIVE_MS = 3 * 24 * 60 * 60 * 1000;  // 3 hari tak aktif -> auto remove
+const YAPPER_MSG_THRESHOLD = 50;
+const YAPPER_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const YAPPER_INACTIVE_MS = 3 * 24 * 60 * 60 * 1000;
 
 function loadYapperActivity() {
   if (!fs.existsSync(YAPPER_DATA_PATH)) return new Map();
@@ -200,12 +194,10 @@ async function handleYapperActivity(member) {
   if (!member?.guild) return;
   const now = Date.now();
   const data = yapperActivity.get(member.id) || { timestamps: [], lastActive: now, guildId: member.guild.id };
-
   data.timestamps = (data.timestamps || []).filter((t) => now - t <= YAPPER_WINDOW_MS);
   data.timestamps.push(now);
   data.lastActive = now;
   data.guildId = member.guild.id;
-
   yapperActivity.set(member.id, data);
   scheduleSaveYapperActivity();
 
@@ -260,7 +252,6 @@ function getMalaysiaDateParts() {
 const V2 = MessageFlags.IsComponentsV2;
 const V2_EPHEMERAL = MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral;
 const NO_PING = { parse: [] };
-
 const sep = () => new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small);
 const txt = (content) => new TextDisplayBuilder().setContent(content);
 
@@ -374,7 +365,6 @@ function getBirthdayDiffDays(day, month, today) {
 function buildBirthdayCornerBox(data) {
   const today = getMalaysiaDateParts();
   const chatChannelId = data.config?.chatChannelId || data.config?.channelId || "1552249117621747782";
-
   const todayList = [];
   const upcomingList = [];
   const recentList = [];
@@ -456,7 +446,6 @@ async function refreshBirthdayBoard(data = null) {
   const channel = await client.channels.fetch(bData.config.channelId).catch(() => null);
   const message = await channel?.messages.fetch(bData.config.messageId).catch(() => null);
   if (!message) return;
-
   await message
     .edit({
       components: [buildBirthdayCornerBox(bData)],
@@ -469,7 +458,6 @@ async function refreshBirthdayBoard(data = null) {
 async function runDailyBirthdayRoutine() {
   const bData = await getBirthdayData();
   if (!bData.config?.channelId) return;
-
   const today = getMalaysiaDateParts();
   const channel = await client.channels.fetch(bData.config.channelId).catch(() => null);
   if (!channel?.guild) return;
@@ -497,7 +485,6 @@ async function runDailyBirthdayRoutine() {
   for (const userId of todayBirthdayIds) {
     const member = await guild.members.fetch(userId).catch(() => null);
     if (!member) continue;
-
     if (birthdayRole && !member.roles.cache.has(birthdayRole.id)) {
       await member.roles.add(birthdayRole).catch(() => {});
     }
@@ -824,7 +811,6 @@ async function runRumbleBattle(channel, msgId) {
       round++;
       const kills = Math.max(1, Math.min(alive.length - winnersCount, Math.ceil(alive.length * 0.35)));
       const lines = [];
-
       for (let i = 0; i < kills; i++) {
         const [victim] = alive.splice(Math.floor(Math.random() * alive.length), 1);
         const v = `<@${victim}>`;
@@ -867,7 +853,7 @@ async function runRumbleBattle(channel, msgId) {
   const winnerMentions = winners.map((id) => `<@${id}>`).join(", ");
   const shareText =
     winners.length > 1
-      ? ` (${share.toLocaleString()} ${label} each${remainder > 0 ? `, +${remainder.toLocaleString()} to <@${winners[0]}>` : ""})`
+      ? ` (${share.toLocaleString()} ${label} each${remainder > 0 ? `, +\${remainder.toLocaleString()} to <@\${winners[0]}>` : ""})`
       : "";
 
   const endBody = [
@@ -1188,9 +1174,9 @@ function drawAvatarRing(ctx, cx, cy, r, ring, p) {
 
 async function generateLeaderboardImage(category = "exp") {
   const meta = LEADERBOARD_CATEGORIES[category] || LEADERBOARD_CATEGORIES.exp;
-  const W = 580;
-  const H = 814;
-  const S = 2; // resolusi 2x supaya tajam
+  const W = 740;
+  const H = 690;
+  const S = 2;
   const canvas = createCanvas(W * S, H * S);
   const ctx = canvas.getContext("2d");
   ctx.scale(S, S);
@@ -1208,7 +1194,7 @@ async function generateLeaderboardImage(category = "exp") {
   // ---------- LATAR ----------
   ctx.save();
   ctx.beginPath();
-  ctx.roundRect(0, 0, W, H, 30);
+  ctx.roundRect(0, 0, W, H, 28);
   ctx.clip();
 
   const bg = ctx.createLinearGradient(0, 0, 0, H);
@@ -1224,15 +1210,15 @@ async function generateLeaderboardImage(category = "exp") {
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, H);
   };
-  glow(W * 0.18, 0, 340, "rgba(249,150,177,0.38)", "rgba(249,150,177,0)");
-  glow(W * 0.95, H * 0.22, 300, "rgba(150,90,190,0.28)", "rgba(150,90,190,0)");
-  glow(W * 0.5, H, 380, "rgba(249,150,177,0.22)", "rgba(249,150,177,0)");
+  glow(W * 0.18, 0, 380, "rgba(249,150,177,0.38)", "rgba(249,150,177,0)");
+  glow(W * 0.95, H * 0.22, 340, "rgba(150,90,190,0.28)", "rgba(150,90,190,0)");
+  glow(W * 0.5, H, 420, "rgba(249,150,177,0.22)", "rgba(249,150,177,0)");
   ctx.restore();
 
   ctx.strokeStyle = "rgba(249,150,177,0.25)";
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.roundRect(0.5, 0.5, W - 1, H - 1, 30);
+  ctx.roundRect(0.5, 0.5, W - 1, H - 1, 28);
   ctx.stroke();
 
   // ---------- DATA ----------
@@ -1283,45 +1269,44 @@ async function generateLeaderboardImage(category = "exp") {
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
   ctx.fillStyle = PINK;
-  ctx.font = `700 12px ${SANS}`;
-  ctx.fillText(`PlatoMy  •  ${meta.label.replace(" Leaderboard", "")}`, W / 2, 44);
+  ctx.font = `700 13px ${SANS}`;
+  ctx.fillText(`PlatoMy  •  ${meta.label.replace(" Leaderboard", "")}`, W / 2, 34);
 
-  const tg = ctx.createLinearGradient(0, 60, 0, 98);
+  const tg = ctx.createLinearGradient(0, 46, 0, 82);
   tg.addColorStop(0.15, "#ffffff");
   tg.addColorStop(1, PINK);
   ctx.fillStyle = tg;
-  ctx.font = `italic 700 42px ${SERIF}`;
-  ctx.fillText("Leaderboard", W / 2, 92);
+  ctx.font = `italic 700 40px ${SERIF}`;
+  ctx.fillText("Leaderboard", W / 2, 76);
 
   ctx.fillStyle = MUTED;
-  ctx.font = `500 12px ${SANS}`;
+  ctx.font = `500 12.5px ${SANS}`;
   const subtitle = meta.subtitle.charAt(0) + meta.subtitle.slice(1).toLowerCase();
-  ctx.fillText(subtitle, W / 2, 114);
+  ctx.fillText(subtitle, W / 2, 96);
 
   // ---------- PODIUM (susunan 2 - 1 - 3) ----------
-  const cxs = [W / 2 - 191.5, W / 2, W / 2 + 191.5];
+  const cxs = [W / 2 - 220, W / 2, W / 2 + 220];
   [1, 0, 2].forEach((pi, col) => {
     const p = players[pi];
     const n = pi + 1;
     const first = n === 1;
     const cx = cxs[col];
-    const r = first ? 48 : 33;
-    const cy = first ? 205 : 234;
+    const r = first ? 42 : 31;
+    const cy = first ? 168 : 192;
 
     ctx.globalAlpha = p.hasUser ? 1 : 0.45;
 
     if (first) {
-      // halo juara
       ctx.strokeStyle = PINK;
       ctx.lineWidth = 1;
       ctx.globalAlpha = p.hasUser ? 0.45 : 0.2;
       ctx.beginPath();
-      ctx.arc(cx, cy, r + 9, 0, Math.PI * 2);
+      ctx.arc(cx, cy, r + 8, 0, Math.PI * 2);
       ctx.stroke();
 
       ctx.globalAlpha = p.hasUser ? 0.18 : 0.08;
       ctx.beginPath();
-      ctx.arc(cx, cy, r + 19, 0, Math.PI * 2);
+      ctx.arc(cx, cy, r + 17, 0, Math.PI * 2);
       ctx.stroke();
 
       ctx.globalAlpha = p.hasUser ? 1 : 0.45;
@@ -1330,28 +1315,26 @@ async function generateLeaderboardImage(category = "exp") {
     drawAvatarRing(ctx, cx, cy, r, first ? 4 : 3, p);
 
     if (first) {
-      // mahkota (dilukis, tanpa emoji)
       ctx.save();
-      ctx.translate(cx, cy - r - 16);
+      ctx.translate(cx, cy - r - 14);
       ctx.rotate((-6 * Math.PI) / 180);
       ctx.shadowColor = PINK;
       ctx.shadowBlur = 10;
       ctx.fillStyle = "#f7c948";
       ctx.beginPath();
-      ctx.moveTo(-14, 10);
-      ctx.lineTo(-14, -6);
-      ctx.lineTo(-7, 1);
-      ctx.lineTo(0, -10);
-      ctx.lineTo(7, 1);
-      ctx.lineTo(14, -6);
-      ctx.lineTo(14, 10);
+      ctx.moveTo(-13, 9);
+      ctx.lineTo(-13, -5);
+      ctx.lineTo(-6, 1);
+      ctx.lineTo(0, -9);
+      ctx.lineTo(6, 1);
+      ctx.lineTo(13, -5);
+      ctx.lineTo(13, 9);
       ctx.closePath();
       ctx.fill();
       ctx.restore();
     }
 
-    // lencana nombor
-    const br = first ? 15 : 12;
+    const br = first ? 14 : 11;
     const by = cy + r - 1;
     ctx.fillStyle = "#0c080f";
     ctx.beginPath();
@@ -1364,26 +1347,24 @@ async function generateLeaderboardImage(category = "exp") {
     ctx.fill();
 
     ctx.fillStyle = "#1b0f1c";
-    ctx.font = `italic 700 ${first ? 17 : 14}px ${SERIF}`;
+    ctx.font = `italic 700 ${first ? 16 : 13}px ${SERIF}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(String(n), cx, by + 1);
     ctx.textBaseline = "alphabetic";
 
-    // nama
     ctx.fillStyle = TEXT;
-    ctx.font = `800 ${first ? 16 : 13.5}px ${SANS}`;
+    ctx.font = `800 ${first ? 16.5 : 14.5}px ${SANS}`;
     ctx.textAlign = "center";
-    ctx.fillText(fitText(ctx, p.name, first ? 190 : 140), cx, first ? 288 : 297);
+    ctx.fillText(fitText(ctx, p.name, first ? 210 : 180), cx, first ? 244 : 252);
 
-    // EXP / jumlah
-    const numSize = first ? 19 : 15;
+    const numSize = first ? 20 : 16;
     ctx.font = `italic 500 ${numSize}px ${SERIF}`;
     const wNum = ctx.measureText(p.num).width;
-    ctx.font = `500 10px ${SANS}`;
+    ctx.font = `500 11px ${SANS}`;
     const wUnit = p.unit ? ctx.measureText(p.unit).width : 0;
-    const startX = cx - (wNum + (p.unit ? 3 + wUnit : 0)) / 2;
-    const expY = first ? 311 : 316;
+    const startX = cx - (wNum + (p.unit ? 4 + wUnit : 0)) / 2;
+    const expY = first ? 267 : 272;
 
     ctx.textAlign = "left";
     ctx.fillStyle = first ? PINK_SOFT : PINK;
@@ -1392,65 +1373,62 @@ async function generateLeaderboardImage(category = "exp") {
 
     if (p.unit) {
       ctx.fillStyle = MUTED;
-      ctx.font = `500 10px ${SANS}`;
-      ctx.fillText(p.unit, startX + wNum + 3, expY);
+      ctx.font = `500 11px ${SANS}`;
+      ctx.fillText(p.unit, startX + wNum + 4, expY);
     }
 
     if (showLevel) {
       ctx.textAlign = "center";
       ctx.fillStyle = MUTED;
-      ctx.font = `700 11px ${SANS}`;
-      ctx.fillText(`Level ${pad2(p.level)}`, cx, 332);
+      ctx.font = `700 11.5px ${SANS}`;
+      ctx.fillText(`Level ${pad2(p.level)}`, cx, 286);
     }
 
     ctx.globalAlpha = 1;
   });
 
   // ---------- SENARAI #4 - #10 ----------
-  const listX = 16;
-  const listW = W - 32;
-  const listTop = 358;
-  const rowH = 57;
+  const listX = 20;
+  const listW = W - 40;
+  const listTop = 302;
+  const rowH = 49;
 
   ctx.fillStyle = "rgba(255,255,255,0.045)";
   ctx.beginPath();
-  ctx.roundRect(listX, listTop, listW, 8 + 7 * rowH, 22);
+  ctx.roundRect(listX, listTop, listW, 8 + 7 * rowH, 20);
   ctx.fill();
   ctx.strokeStyle = "rgba(249,150,177,0.2)";
   ctx.lineWidth = 1;
   ctx.stroke();
 
-  const barX = 114;
-  const barW = 286;
+  const barX = 128;
+  const barW = 360;
+  const rightX = W - 36;
 
   for (let i = 3; i < 10; i++) {
     const p = players[i];
     const row = i - 3;
     const y0 = listTop + 4 + row * rowH;
-    const mid = y0 + 28;
+    const mid = y0 + rowH / 2;
 
     ctx.globalAlpha = p.hasUser ? 1 : 0.45;
 
-    // nombor ranking
     ctx.textAlign = "center";
     ctx.fillStyle = PINK;
     ctx.font = `italic 700 20px ${SERIF}`;
-    ctx.fillText(String(i + 1), 43, mid + 7);
+    ctx.fillText(String(i + 1), 50, mid + 7);
 
-    // avatar
-    drawAvatarRing(ctx, 85, mid, 18, 2, p);
+    drawAvatarRing(ctx, 96, mid, 16, 2, p);
 
-    // nama
     ctx.textAlign = "left";
     ctx.fillStyle = TEXT;
-    ctx.font = `700 13.5px ${SANS}`;
-    ctx.fillText(fitText(ctx, p.name, 300), barX, showBar ? mid - 4 : mid + 5);
+    ctx.font = `700 14.5px ${SANS}`;
+    ctx.fillText(fitText(ctx, p.name, showBar ? 380 : 410), barX, showBar ? mid - 4 : mid + 5);
 
-    // bar progress & % (disembunyikan untuk kategori Sponsor)
     if (showBar) {
       ctx.fillStyle = "rgba(255,255,255,0.1)";
       ctx.beginPath();
-      ctx.roundRect(barX, mid + 7, barW, 3, 2);
+      ctx.roundRect(barX, mid + 6, barW, 3.5, 2);
       ctx.fill();
 
       if (p.pct > 0) {
@@ -1463,37 +1441,35 @@ async function generateLeaderboardImage(category = "exp") {
         ctx.shadowBlur = 6;
         ctx.fillStyle = fg;
         ctx.beginPath();
-        ctx.roundRect(barX, mid + 7, Math.max(3, (barW * p.pct) / 100), 3, 2);
+        ctx.roundRect(barX, mid + 6, Math.max(3, (barW * p.pct) / 100), 3.5, 2);
         ctx.fill();
         ctx.restore();
       }
 
       ctx.textAlign = "right";
       ctx.fillStyle = MUTED;
-      ctx.font = `600 10px ${SANS}`;
-      ctx.fillText(`${p.pct}%`, 439, mid + 11);
+      ctx.font = `600 10.5px ${SANS}`;
+      ctx.fillText(`${p.pct}%`, 532, mid + 10);
     }
 
-    // EXP / jumlah di kanan
     const expY = showLevel ? mid - 3 : mid + 6;
     ctx.textAlign = "right";
-    ctx.font = `500 9.5px ${SANS}`;
+    ctx.font = `500 10.5px ${SANS}`;
     const wUnit = p.unit ? ctx.measureText(p.unit).width : 0;
     if (p.unit) {
       ctx.fillStyle = MUTED;
-      ctx.fillText(p.unit, 550, expY);
+      ctx.fillText(p.unit, rightX, expY);
     }
 
     ctx.fillStyle = PINK_SOFT;
-    ctx.font = `italic 600 15px ${SERIF}`;
-    ctx.fillText(p.num, 550 - (p.unit ? wUnit + 3 : 0), expY);
+    ctx.font = `italic 600 16px ${SERIF}`;
+    ctx.fillText(p.num, rightX - (p.unit ? wUnit + 4 : 0), expY);
 
-    // pill LVL (EXP bulanan sahaja)
     if (showLevel) {
       const label = `LVL ${pad2(p.level)}`;
       ctx.font = `700 10.5px ${SANS}`;
       const pw = ctx.measureText(label).width + 16;
-      const px = 550 - pw;
+      const px = rightX - pw;
       const py = mid + 3;
 
       ctx.strokeStyle = "rgba(249,150,177,0.5)";
@@ -1509,32 +1485,31 @@ async function generateLeaderboardImage(category = "exp") {
 
     ctx.globalAlpha = 1;
 
-    // garis pemisah
     if (row < 6) {
       ctx.strokeStyle = "rgba(249,150,177,0.14)";
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(30, y0 + rowH - 0.5);
-      ctx.lineTo(550, y0 + rowH - 0.5);
+      ctx.moveTo(34, y0 + rowH - 0.5);
+      ctx.lineTo(W - 34, y0 + rowH - 0.5);
       ctx.stroke();
     }
   }
 
   // ---------- FOOTER ----------
   const part1 = "Auto-update setiap 10 minit  ·  ";
-  ctx.font = `500 10.5px ${SANS}`;
+  ctx.font = `500 11px ${SANS}`;
   const w1 = ctx.measureText(part1).width;
-  ctx.font = `700 10.5px ${SANS}`;
+  ctx.font = `700 11px ${SANS}`;
   const w2 = ctx.measureText("PlatoMy").width;
   const fx = W / 2 - (w1 + w2) / 2;
 
   ctx.textAlign = "left";
   ctx.fillStyle = MUTED;
-  ctx.font = `500 10.5px ${SANS}`;
-  ctx.fillText(part1, fx, 794);
+  ctx.font = `500 11px ${SANS}`;
+  ctx.fillText(part1, fx, 674);
   ctx.fillStyle = PINK;
-  ctx.font = `700 10.5px ${SANS}`;
-  ctx.fillText("PlatoMy", fx + w1, 794);
+  ctx.font = `700 11px ${SANS}`;
+  ctx.fillText("PlatoMy", fx + w1, 674);
 
   return new AttachmentBuilder(canvas.toBuffer("image/png"), { name: `leaderboard-${category}.png` });
 }
@@ -1821,13 +1796,11 @@ client.once(Events.ClientReady, async (c) => {
     console.error("Gagal mendaftarkan slash commands:", error);
   }
 
-  // --- SAMBUNG GIVEAWAY SELEPAS RESTART ---
   for (const [msgId, game] of giveawayGames) {
     if (game.ended) continue;
     setTimeout(() => endGiveaway(msgId), Math.max(0, game.endTimeSeconds * 1000 - Date.now()));
   }
 
-  // --- AUTO-UPDATE SEMUA CHANNEL LEADERBOARD (Setiap 10 minit) ---
   cron.schedule(
     "*/10 * * * *",
     async () => {
@@ -1858,7 +1831,6 @@ client.once(Events.ClientReady, async (c) => {
     { timezone: "Asia/Kuala_Lumpur" }
   );
 
-  // --- AUTO-REMOVE ROLE MURAI YAPPERS BILA 3 HARI TAK AKTIF (Semak setiap 1 jam) ---
   cron.schedule("0 * * * *", async () => {
     const now = Date.now();
     let modified = false;
@@ -1887,7 +1859,6 @@ client.once(Events.ClientReady, async (c) => {
     if (modified) scheduleSaveYapperActivity();
   });
 
-  // --- AUTO-REFRESH BIRTHDAY CORNER + ROLE + THREAD HARIAN (12:00 malam waktu Malaysia) ---
   cron.schedule(
     "0 0 * * *",
     async () => {
@@ -1901,7 +1872,6 @@ client.once(Events.ClientReady, async (c) => {
     { timezone: "Asia/Kuala_Lumpur" }
   );
 
-  // --- AUTO-RESET BULANAN: EXP + SPONSOR (Setiap 1 hari bulan jam 12:00 malam waktu Malaysia) ---
   cron.schedule(
     "0 0 1 * *",
     async () => {
@@ -2315,357 +2285,4 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const result = await rerollGiveaway(msgId, count);
         await interaction.editReply({
           content: result.ok ? `✅ Berjaya reroll ${result.count} pemenang!` : `❌ ${result.error}`,
-        });
-        return;
-      }
-
-      if (name === "rumble") {
-        if (!isAdmin(interaction)) {
-          return interaction.reply({ content: "❌ Anda tidak mempunyai kebenaran Administrator!", ephemeral: true });
-        }
-        const currencyType = interaction.options.getString("currency");
-        const totalPrize = interaction.options.getInteger("prize");
-        const durationMins = interaction.options.getInteger("duration");
-        const winnersCount = interaction.options.getInteger("winners") ?? 1;
-
-        if (totalPrize < winnersCount) {
-          return interaction.reply({
-            content: "❌ Hadiah mesti sekurang-kurangnya sama dengan bilangan pemenang.",
-            ephemeral: true,
-          });
-        }
-
-        await createRumble(interaction.channel, currencyType, totalPrize, durationMins, winnersCount);
-        await interaction.reply({ content: "✅ PlatoMy Rumble berjaya dimulakan!", ephemeral: true });
-        return;
-      }
-    }
-
-    // ===== BUTANG =====
-    if (interaction.isButton()) {
-      const id = interaction.customId;
-
-      if (id === "open_birthday_modal") {
-        const modal = new ModalBuilder()
-          .setCustomId("birthday_modal")
-          .setTitle("🎂 Register / Update Birthday");
-
-        const dayInput = new TextInputBuilder()
-          .setCustomId("bday_day")
-          .setLabel("Day (1 - 31)")
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-          .setMaxLength(2)
-          .setPlaceholder("cth: 20");
-
-        const monthInput = new TextInputBuilder()
-          .setCustomId("bday_month")
-          .setLabel("Month (1 - 12)")
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-          .setMaxLength(2)
-          .setPlaceholder("cth: 11");
-
-        modal.addComponents(
-          new ActionRowBuilder().addComponents(dayInput),
-          new ActionRowBuilder().addComponents(monthInput)
-        );
-
-        await interaction.showModal(modal);
-        return;
-      }
-
-      if (id === "join_giveaway") {
-        await interaction.deferReply({ ephemeral: true });
-        const game = giveawayGames.get(interaction.message.id);
-        if (!game || game.ended) {
-          return interaction.editReply({ content: "❌ Giveaway ini sudah tamat." });
-        }
-        if (game.requiredRoleId && !interaction.member?.roles?.cache?.has(game.requiredRoleId)) {
-          return interaction.editReply({
-            content: `❌ Anda perlukan role <@&${game.requiredRoleId}> untuk menyertai giveaway ini.`,
-          });
-        }
-        if (game.participants.includes(interaction.user.id)) {
-          return interaction.editReply({ content: "⚠️ Anda sudah menyertai giveaway ini!" });
-        }
-
-        game.participants.push(interaction.user.id);
-        saveGiveaways();
-        await interaction.message
-          .edit({ components: [giveawayBox(game)], flags: V2, allowedMentions: NO_PING })
-          .catch(() => {});
-        await interaction.editReply({ content: "✅ Berjaya menyertai giveaway!" });
-        return;
-      }
-
-      if (id.startsWith("join_rumble_")) {
-        await interaction.deferReply({ ephemeral: true });
-        const game = rumbleMap.get(interaction.message.id);
-        if (!game || game.ended) return interaction.editReply({ content: "❌ This rumble has ended." });
-        if (game.participants.includes(interaction.user.id)) {
-          return interaction.editReply({ content: "⚠️ You've already joined!" });
-        }
-
-        game.participants.push(interaction.user.id);
-        await interaction.message.edit({ components: [rumbleOpenBox(game)], flags: V2 }).catch(() => {});
-        await interaction.editReply({ content: "✅ Successfully joined PlatoMy Rumble!" });
-        return;
-      }
-
-      if (id === "open_trading_modal") {
-        const modal = new ModalBuilder().setCustomId("trading_modal").setTitle("🛍️ PlatoMy Trading");
-        const itemInput = new TextInputBuilder()
-          .setCustomId("trading_text")
-          .setLabel("Item details")
-          .setStyle(TextInputStyle.Paragraph)
-          .setRequired(true)
-          .setMaxLength(1000);
-        modal.addComponents(new ActionRowBuilder().addComponents(itemInput));
-        await interaction.showModal(modal);
-        return;
-      }
-
-      if (id.startsWith("accept_trade:")) {
-        const requesterId = id.split(":")[1];
-        const hasTradeRole = interaction.member?.roles?.cache?.some((r) =>
-          r.name.toLowerCase().includes(TRADE_ROLE_NAME)
-        );
-        if (!hasTradeRole) {
-          return interaction.reply({ content: "❌ You need the Trade role to accept trades.", ephemeral: true });
-        }
-        if (interaction.user.id === requesterId) {
-          return interaction.reply({ content: "⚠️ You can't accept your own trade.", ephemeral: true });
-        }
-        if (acceptedTrades.has(interaction.message.id)) {
-          return interaction.reply({ content: "❌ This trade has already been accepted.", ephemeral: true });
-        }
-
-        acceptedTrades.add(interaction.message.id);
-        await interaction.deferUpdate();
-
-        const infoText = collectText(interaction.message.components).find((t) => t.includes("**Item Details:**")) || "";
-        const item = infoText.split("**Item Details:**")[1]?.trim() || "-";
-        const tradeChannel = await createTradeChannel(interaction.guild, requesterId, interaction.user, item);
-
-        await interaction.editReply({
-          components: [buildTradeList({ requesterId, details: item, accepterId: interaction.user.id })],
-          flags: V2,
-        });
-
-        if (tradeChannel) {
-          await interaction.channel
-            .send({
-              content: `🤝 <@${requesterId}>, your trade was accepted by ${interaction.user}. Head to ${tradeChannel} to complete the trade!`,
-              allowedMentions: { users: [requesterId] },
-            })
-            .catch(() => {});
-        } else {
-          await interaction
-            .followUp({
-              content: "❌ I couldn't create the trade channel. Please check the bot's permissions on the trade category.",
-              ephemeral: true,
-            })
-            .catch(() => {});
-          await interaction.channel
-            .send(
-              `🤝 <@${requesterId}>, your trade was accepted by ${interaction.user}. Please contact each other to complete the trade!`
-            )
-            .catch(() => {});
-        }
-
-        const logChannel = findChannel(interaction.guild, TRADING_LOG_CHANNEL_NAME);
-        if (logChannel) {
-          const logLines = [
-            `📥 **Requester:** <@${requesterId}> (\`${requesterId}\`)`,
-            `🤝 **Accepted by:** ${interaction.user} (\`${interaction.user.id}\`)`,
-          ];
-          if (tradeChannel) logLines.push(`📍 **Trade Channel:** ${tradeChannel}`);
-          logLines.push("", "📝 **Item:**", item);
-
-          await logChannel
-            .send({
-              components: [
-                info("🛍️ Trading Log: Trade Accepted", logLines.join(NL), `Trading Log • Today at ${getMalaysiaTime()}`),
-              ],
-              flags: V2,
-              allowedMentions: NO_PING,
-            })
-            .catch(() => {});
-        }
-        return;
-      }
-
-      if (id.startsWith("close_trade:")) {
-        const accepterId = id.split(":")[1];
-        if (interaction.channel?.parentId !== TRADE_CATEGORY_ID) {
-          return interaction.reply({ content: "❌ This button only works inside a trade channel.", ephemeral: true });
-        }
-        if (interaction.user.id !== accepterId && !isAdmin(interaction)) {
-          return interaction.reply({
-            content: "❌ Only the person who accepted this trade can close this channel.",
-            ephemeral: true,
-          });
-        }
-
-        const channelName = interaction.channel.name;
-        await interaction.reply({
-          content: `🔒 Trade closed by ${interaction.user}. This channel will be deleted in 5 seconds...`,
-          allowedMentions: NO_PING,
-        });
-
-        const logChannel = findChannel(interaction.guild, TRADING_LOG_CHANNEL_NAME);
-        if (logChannel) {
-          const closeLines = [
-            `🔒 **Closed by:** ${interaction.user} (\`${interaction.user.id}\`)`,
-            `🤝 **Accepted by:** <@${accepterId}>`,
-            `📍 **Channel:** ${channelName}`,
-          ].join(NL);
-
-          await logChannel
-            .send({
-              components: [
-                info("🛍️ Trading Log: Trade Closed", closeLines, `Trading Log • Today at ${getMalaysiaTime()}`),
-              ],
-              flags: V2,
-              allowedMentions: NO_PING,
-            })
-            .catch(() => {});
-        }
-
-        await sleep(5000);
-        await interaction.channel.delete(`Trade closed by ${interaction.user.tag}`).catch((e) => {
-          console.error("Gagal padam channel trade:", e);
-        });
-        return;
-      }
-    }
-
-    // ===== MODAL =====
-    if (interaction.isModalSubmit()) {
-      if (interaction.customId === "birthday_modal") {
-        const day = parseInt(interaction.fields.getTextInputValue("bday_day").trim(), 10);
-        const month = parseInt(interaction.fields.getTextInputValue("bday_month").trim(), 10);
-        const maxDaysInMonth = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-
-        if (isNaN(month) || month < 1 || month > 12 || isNaN(day) || day < 1 || day > maxDaysInMonth[month - 1]) {
-          return interaction.reply({
-            content: "❌ Tarikh tidak sah! Sila masukkan Day (1–31) dan Month (1–12) yang betul.",
-            ephemeral: true,
-          });
-        }
-
-        const bData = await getBirthdayData();
-        const prev = bData.users[interaction.user.id];
-        const isSameDate = prev && prev.day === day && prev.month === month;
-        const celebratedYear = isSameDate ? prev.celebratedYear : null;
-
-        await saveUserBirthday(interaction.user.id, day, month, celebratedYear);
-
-        const replyMsg = prev
-          ? `🎂 Tarikh hari lahir anda telah dikemas kini dari **${formatDayMonth(prev.day, prev.month)}** kepada **${formatDayMonth(day, month)}**!`
-          : `🎂 Hari lahir anda telah didaftarkan pada **${formatDayMonth(day, month)}**!`;
-
-        await interaction.reply({ content: replyMsg, ephemeral: true });
-        await runDailyBirthdayRoutine().catch(() => refreshBirthdayBoard());
-        return;
-      }
-
-      if (interaction.customId === "trading_modal") {
-        const details = interaction.fields.getTextInputValue("trading_text").trim();
-        if (!details) {
-          return interaction.reply({ content: "❌ Please fill in the item details.", ephemeral: true });
-        }
-
-        const listChannel = findChannel(interaction.guild, TRADING_LIST_CHANNEL_NAME);
-        if (!listChannel) {
-          return interaction.reply({ content: "❌ The trading-list channel was not found.", ephemeral: true });
-        }
-
-        const traderRole = interaction.guild.roles.cache.find((r) => r.name.toLowerCase().includes(TRADER_ROLE_NAME));
-        const sent = await listChannel
-          .send({
-            components: [
-              ...(traderRole ? [txt(`<@&${traderRole.id}>`)] : []),
-              buildTradeList({ requesterId: interaction.user.id, details }),
-            ],
-            flags: V2,
-            allowedMentions: traderRole ? { roles: [traderRole.id] } : NO_PING,
-          })
-          .catch(() => null);
-
-        if (!sent) {
-          return interaction.reply({
-            content: "❌ The bot can't send to the trading-list channel. Please check the bot's permissions.",
-            ephemeral: true,
-          });
-        }
-
-        await interaction.reply({ content: "✅ Your item details have been sent!", ephemeral: true });
-
-        const logChannel = findChannel(interaction.guild, TRADING_LOG_CHANNEL_NAME);
-        if (logChannel) {
-          const reqLines = [
-            `👤 **Requester:** ${interaction.user} (\`${interaction.user.id}\`)`,
-            "",
-            "📝 **Item:**",
-            details,
-          ].join(NL);
-
-          await logChannel
-            .send({
-              components: [
-                info("🛍️ Trading Log: New Request", reqLines, `Trading Log • Today at ${getMalaysiaTime()}`),
-              ],
-              flags: V2,
-              allowedMentions: NO_PING,
-            })
-            .catch(() => {});
-        }
-        return;
-      }
-
-      if (interaction.customId.startsWith("embed_builder:")) {
-        const channelId = interaction.customId.split(":")[1];
-        const targetChannel = await interaction.guild.channels.fetch(channelId).catch(() => null);
-        if (!targetChannel || !targetChannel.isTextBased()) {
-          return interaction.reply({ content: "❌ Channel tidak dijumpai.", ephemeral: true });
-        }
-
-        const title = interaction.fields.getTextInputValue("eb_title").trim();
-        const desc = interaction.fields.getTextInputValue("eb_desc").trim();
-        const color = interaction.fields.getTextInputValue("eb_color");
-        const image = interaction.fields.getTextInputValue("eb_image").trim();
-
-        if (!title && !desc && !isUrl(image)) {
-          return interaction.reply({ content: "❌ Isi sekurang-kurangnya tajuk, mesej atau gambar.", ephemeral: true });
-        }
-
-        const box = new ContainerBuilder();
-        const ac = accent(color);
-        if (ac !== null) box.setAccentColor(ac);
-        if (title) box.addTextDisplayComponents(txt(`## ${title}`));
-        if (title && desc) box.addSeparatorComponents(sep());
-        if (desc) box.addTextDisplayComponents(txt(desc));
-        if (isUrl(image)) {
-          box.addMediaGalleryComponents(
-            new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(image))
-          );
-        }
-
-        await targetChannel.send({ components: [box], flags: V2 });
-        await interaction.reply({ content: `✅ Container berjaya dihantar ke <#${targetChannel.id}>!`, ephemeral: true });
-        return;
-      }
-    }
-  } catch (err) {
-    console.error("Ralat interaction:", err);
-    const msg = { content: "❌ Ralat berlaku. Cuba lagi.", ephemeral: true };
-    if (interaction.deferred || interaction.replied) await interaction.followUp(msg).catch(() => {});
-    else await interaction.reply(msg).catch(() => {});
-  }
-});
-
-client.login(token).catch((err) => {
-  console.error("GAGAL LOGIN:", err);
-});
+      
