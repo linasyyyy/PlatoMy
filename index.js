@@ -25,16 +25,9 @@ import {
   MessageFlags,
   AttachmentBuilder,
 } from "discord.js";
-import express from "express";
-import session from "express-session";
-import passport from "passport";
-import { Strategy as DiscordStrategy } from "passport-discord";
-import path from "path";
-import { fileURLToPath } from "url";
 import fs from "fs";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import cron from "node-cron";
-import { registerDashboardApi } from "./dashboard-api.js";
 import {
   loadWallets,
   startAutosave,
@@ -45,8 +38,6 @@ import {
   saveUserBirthdayDB,
 } from "./db.js";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 const NL = String.fromCharCode(10);
 
 const token = process.env.DISCORD_TOKEN;
@@ -64,7 +55,6 @@ const client = new Client({
 });
 
 const wallets = new Map();
-const giveawaysMap = new Map();
 const rumbleMap = new Map();
 const acceptedTrades = new Set();
 
@@ -91,6 +81,13 @@ const LOG_CHANNEL_IDS = {
   [WALLET_LOG_CHANNEL_NAME]: "1569585830224461884",
   [TRADING_LOG_CHANNEL_NAME]: "1569585956439461908",
 };
+
+// --- EMOJI & KADAR TUKARAN ---
+const PIPS_EMOJI = "<:Pips:1549739800884551710>";
+const COINS_EMOJI = "<:PlatoCoins:1549740441682059385>";
+const WINNER_EMOJI = "<a:trophee:1563423570720329749>";
+const COINS_PER_PIP = 750;
+const coinsToPips = (c) => Math.floor((Number(c) || 0) / COINS_PER_PIP);
 
 const URL_1 =
   "https://cdn.discordapp.com/attachments/1556946394239991848/" +
@@ -558,15 +555,18 @@ const bankFooter = () => `${BANK_FOOTER} • Today at ${getMalaysiaTime()}`;
 
 function balanceLines(w) {
   return [
-    `╰┈➤ 🪙 Plato Coins: ${w.coins.toLocaleString()}`,
-    `╰┈➤ 💠 Pips: ${w.pips.toLocaleString()}`,
-    `╰┈➤ 🌸 Total Sponsor: ${w.sponsorTotal.toLocaleString()}`,
+    `╰┈➤ ${COINS_EMOJI} Plato Coins: ${w.coins.toLocaleString()}`,
+    `╰┈➤ ${PIPS_EMOJI} Pips: ${w.pips.toLocaleString()}`,
+    `╰┈➤ 🌸 Total Sponsor: ${COINS_EMOJI} ${w.sponsorTotal.toLocaleString()} (≈ ${PIPS_EMOJI} ${coinsToPips(w.sponsorTotal).toLocaleString()})`,
   ].join(NL);
 }
 
-function walletBox(w) {
-  return new ContainerBuilder()
-    .addTextDisplayComponents(txt("# ˚₊‧꒰ാ 👛 𝑃𝐿𝐴𝑇𝑂𝑀𝑌 𝑊𝐴𝐿𝐿𝐸𝑇 ໒꒱‧₊˚"))
+function walletBox(w, target = null) {
+  const box = new ContainerBuilder().addTextDisplayComponents(txt("# ˚₊‧꒰ാ 👛 𝑃𝐿𝐴𝑇𝑂𝑀𝑌 𝑊𝐴𝐿𝐿𝐸𝑇 ໒꒱‧₊˚"));
+  if (target) {
+    box.addTextDisplayComponents(txt(`╰┈➤ 👤 **Player:** ${target} (\`${target.id}\`)`));
+  }
+  return box
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(txt(balanceLines(w)))
     .addTextDisplayComponents(txt(`-# ${bankFooter()}`));
@@ -747,7 +747,7 @@ const SOLO_SCENES = [
 ];
 
 function rumbleLabel(currencyType) {
-  return currencyType === "coins" ? "🪙 Plato Coins" : "💠 Pips";
+  return currencyType === "coins" ? `${COINS_EMOJI} Plato Coins` : `${PIPS_EMOJI} Pips`;
 }
 
 function rumbleOpenBox(game) {
@@ -758,7 +758,7 @@ function rumbleOpenBox(game) {
 
   const body = [
     `🎁 **Total Prize:** ${game.totalPrize.toLocaleString()} ${rumbleLabel(game.currencyType)}`,
-    `🏆 **Winners:** ${game.winnersCount}`,
+    `${WINNER_EMOJI} **Winners:** ${game.winnersCount}`,
     `⏳ **Ends:** <t:${game.endTimeSeconds}:R>`,
     "",
     `👥 **Players:** ${game.participants.length}`,
@@ -802,7 +802,7 @@ async function runRumbleBattle(channel, msgId) {
     await edit(
       info(
         "🌸・Rumble Ended",
-        [`🎁 **Prize:** ${prizeText}`, "🏆 **Winners:** No participants", "", "👥 **Players:** 0"].join(NL)
+        [`🎁 **Prize:** ${prizeText}`, `${WINNER_EMOJI} **Winners:** No participants`, "", "👥 **Players:** 0"].join(NL)
       )
     );
     await channel.send("😢 Rumble ended with no participants.").catch(() => {});
@@ -816,7 +816,7 @@ async function runRumbleBattle(channel, msgId) {
       "🔥 **The battle begins!**",
       `${players.length} players have entered the arena...`,
     ];
-    if (winnersCount > 1) startLines.push(`🏆 Last **${winnersCount}** standing win!`);
+    if (winnersCount > 1) startLines.push(`${WINNER_EMOJI} Last **${winnersCount}** standing win!`);
 
     await edit(info("🌸・PlatoMy Rumble Arena", startLines.join(NL)));
     await sleep(5000);
@@ -874,7 +874,7 @@ async function runRumbleBattle(channel, msgId) {
 
   const endBody = [
     `🎁 **Prize:** ${prizeText}${shareText}`,
-    `🏆 **Winner${winners.length > 1 ? "s" : ""}:** ${winnerMentions}`,
+    `${WINNER_EMOJI} **Winner${winners.length > 1 ? "s" : ""}:** ${winnerMentions}`,
     "",
     `👥 **Players:** ${players.length}`,
   ].join(NL);
@@ -882,10 +882,160 @@ async function runRumbleBattle(channel, msgId) {
   await edit(info("🌸・Rumble Ended", endBody));
 
   if (winners.length === 1) {
-    await channel.send(`🏆 <@${winners[0]}> won **${prizeText}** in PlatoMy Rumble!`).catch(() => {});
+    await channel.send(`${WINNER_EMOJI} <@${winners[0]}> won **${prizeText}** in PlatoMy Rumble!`).catch(() => {});
   } else {
-    await channel.send(`🏆 ${winnerMentions} won **${prizeText}** in PlatoMy Rumble!${shareText}`).catch(() => {});
+    await channel.send(`${WINNER_EMOJI} ${winnerMentions} won **${prizeText}** in PlatoMy Rumble!${shareText}`).catch(() => {});
   }
+}
+
+// ================= GIVEAWAY =================
+const GIVEAWAY_DATA_PATH = "./giveaways.json";
+
+function loadGiveaways() {
+  if (!fs.existsSync(GIVEAWAY_DATA_PATH)) return new Map();
+  try {
+    return new Map(Object.entries(JSON.parse(fs.readFileSync(GIVEAWAY_DATA_PATH, "utf8")) || {}));
+  } catch {
+    return new Map();
+  }
+}
+
+const giveawayGames = loadGiveaways();
+
+function saveGiveaways() {
+  try {
+    fs.writeFileSync(GIVEAWAY_DATA_PATH, JSON.stringify(Object.fromEntries(giveawayGames.entries())));
+  } catch (err) {
+    console.error("Gagal simpan giveaways.json:", err);
+  }
+}
+
+function pickRandom(arr, n) {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy.slice(0, n);
+}
+
+function giveawayBox(game) {
+  const box = new ContainerBuilder();
+
+  if (isUrl(game.imageUrl)) {
+    box.addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(game.imageUrl.trim()))
+    );
+  }
+
+  const reqText = game.requiredRoleId ? `<@&${game.requiredRoleId}>` : "Terbuka untuk semua";
+  const lines = [
+    `🎁 **Prize:** ${game.prize}`,
+    `${WINNER_EMOJI} **Winners:** ${game.ended && game.winners.length ? game.winners.map((id) => `<@${id}>`).join(", ") : game.winnersCount}`,
+    `📌 **Requirement:** ${reqText}`,
+    game.ended ? "⏳ **Status:** Tamat" : `⏳ **Ends:** <t:${game.endTimeSeconds}:R>`,
+    `👤 **Host:** <@${game.hostId}>`,
+    "",
+    `👥 **Entries:** ${game.participants.length}`,
+  ].join(NL);
+
+  const btn = new ButtonBuilder()
+    .setCustomId("join_giveaway")
+    .setLabel(game.ended ? "Giveaway Ended" : "Join Giveaway")
+    .setEmoji("🎉")
+    .setStyle(ButtonStyle.Secondary)
+    .setDisabled(game.ended);
+
+  return box
+    .addTextDisplayComponents(txt(`## 🌸・PlatoMy Giveaway${game.ended ? " (Ended)" : ""}`))
+    .addSeparatorComponents(sep())
+    .addTextDisplayComponents(txt(lines))
+    .addActionRowComponents(new ActionRowBuilder().addComponents(btn));
+}
+
+async function createGiveaway(channel, { prize, durationMins, winnersCount, requiredRoleId, imageUrl, hostId }) {
+  const game = {
+    channelId: channel.id,
+    prize,
+    winnersCount,
+    requiredRoleId: requiredRoleId || null,
+    imageUrl: imageUrl || null,
+    hostId,
+    participants: [],
+    winners: [],
+    ended: false,
+    endTimeSeconds: Math.floor((Date.now() + durationMins * 60 * 1000) / 1000),
+  };
+
+  const msg = await channel.send({
+    components: [giveawayBox(game)],
+    flags: V2,
+    allowedMentions: NO_PING,
+  });
+
+  giveawayGames.set(msg.id, game);
+  saveGiveaways();
+  setTimeout(() => endGiveaway(msg.id), durationMins * 60 * 1000);
+  return msg;
+}
+
+async function endGiveaway(msgId) {
+  const game = giveawayGames.get(msgId);
+  if (!game || game.ended) return;
+
+  game.ended = true;
+  game.winners = pickRandom(game.participants, game.winnersCount);
+  saveGiveaways();
+
+  const channel = await client.channels.fetch(game.channelId).catch(() => null);
+  if (!channel) return;
+
+  const msg = await channel.messages.fetch(msgId).catch(() => null);
+  if (msg) {
+    await msg.edit({ components: [giveawayBox(game)], flags: V2, allowedMentions: NO_PING }).catch(() => {});
+  }
+
+  if (game.winners.length === 0) {
+    await channel.send("😢 Giveaway tamat tanpa peserta.").catch(() => {});
+    return;
+  }
+
+  const mentions = game.winners.map((id) => `<@${id}>`).join(", ");
+  await channel
+    .send({
+      content: `${WINNER_EMOJI} Tahniah ${mentions}! Anda memenangi **${game.prize}**!`,
+      allowedMentions: { users: game.winners },
+    })
+    .catch(() => {});
+}
+
+async function rerollGiveaway(msgId, count) {
+  const game = giveawayGames.get(msgId);
+  if (!game) return { ok: false, error: "Giveaway tidak dijumpai. Pastikan Message ID betul." };
+  if (!game.ended) return { ok: false, error: "Giveaway ini belum tamat." };
+
+  const pool = game.participants.filter((id) => !game.winners.includes(id));
+  if (pool.length === 0) return { ok: false, error: "Tiada peserta lain untuk di-reroll." };
+
+  const newWinners = pickRandom(pool, count);
+  game.winners.push(...newWinners);
+  saveGiveaways();
+
+  const channel = await client.channels.fetch(game.channelId).catch(() => null);
+  if (channel) {
+    const msg = await channel.messages.fetch(msgId).catch(() => null);
+    if (msg) {
+      await msg.edit({ components: [giveawayBox(game)], flags: V2, allowedMentions: NO_PING }).catch(() => {});
+    }
+    const mentions = newWinners.map((id) => `<@${id}>`).join(", ");
+    await channel
+      .send({
+        content: `🔄 ${WINNER_EMOJI} Reroll! Pemenang baharu: ${mentions} — tahniah, anda memenangi **${game.prize}**!`,
+        allowedMentions: { users: newWinners },
+      })
+      .catch(() => {});
+  }
+  return { ok: true, count: newWinners.length };
 }
 
 // ================= LEADERBOARD & RANK CARD (@napi-rs/canvas + PostgreSQL) =================
@@ -910,8 +1060,8 @@ const LEADERBOARD_CATEGORIES = {
     subtitle: "TOP 10 COMMUNITY SPONSORS",
     field: "sponsorTotal",
     barLabel: "Contribution",
-    subText: (val) => `${val.toLocaleString()} Sponsor`,
-    badgeText: (val) => `${val.toLocaleString()}`,
+    subText: (val) => `${val.toLocaleString()} Coins`,
+    badgeText: (val) => `≈ ${coinsToPips(val).toLocaleString()} Pips`,
     progressPct: (val, topVal) => (val > 0 ? Math.min(100, Math.round((val / Math.max(1, topVal)) * 100)) : 0),
   },
   coins: {
@@ -1329,69 +1479,14 @@ async function generateRankCard(user) {
   return new AttachmentBuilder(canvas.toBuffer("image/png"), { name: "myrank.png" });
 }
 
-// --- WEB DASHBOARD & PASSPORT ---
-const app = express();
-const PORT = process.env.PORT || 8080;
-
-app.set("view engine", "ejs");
-app.set("views", path.join(__dirname, "views"));
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
-
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || "platomy_y2k_secret_key_123",
-    resave: false,
-    saveUninitialized: false,
-  })
-);
-
-app.use(passport.initialize());
-app.use(passport.session());
-
-const CLIENT_ID = process.env.CLIENT_ID || "1556578779437072546";
-const CLIENT_SECRET = process.env.CLIENT_SECRET || "XIfRq23FWQttp-5E9JSgRLfizc03Io_9";
-const CALLBACK_URL = process.env.CALLBACK_URL || "https://platomy-production.up.railway.app/discord/callback";
-
-passport.serializeUser((user, done) => done(null, user));
-passport.deserializeUser((obj, done) => done(null, obj));
-
-passport.use(
-  new DiscordStrategy(
-    {
-      clientID: CLIENT_ID,
-      clientSecret: CLIENT_SECRET,
-      callbackURL: CALLBACK_URL,
-      scope: ["identify", "guilds"],
-    },
-    (accessToken, refreshToken, profile, done) => {
-      process.nextTick(() => done(null, profile));
-    }
-  )
-);
-
-app.get("/login", passport.authenticate("discord"));
-app.get("/discord/callback", passport.authenticate("discord", { failureRedirect: "/" }), (req, res) => {
-  res.redirect("/");
-});
-app.get("/logout", (req, res) => {
-  req.logout(() => {
-    res.redirect("/");
-  });
-});
-
-app.get("/logo.jpg", (req, res) => res.sendFile(path.join(__dirname, "public:logo.jpg.jpg")));
-
-registerDashboardApi({ app, client, wallets, getWallet, giveawaysMap, rumbleMap, createRumble });
-
-app.listen(PORT, () => {
-  console.log(`Web Dashboard PlatoMy berjalan di port ${PORT}!`);
-});
-
 // --- SLASH COMMANDS ---
 const commands = [
-  new SlashCommandBuilder().setName("wallet").setDescription("Semak baki akaun PlatoMy • Wallet anda! 🏦"),
+  new SlashCommandBuilder()
+    .setName("wallet")
+    .setDescription("Semak baki akaun PlatoMy • Wallet anda! 🏦")
+    .addUserOption((opt) =>
+      opt.setName("player").setDescription("Semak baki pemain lain (Admin sahaja)").setRequired(false)
+    ),
 
   new SlashCommandBuilder()
     .setName("myrank")
@@ -1407,7 +1502,7 @@ const commands = [
         .setDescription("Tindakan")
         .setRequired(true)
         .addChoices(
-          { name: "Add Sponsor", value: "add_sponsor" },
+          { name: "Add Sponsor (Coins)", value: "add_sponsor" },
           { name: "Add Coins", value: "add_coins" },
           { name: "Deduct Coins", value: "deduct_coins" },
           { name: "Add Pips", value: "add_pips" },
@@ -1476,6 +1571,31 @@ const commands = [
     .addIntegerOption((opt) =>
       opt.setName("winners").setDescription("Berapa ramai pemenang (hadiah dibahagi sama rata, default 1)").setRequired(false).setMinValue(1).setMaxValue(25)
     ),
+
+  new SlashCommandBuilder()
+    .setName("giveaway")
+    .setDescription("Mula giveaway (Admin sahaja)")
+    .addStringOption((opt) => opt.setName("prize").setDescription("Hadiah").setRequired(true))
+    .addIntegerOption((opt) =>
+      opt.setName("duration").setDescription("Tempoh masa (minit)").setRequired(true).setMinValue(1).setMaxValue(10080)
+    )
+    .addIntegerOption((opt) =>
+      opt.setName("winners").setDescription("Bilangan pemenang (default 1)").setRequired(false).setMinValue(1).setMaxValue(25)
+    )
+    .addRoleOption((opt) =>
+      opt.setName("required_role").setDescription("Role yang dibenarkan join (pilihan)").setRequired(false)
+    )
+    .addStringOption((opt) =>
+      opt.setName("image_url").setDescription("Link gambar / GIF (pilihan)").setRequired(false)
+    ),
+
+  new SlashCommandBuilder()
+    .setName("giveaway-reroll")
+    .setDescription("Reroll pemenang giveaway (Admin sahaja)")
+    .addStringOption((opt) => opt.setName("message_id").setDescription("Message ID giveaway").setRequired(true))
+    .addIntegerOption((opt) =>
+      opt.setName("count").setDescription("Berapa pemenang baharu (default 1)").setRequired(false).setMinValue(1).setMaxValue(25)
+    ),
 ].map((c) => c.toJSON());
 
 client.once(Events.ClientReady, async (c) => {
@@ -1486,6 +1606,12 @@ client.once(Events.ClientReady, async (c) => {
     console.log("Slash commands berjaya di-register!");
   } catch (error) {
     console.error("Gagal mendaftarkan slash commands:", error);
+  }
+
+  // --- SAMBUNG GIVEAWAY SELEPAS RESTART ---
+  for (const [msgId, game] of giveawayGames) {
+    if (game.ended) continue;
+    setTimeout(() => endGiveaway(msgId), Math.max(0, game.endTimeSeconds * 1000 - Date.now()));
   }
 
   // --- AUTO-UPDATE SEMUA CHANNEL LEADERBOARD (Setiap 10 minit) ---
@@ -1659,7 +1785,22 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const name = interaction.commandName;
 
       if (name === "wallet") {
-        await interaction.reply({ components: [walletBox(getWallet(interaction.user.id))], flags: V2_EPHEMERAL });
+        const target = interaction.options.getUser("player");
+        const checkingOther = target && target.id !== interaction.user.id;
+
+        if (checkingOther && !isAdmin(interaction)) {
+          return interaction.reply({
+            content: "❌ Hanya Administrator boleh semak wallet pemain lain!",
+            ephemeral: true,
+          });
+        }
+
+        const who = checkingOther ? target : interaction.user;
+        await interaction.reply({
+          components: [walletBox(getWallet(who.id), checkingOther ? who : null)],
+          flags: V2_EPHEMERAL,
+          allowedMentions: NO_PING,
+        });
         return;
       }
 
@@ -1704,7 +1845,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         } else if (action === "add_sponsor") {
           targetWallet.sponsorTotal += amount;
           actionTitle = "🌸 Total Sponsor Added";
-          actionDesc = `Berjaya menambah **${amount.toLocaleString()} Total Sponsor** kepada ${targetUser}.`;
+          actionDesc = `Berjaya menambah **${amount.toLocaleString()} Coins** (≈ ${coinsToPips(amount).toLocaleString()} Pips) sebagai Total Sponsor kepada ${targetUser}.`;
         } else if (action === "check") {
           actionTitle = "📊 Wallet Checked";
           actionDesc = `Menyemak baki wallet ${targetUser}.`;
@@ -1917,6 +2058,43 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return;
       }
 
+      if (name === "giveaway") {
+        if (!isAdmin(interaction)) {
+          return interaction.reply({ content: "❌ Anda tidak mempunyai kebenaran Administrator!", ephemeral: true });
+        }
+        const imageUrl = interaction.options.getString("image_url");
+        if (imageUrl && !isUrl(imageUrl)) {
+          return interaction.reply({ content: "❌ Link gambar tidak sah. Mesti bermula dengan https://", ephemeral: true });
+        }
+
+        await createGiveaway(interaction.channel, {
+          prize: interaction.options.getString("prize"),
+          durationMins: interaction.options.getInteger("duration"),
+          winnersCount: interaction.options.getInteger("winners") ?? 1,
+          requiredRoleId: interaction.options.getRole("required_role")?.id || null,
+          imageUrl,
+          hostId: interaction.user.id,
+        });
+
+        await interaction.reply({ content: "✅ Giveaway berjaya dimulakan!", ephemeral: true });
+        return;
+      }
+
+      if (name === "giveaway-reroll") {
+        if (!isAdmin(interaction)) {
+          return interaction.reply({ content: "❌ Anda tidak mempunyai kebenaran Administrator!", ephemeral: true });
+        }
+        await interaction.deferReply({ ephemeral: true });
+        const msgId = interaction.options.getString("message_id").trim();
+        const count = interaction.options.getInteger("count") ?? 1;
+
+        const result = await rerollGiveaway(msgId, count);
+        await interaction.editReply({
+          content: result.ok ? `✅ Berjaya reroll ${result.count} pemenang!` : `❌ ${result.error}`,
+        });
+        return;
+      }
+
       if (name === "rumble") {
         if (!isAdmin(interaction)) {
           return interaction.reply({ content: "❌ Anda tidak mempunyai kebenaran Administrator!", ephemeral: true });
@@ -1969,6 +2147,32 @@ client.on(Events.InteractionCreate, async (interaction) => {
           new ActionRowBuilder().addComponents(monthInput)
         );
         await interaction.showModal(modal);
+        return;
+      }
+
+      if (id === "join_giveaway") {
+        await interaction.deferReply({ ephemeral: true });
+        const game = giveawayGames.get(interaction.message.id);
+
+        if (!game || game.ended) {
+          return interaction.editReply({ content: "❌ Giveaway ini sudah tamat." });
+        }
+        if (game.requiredRoleId && !interaction.member?.roles?.cache?.has(game.requiredRoleId)) {
+          return interaction.editReply({
+            content: `❌ Anda perlukan role <@&${game.requiredRoleId}> untuk menyertai giveaway ini.`,
+          });
+        }
+        if (game.participants.includes(interaction.user.id)) {
+          return interaction.editReply({ content: "⚠️ Anda sudah menyertai giveaway ini!" });
+        }
+
+        game.participants.push(interaction.user.id);
+        saveGiveaways();
+
+        await interaction.message
+          .edit({ components: [giveawayBox(game)], flags: V2, allowedMentions: NO_PING })
+          .catch(() => {});
+        await interaction.editReply({ content: "✅ Berjaya menyertai giveaway!" });
         return;
       }
 
