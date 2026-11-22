@@ -79,8 +79,9 @@ export const commands = [
     .addStringOption((opt) => opt.setName("image_url").setDescription("Link URL gambar").setRequired(true))
     .addStringOption((opt) => opt.setName("color").setDescription("Kod warna Hex (cth: #ffb6c1)").setRequired(false)),
   new SlashCommandBuilder()
-    .setName("rumble")
-    .setDescription("Mula permainan PlatoMy Rumble (Admin sahaja)")
+    new SlashCommandBuilder()
+    .setName("plato-arena")
+    .setDescription("Mula permainan Plato Arena dengan pilihan Bounty (Admin sahaja)")
     .addStringOption((opt) =>
       opt
         .setName("currency")
@@ -102,6 +103,16 @@ export const commands = [
         .setRequired(false)
         .setMinValue(1)
         .setMaxValue(25)
+    )
+    .addUserOption((opt) =>
+      opt.setName("bounty_target").setDescription("Sasaran Bounty (pilihan)").setRequired(false)
+    )
+    .addIntegerOption((opt) =>
+      opt
+        .setName("bounty_prize")
+        .setDescription("Hadiah tambahan untuk pembunuh sasaran Bounty (pilihan)")
+        .setRequired(false)
+        .setMinValue(1)
     ),
   new SlashCommandBuilder()
     .setName("giveaway")
