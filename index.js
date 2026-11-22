@@ -458,20 +458,28 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return interaction.editReply({ content: result.ok ? `✅ Berjaya reroll ${result.count} pemenang!` : `❌ ${result.error}` });
       }
 
-      if (name === "rumble") {
+      if (name === "plato-arena") {
         if (!isAdmin(interaction)) return interaction.reply({ content: "❌ Anda tidak mempunyai kebenaran Administrator!", ephemeral: true });
         const currencyType = interaction.options.getString("currency");
         const totalPrize = interaction.options.getInteger("prize");
         const durationMins = interaction.options.getInteger("duration");
         const winnersCount = interaction.options.getInteger("winners") ?? 1;
+        const bountyTarget = interaction.options.getUser("bounty_target");
+        const bountyPrize = interaction.options.getInteger("bounty_prize") ?? 0;
+
         if (totalPrize < winnersCount) {
           return interaction.reply({ content: "❌ Hadiah mesti sekurang-kurangnya sama dengan bilangan pemenang.", ephemeral: true });
         }
-        await createRumble(interaction.channel, currencyType, totalPrize, durationMins, winnersCount);
-        return interaction.reply({ content: "✅ PlatoMy Rumble berjaya dimulakan!", ephemeral: true });
-      }
-    }
+        if ((bountyTarget && !bountyPrize) || (!bountyTarget && bountyPrize > 0)) {
+          return interaction.reply({
+            content: "❌ Sila isi kedua-dua `bounty_target` dan `bounty_prize` jika mahu aktifkan Bounty.",
+            ephemeral: true,
+          });
+        }
 
+        await createRumble(interaction.channel, currencyType, totalPrize, durationMins, winnersCount, bountyTarget?.id || null, bountyPrize);
+        return interaction.reply({ content: "✅ Plato Arena berjaya dimulakan!", ephemeral: true });
+      }
     // ===== BUTANG =====
     if (interaction.isButton()) {
       const id = interaction.customId;
