@@ -31,6 +31,7 @@ export async function loadWallets(wallets) {
     await pool.query(`ALTER TABLE platomy_wallets ADD COLUMN IF NOT EXISTS sponsor_total BIGINT NOT NULL DEFAULT 0`);
     await pool.query(`ALTER TABLE platomy_wallets ADD COLUMN IF NOT EXISTS exp_total BIGINT NOT NULL DEFAULT 0`);
     await pool.query(`ALTER TABLE platomy_wallets ADD COLUMN IF NOT EXISTS sponsor_monthly BIGINT NOT NULL DEFAULT 0`);
+    await pool.query(`ALTER TABLE platomy_wallets DROP CONSTRAINT IF EXISTS platomy_wallets_discord_id_fkey`);
     await pool.query(`UPDATE platomy_wallets SET exp_total = exp WHERE exp_total = 0 AND exp > 0`);
 
     await pool.query(`
