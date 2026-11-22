@@ -2,397 +2,342 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>PlatoMy Leaderboard</title>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Montserrat:wght@800;900&family=Plus+Jakarta+Sans:wght@500;700&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;1,500;1,700&family=Manrope:wght@500;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg-dark: #09090d;
-      --pink-main: #F996B1;
-      --pink-bright: #ffb3c8;
-      --pink-glow: rgba(249, 150, 177, 0.45);
-      --white: #FFFFFF;
-      --glass-bg: rgba(20, 20, 28, 0.55);
-      --glass-border: rgba(249, 150, 177, 0.28);
+      --pink: #F996B1;
+      --pink-soft: #ffd3df;
+      --plum: #3b1a40;
+      --night: #0c080f;
+      --text: #fdf2f6;
+      --muted: rgba(253, 242, 246, 0.58);
     }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      background-color: var(--bg-dark);
-      color: var(--white);
-      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: #050307;
+      color: var(--text);
+      font-family: 'Manrope', sans-serif;
       display: flex;
       justify-content: center;
       align-items: center;
       min-height: 100vh;
       padding: 12px;
-      overflow-x: hidden;
     }
 
-    .leaderboard-wrapper {
+    .board {
       position: relative;
       width: 100%;
       max-width: 580px;
-      background: radial-gradient(circle at 15% 15%, rgba(249, 150, 177, 0.16), transparent 45%),
-                  radial-gradient(circle at 85% 85%, rgba(249, 150, 177, 0.14), transparent 45%),
-                  linear-gradient(160deg, #12121a 0%, #09090d 100%);
-      border-radius: 20px;
-      padding: 16px 18px;
-      border: 1.5px solid var(--glass-border);
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.85),
-                  0 0 35px rgba(249, 150, 177, 0.12),
-                  inset 0 1px 1px rgba(255, 255, 255, 0.15);
-      backdrop-filter: blur(20px);
+      padding: 26px 16px 18px;
+      border-radius: 30px;
+      background:
+        radial-gradient(ellipse 70% 38% at 18% 0%, rgba(249,150,177,0.38), transparent 70%),
+        radial-gradient(ellipse 60% 34% at 95% 22%, rgba(150,90,190,0.28), transparent 70%),
+        radial-gradient(ellipse 70% 40% at 50% 105%, rgba(249,150,177,0.22), transparent 70%),
+        linear-gradient(180deg, #170d1c 0%, var(--night) 100%);
+      box-shadow: 0 0 0 1px rgba(249,150,177,0.25), 0 30px 70px rgba(0,0,0,0.8);
       overflow: hidden;
     }
 
-    .orb {
-      position: absolute;
-      border-radius: 50%;
-      filter: blur(55px);
-      z-index: 0;
-      pointer-events: none;
-    }
-    .orb-1 {
-      width: 160px;
-      height: 160px;
-      background: rgba(249, 150, 177, 0.25);
-      top: -45px;
-      right: -35px;
-    }
-    .orb-2 {
-      width: 140px;
-      height: 140px;
-      background: rgba(255, 255, 255, 0.08);
-      bottom: -35px;
-      left: -35px;
-    }
-
-    .header {
-      position: relative;
-      z-index: 1;
-      text-align: center;
-      margin-bottom: 10px;
-    }
-
-    .badge-top {
-      display: inline-block;
-      font-family: 'Rajdhani', sans-serif;
-      font-size: 10px;
+    /* ---------- HEADER ---------- */
+    .header { text-align: center; }
+    .header .brand {
       font-weight: 700;
-      letter-spacing: 2.5px;
-      text-transform: uppercase;
-      color: var(--pink-main);
-      background: rgba(249, 150, 177, 0.1);
-      border: 1px solid rgba(249, 150, 177, 0.35);
-      padding: 2px 10px;
-      border-radius: 50px;
-      margin-bottom: 4px;
-      box-shadow: 0 0 12px rgba(249, 150, 177, 0.2);
+      font-size: 12px;
+      color: var(--pink);
+      letter-spacing: 0.5px;
     }
-
     .header h1 {
-      font-family: 'Cinzel Decorative', serif;
-      font-size: 20px;
-      font-weight: 900;
-      letter-spacing: 1.5px;
-      background: linear-gradient(90deg, #FFFFFF 0%, #F996B1 55%, #FFFFFF 100%);
+      font-family: 'Fraunces', serif;
+      font-style: italic;
+      font-weight: 700;
+      font-size: 42px;
+      line-height: 1.05;
+      margin-top: 2px;
+      background: linear-gradient(180deg, #ffffff 15%, var(--pink) 100%);
       -webkit-background-clip: text;
+      background-clip: text;
       -webkit-text-fill-color: transparent;
-      margin-bottom: 2px;
     }
+    .header p { margin-top: 4px; font-size: 12px; color: var(--muted); }
 
-    .header p {
-      font-size: 10px;
-      color: rgba(255, 255, 255, 0.6);
-      letter-spacing: 1.2px;
-      text-transform: uppercase;
+    /* ---------- PODIUM ---------- */
+    .podium {
+      display: grid;
+      grid-template-columns: 1fr 1.25fr 1fr;
+      align-items: end;
+      gap: 6px;
+      margin: 38px 0 22px;
     }
-
-    .divider {
-      height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(249, 150, 177, 0.5), transparent);
-      margin: 8px 0 10px;
-    }
-
-    .player-list {
-      position: relative;
-      z-index: 1;
+    .pod {
       display: flex;
       flex-direction: column;
-      gap: 4px;
-    }
-
-    .player-row {
-      display: grid;
-      grid-template-columns: 34px 32px 1.25fr 1.45fr 66px;
       align-items: center;
-      gap: 8px;
-      background: var(--glass-bg);
-      border: 1px solid rgba(255, 255, 255, 0.07);
-      border-radius: 10px;
-      padding: 4px 10px;
-      backdrop-filter: blur(12px);
-      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-    }
-
-    .player-row:hover {
-      transform: translateY(-1px);
-      border-color: rgba(249, 150, 177, 0.45);
-      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
-    }
-
-    .player-row.rank-1 {
-      background: linear-gradient(90deg, rgba(249, 150, 177, 0.18) 0%, rgba(20, 20, 28, 0.75) 60%);
-      border: 1.2px solid var(--pink-main);
-      box-shadow: 0 0 16px rgba(249, 150, 177, 0.2), inset 0 0 10px rgba(249, 150, 177, 0.08);
-    }
-
-    .player-row.rank-2,
-    .player-row.rank-3 {
-      border: 1px solid rgba(249, 150, 177, 0.35);
-      background: linear-gradient(90deg, rgba(255, 255, 255, 0.06) 0%, rgba(20, 20, 28, 0.65) 60%);
-    }
-
-    .rank-num {
-      font-family: 'Montserrat', sans-serif;
-      font-size: 13px;
-      font-weight: 900;
-      color: rgba(255, 255, 255, 0.45);
+      min-width: 0;
       text-align: center;
     }
-    .rank-1 .rank-num {
-      font-size: 15px;
-      color: var(--pink-main);
-      text-shadow: 0 0 10px var(--pink-glow);
-    }
-    .rank-2 .rank-num,
-    .rank-3 .rank-num {
-      color: var(--white);
-      text-shadow: 0 0 8px rgba(255, 255, 255, 0.35);
-    }
+    .pod.p2, .pod.p3 { margin-bottom: 0; }
 
-    .avatar-box {
+    .pod-avatar {
       position: relative;
-      width: 28px;
-      height: 28px;
+      width: 66px;
+      height: 66px;
       border-radius: 50%;
-      padding: 1.5px;
-      background: linear-gradient(135deg, var(--white), var(--pink-main));
-      box-shadow: 0 0 8px rgba(249, 150, 177, 0.3);
+      padding: 3px;
+      background: conic-gradient(from 200deg, #fff, var(--pink), #b77ad0, var(--pink), #fff);
+      margin-bottom: 14px;
     }
+    .pod.p1 .pod-avatar { width: 96px; height: 96px; padding: 4px; margin-bottom: 16px; }
+
+    /* halo di sekeliling juara */
+    .pod.p1 .pod-avatar::before,
+    .pod.p1 .pod-avatar::after {
+      content: "";
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid var(--pink);
+      pointer-events: none;
+    }
+    .pod.p1 .pod-avatar::before { inset: -9px; opacity: 0.45; }
+    .pod.p1 .pod-avatar::after { inset: -19px; opacity: 0.18; }
 
     .avatar-inner {
       width: 100%;
       height: 100%;
       border-radius: 50%;
-      background: #181822;
+      background: #20132a;
       display: flex;
       align-items: center;
       justify-content: center;
+      font-family: 'Fraunces', serif;
+      font-style: italic;
       font-weight: 700;
-      font-size: 10px;
-      color: var(--white);
+      font-size: 18px;
       overflow: hidden;
     }
-
-    .avatar-inner img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
+    .pod.p1 .avatar-inner { font-size: 28px; }
+    .avatar-inner img { width: 100%; height: 100%; object-fit: cover; }
 
     .crown {
       position: absolute;
-      top: -8px;
+      top: -30px;
       left: 50%;
+      transform: translateX(-50%) rotate(-6deg);
+      font-size: 24px;
+      filter: drop-shadow(0 0 8px var(--pink));
+    }
+
+    .pod-badge {
+      position: absolute;
+      left: 50%;
+      bottom: -11px;
       transform: translateX(-50%);
-      font-size: 10px;
-      filter: drop-shadow(0 0 4px var(--pink-main));
-    }
-
-    .player-info {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--pink);
+      color: #1b0f1c;
       display: flex;
-      flex-direction: column;
-      line-height: 1.15;
-      overflow: hidden;
-    }
-
-    .player-name {
-      font-size: 12.5px;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Fraunces', serif;
+      font-style: italic;
       font-weight: 700;
-      color: var(--white);
+      font-size: 14px;
+      box-shadow: 0 0 0 3px var(--night);
+    }
+    .pod.p1 .pod-badge { width: 30px; height: 30px; bottom: -14px; font-size: 17px; }
+
+    .pod-name {
+      max-width: 100%;
+      padding: 0 4px;
+      font-weight: 800;
+      font-size: 13.5px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
+    .pod.p1 .pod-name { font-size: 16px; }
 
-    .player-sub {
-      font-family: 'Rajdhani', sans-serif;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--pink-main);
-      letter-spacing: 0.4px;
+    .pod-exp {
+      margin-top: 2px;
+      font-family: 'Fraunces', serif;
+      font-style: italic;
+      font-weight: 500;
+      font-size: 15px;
+      color: var(--pink);
+    }
+    .pod.p1 .pod-exp { font-size: 19px; color: var(--pink-soft); }
+    .pod-exp small { font-family: 'Manrope', sans-serif; font-style: normal; font-size: 10px; color: var(--muted); margin-left: 2px; }
+
+    .pod-lvl { margin-top: 3px; font-size: 11px; font-weight: 700; color: var(--muted); }
+
+    /* ---------- SENARAI #4 - #10 ---------- */
+    .list {
+      border-radius: 22px;
+      background: rgba(255, 255, 255, 0.045);
+      border: 1px solid rgba(249, 150, 177, 0.2);
+      padding: 4px 14px;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 26px 36px 1fr auto;
+      align-items: center;
+      gap: 11px;
+      padding: 9px 0;
+      border-bottom: 1px solid rgba(249, 150, 177, 0.14);
+    }
+    .row:last-child { border-bottom: none; }
+
+    .row-rank {
+      font-family: 'Fraunces', serif;
+      font-style: italic;
+      font-weight: 700;
+      font-size: 20px;
+      color: var(--pink);
+      text-align: center;
     }
 
-    .progress-wrap {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
+    .row .avatar-box {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      padding: 2px;
+      background: conic-gradient(from 200deg, #fff, var(--pink), #b77ad0, var(--pink), #fff);
     }
+    .row .avatar-inner { font-size: 12px; }
 
-    .progress-meta {
-      display: flex;
-      justify-content: space-between;
-      font-family: 'Rajdhani', sans-serif;
-      font-size: 9.5px;
-      line-height: 1;
-      color: rgba(255, 255, 255, 0.65);
-    }
-
-    .progress-track {
-      width: 100%;
-      height: 5px;
-      background: rgba(255, 255, 255, 0.07);
-      border-radius: 50px;
+    .row-main { min-width: 0; }
+    .row-name {
+      font-weight: 700;
+      font-size: 13.5px;
+      white-space: nowrap;
       overflow: hidden;
-      position: relative;
-      border: 1px solid rgba(255, 255, 255, 0.06);
+      text-overflow: ellipsis;
     }
-
-    .progress-fill {
+    .bar-line { display: flex; align-items: center; gap: 7px; margin-top: 5px; }
+    .track { flex: 1; height: 3px; border-radius: 50px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+    .fill {
+      position: relative;
       height: 100%;
       border-radius: 50px;
-      background: linear-gradient(90deg, #f996b1 0%, #ffd1df 100%);
-      box-shadow: 0 0 8px var(--pink-glow);
-      position: relative;
+      background: linear-gradient(90deg, #b77ad0, var(--pink), var(--pink-soft));
+      box-shadow: 0 0 8px rgba(249, 150, 177, 0.6);
       overflow: hidden;
     }
-
-    .progress-fill::after {
+    .fill::after {
       content: "";
       position: absolute;
       inset: 0;
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent);
       transform: translateX(-100%);
-      animation: liquidShine 3.2s infinite ease-in-out;
+      animation: shine 3.4s infinite ease-in-out;
     }
+    @keyframes shine { 0%, 60% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+    .pct { min-width: 26px; text-align: right; font-size: 10px; font-weight: 600; color: var(--muted); }
 
-    @keyframes liquidShine {
-      0%, 60% { transform: translateX(-100%); }
-      100% { transform: translateX(100%); }
+    .row-right { text-align: right; }
+    .row-exp {
+      font-family: 'Fraunces', serif;
+      font-style: italic;
+      font-weight: 600;
+      font-size: 15px;
+      color: var(--pink-soft);
     }
-
-    .level-badge {
-      font-family: 'Rajdhani', sans-serif;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.6px;
-      text-align: center;
-      padding: 3px 6px;
-      border-radius: 7px;
-      background: rgba(249, 150, 177, 0.12);
-      border: 1px solid rgba(249, 150, 177, 0.4);
-      color: var(--white);
-      box-shadow: inset 0 0 6px rgba(249, 150, 177, 0.15);
-    }
-
-    .level-badge span {
-      color: var(--pink-main);
-    }
-
-    .footer {
-      position: relative;
-      z-index: 1;
-      margin-top: 10px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-family: 'Rajdhani', sans-serif;
+    .row-exp small { font-family: 'Manrope', sans-serif; font-style: normal; font-size: 9.5px; color: var(--muted); margin-left: 2px; }
+    .row-lvl {
+      display: inline-block;
+      margin-top: 2px;
+      padding: 1px 8px;
+      border-radius: 50px;
+      border: 1px solid rgba(249, 150, 177, 0.5);
       font-size: 10.5px;
-      color: rgba(255, 255, 255, 0.5);
-      letter-spacing: 0.8px;
+      font-weight: 700;
+      color: var(--pink);
     }
 
-    .footer strong {
-      color: var(--pink-main);
-    }
+    .footer { margin-top: 14px; text-align: center; font-size: 10.5px; color: var(--muted); }
+    .footer b { color: var(--pink); font-weight: 700; }
 
-    @media (max-width: 520px) {
-      .leaderboard-wrapper {
-        padding: 14px 12px;
-      }
-      .player-row {
-        grid-template-columns: 28px 28px 1fr 58px;
-        padding: 4px 8px;
-        gap: 6px;
-      }
-      .progress-wrap {
-        display: none;
-      }
-      .header h1 {
-        font-size: 17px;
-      }
+    @media (max-width: 420px) {
+      .header h1 { font-size: 34px; }
+      .pod-avatar { width: 56px; height: 56px; }
+      .pod.p1 .pod-avatar { width: 82px; height: 82px; }
+      .pod-name { font-size: 12px; }
+      .pod.p1 .pod-name { font-size: 14px; }
     }
+    @media (prefers-reduced-motion: reduce) { .fill::after { animation: none; } }
   </style>
 </head>
 <body>
 
-  <div class="leaderboard-wrapper">
-    <div class="orb orb-1"></div>
-    <div class="orb orb-2"></div>
-
+  <div class="board">
     <div class="header">
-      <div class="badge-top">✦ PLATOMY ✦</div>
-      <h1>MONTHLY LEADERBOARD</h1>
-      <p>Top 10 Community EXP Rankings</p>
-      <div class="divider"></div>
+      <div class="brand">PlatoMy</div>
+      <h1>Leaderboard</h1>
+      <p>Top 10 community EXP this month</p>
     </div>
 
-    <div class="player-list" id="playerList"></div>
+    <div class="podium" id="podium"></div>
+    <div class="list" id="list"></div>
 
-    <div class="footer">
-      <span>AUTO-UPDATE SETIAP 10 MINIT</span>
-      <span>POWERED BY <strong>PLATOMY</strong></span>
-    </div>
+    <div class="footer">Auto-update setiap 10 minit &nbsp;&middot;&nbsp; <b>PlatoMy</b></div>
   </div>
 
   <script>
     const players = {{PLAYERS_DATA}};
 
-    const listEl = document.getElementById("playerList");
-    listEl.innerHTML = players.slice(0, 10).map((p, index) => {
-      const rank = p.rank || index + 1;
-      const rankClass = rank <= 3 ? `rank-${rank}` : "";
-      const isFirst = p.crown !== undefined ? p.crown : rank === 1;
-      const avatarContent = p.avatar
-        ? `<img src="${p.avatar}" alt="${p.name}">`
-        : (p.initials || p.name.slice(0, 2).toUpperCase());
+    const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => (
+      { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+    ));
 
+    const top10 = players.slice(0, 10).map((p, i) => ({ ...p, rank: p.rank || i + 1 }));
+
+    const avatar = p => p.avatar
+      ? `<img src="${esc(p.avatar)}" alt="${esc(p.name)}">`
+      : esc(p.initials || String(p.name || "?").slice(0, 2).toUpperCase());
+
+    const lvl = p => String(p.level).padStart(2, "0");
+    const pct = p => Math.max(0, Math.min(100, Number(p.xp) || 0));
+
+    // PODIUM: susunan 2 - 1 - 3
+    document.getElementById("podium").innerHTML = [1, 0, 2].filter(i => top10[i]).map(i => {
+      const p = top10[i];
+      const n = i + 1;
+      const showCrown = p.crown !== undefined ? p.crown : n === 1;
       return `
-        <div class="player-row ${rankClass}">
-          <div class="rank-num">#${rank}</div>
-          <div class="avatar-box">
-            ${isFirst ? '<span class="crown">👑</span>' : ''}
-            <div class="avatar-inner">${avatarContent}</div>
+        <div class="pod p${n}">
+          <div class="pod-avatar">
+            ${showCrown ? '<span class="crown">👑</span>' : ''}
+            <div class="avatar-inner">${avatar(p)}</div>
+            <span class="pod-badge">${n}</span>
           </div>
-          <div class="player-info">
-            <div class="player-name">${p.name}</div>
-            <div class="player-sub">${p.exp} EXP</div>
-          </div>
-          <div class="progress-wrap">
-            <div class="progress-meta"><span>XP Progress</span><span>${p.xp}%</span></div>
-            <div class="progress-track"><div class="progress-fill" style="width: ${p.xp}%;"></div></div>
-          </div>
-          <div class="level-badge"><span>LVL</span> ${String(p.level).padStart(2, '0')}</div>
-        </div>
-      `;
+          <div class="pod-name">${esc(p.name)}</div>
+          <div class="pod-exp">${esc(p.exp)}<small>EXP</small></div>
+          <div class="pod-lvl">Level ${lvl(p)}</div>
+        </div>`;
     }).join("");
+
+    // SENARAI: #4 - #10
+    document.getElementById("list").innerHTML = top10.slice(3).map(p => `
+      <div class="row">
+        <div class="row-rank">${p.rank}</div>
+        <div class="avatar-box"><div class="avatar-inner">${avatar(p)}</div></div>
+        <div class="row-main">
+          <div class="row-name">${esc(p.name)}</div>
+          <div class="bar-line">
+            <div class="track"><div class="fill" style="width:${pct(p)}%"></div></div>
+            <div class="pct">${pct(p)}%</div>
+          </div>
+        </div>
+        <div class="row-right">
+          <div class="row-exp">${esc(p.exp)}<small>EXP</small></div>
+          <div class="row-lvl">LVL ${lvl(p)}</div>
+        </div>
+      </div>`).join("");
   </script>
 
 </body>
