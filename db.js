@@ -4,7 +4,7 @@ const url = process.env.DATABASE_URL;
 const pool = url
   ? new pg.Pool({
       connectionString: url,
-      ssl: url.includes(".railway.internal") ? false : { rejectUnauthorized: false },
+      ssl: { rejectUnauthorized: false },
     })
   : null;
 
