@@ -59,7 +59,9 @@ const rumbleMap = new Map();
 const acceptedTrades = new Set();
 
 function getWallet(id) {
-  if (!wallets.has(id)) wallets.set(id, { coins: 0, pips: 0, exp: 0, sponsorTotal: 0 });
+  if (!wallets.has(id)) {
+    wallets.set(id, { coins: 0, pips: 0, exp: 0, expTotal: 0, sponsorTotal: 0, sponsorMonthly: 0 });
+  }
   return wallets.get(id);
 }
 
@@ -87,7 +89,6 @@ const PIPS_EMOJI = "<:Pips:1549739800884551710>";
 const COINS_EMOJI = "<:PlatoCoins:1549740441682059385>";
 const WINNER_EMOJI = "<a:trophee:1563423570720329749>";
 const COINS_PER_PIP = 750;
-const coinsToPips = (c) => Math.floor((Number(c) || 0) / COINS_PER_PIP);
 
 const URL_1 =
   "https://cdn.discordapp.com/attachments/1556946394239991848/" +
@@ -557,7 +558,8 @@ function balanceLines(w) {
   return [
     `╰┈➤ ${COINS_EMOJI} Plato Coins: ${w.coins.toLocaleString()}`,
     `╰┈➤ ${PIPS_EMOJI} Pips: ${w.pips.toLocaleString()}`,
-    `╰┈➤ 🌸 Total Sponsor: ${COINS_EMOJI} ${w.sponsorTotal.toLocaleString()} (≈ ${PIPS_EMOJI} ${coinsToPips(w.sponsorTotal).toLocaleString()})`,
+    `╰┈➤ 🌸 Sponsor (Monthly): ${COINS_EMOJI} ${(w.sponsorMonthly || 0).toLocaleString()}`,
+    `╰┈➤ 🌸 Sponsor (Lifetime): ${COINS_EMOJI} ${w.sponsorTotal.toLocaleString()}`,
   ].join(NL);
 }
 
@@ -1041,28 +1043,53 @@ async function rerollGiveaway(msgId, count) {
 // ================= LEADERBOARD & RANK CARD (@napi-rs/canvas + PostgreSQL) =================
 const LEADERBOARD_CONFIG_PATH = "./leaderboard-config.json";
 
+const pctOfTop = (val, topVal) =>
+  val > 0 ? Math.min(100, Math.round((val / Math.max(1, topVal)) * 100)) : 0;
+
 const LEADERBOARD_CATEGORIES = {
   exp: {
     label: "Monthly EXP Leaderboard",
-    fancyTitle: "𝑀𝑂𝑁𝑇𝐻𝐿𝑌 𝐿𝐸𝐴𝐷𝐸𝑅𝐵𝑂𝐴𝑅𝐷",
-    title: "EXP & LEVELS LEADERBOARD",
-    subtitle: "TOP 10 COMMUNITY ACTIVITY RANKINGS",
+    fancyTitle: "𝑀𝑂𝑁𝑇𝐻𝐿𝑌 𝐸𝑋𝑃 𝐿𝐸𝐴𝐷𝐸𝑅𝐵𝑂𝐴𝑅𝐷",
+    title: "MONTHLY EXP LEADERBOARD",
+    subtitle: "TOP 10 THIS MONTH • RESETS EVERY 1ST",
     field: "exp",
     barLabel: "XP Progress",
     subText: (val) => `${val.toLocaleString()} EXP`,
     badgeText: (val, hasUser) => `LVL ${String(hasUser ? getLevelInfo(val).level : 0).padStart(2, "0")}`,
     progressPct: (val) => getLevelInfo(val).progressPct,
   },
+  exp_all: {
+    label: "Lifetime EXP Leaderboard",
+    fancyTitle: "𝐿𝐼𝐹𝐸𝑇𝐼𝑀𝐸 𝐸𝑋𝑃 𝐿𝐸𝐴𝐷𝐸𝑅𝐵𝑂𝐴𝑅𝐷",
+    title: "LIFETIME EXP LEADERBOARD",
+    subtitle: "TOP 10 ALL-TIME COMMUNITY ACTIVITY",
+    field: "expTotal",
+    barLabel: "Total XP",
+    subText: (val) => `${val.toLocaleString()} EXP`,
+    badgeText: (val) => `${val.toLocaleString()} XP`,
+    progressPct: pctOfTop,
+  },
   sponsor: {
     label: "Monthly Sponsor Leaderboard",
-    fancyTitle: "𝑆𝑃𝑂𝑁𝑆𝑂𝑅 𝐿𝐸𝐴𝐷𝐸𝑅𝐵𝑂𝐴𝑅𝐷",
-    title: "SPONSOR LEADERBOARD",
-    subtitle: "TOP 10 COMMUNITY SPONSORS",
+    fancyTitle: "𝑀𝑂𝑁𝑇𝐻𝐿𝑌 𝑆𝑃𝑂𝑁𝑆𝑂𝑅 𝐿𝐸𝐴𝐷𝐸𝑅𝐵𝑂𝐴𝑅𝐷",
+    title: "MONTHLY SPONSOR LEADERBOARD",
+    subtitle: "TOP 10 SPONSORS THIS MONTH • RESETS EVERY 1ST",
+    field: "sponsorMonthly",
+    barLabel: "Contribution",
+    subText: (val) => `${val.toLocaleString()} Coins`,
+    badgeText: (val) => `${val.toLocaleString()}`,
+    progressPct: pctOfTop,
+  },
+  sponsor_all: {
+    label: "Lifetime Sponsor Leaderboard",
+    fancyTitle: "𝐿𝐼𝐹𝐸𝑇𝐼𝑀𝐸 𝑆𝑃𝑂𝑁𝑆𝑂𝑅 𝐿𝐸𝐴𝐷𝐸𝑅𝐵𝑂𝐴𝑅𝐷",
+    title: "LIFETIME SPONSOR LEADERBOARD",
+    subtitle: "TOP 10 ALL-TIME COMMUNITY SPONSORS",
     field: "sponsorTotal",
     barLabel: "Contribution",
     subText: (val) => `${val.toLocaleString()} Coins`,
-    badgeText: (val) => `≈ ${coinsToPips(val).toLocaleString()} Pips`,
-    progressPct: (val, topVal) => (val > 0 ? Math.min(100, Math.round((val / Math.max(1, topVal)) * 100)) : 0),
+    badgeText: (val) => `${val.toLocaleString()}`,
+    progressPct: pctOfTop,
   },
   coins: {
     label: "Plato Coins Leaderboard",
@@ -1073,7 +1100,7 @@ const LEADERBOARD_CATEGORIES = {
     barLabel: "Coin Share",
     subText: (val) => `${val.toLocaleString()} Coins`,
     badgeText: (val) => `${val.toLocaleString()}`,
-    progressPct: (val, topVal) => (val > 0 ? Math.min(100, Math.round((val / Math.max(1, topVal)) * 100)) : 0),
+    progressPct: pctOfTop,
   },
   pips: {
     label: "Pips Leaderboard",
@@ -1084,7 +1111,7 @@ const LEADERBOARD_CATEGORIES = {
     barLabel: "Pips Share",
     subText: (val) => `${val.toLocaleString()} Pips`,
     badgeText: (val) => `${val.toLocaleString()}`,
-    progressPct: (val, topVal) => (val > 0 ? Math.min(100, Math.round((val / Math.max(1, topVal)) * 100)) : 0),
+    progressPct: pctOfTop,
   },
 };
 
@@ -1121,212 +1148,390 @@ function drawRoundRect(ctx, x, y, w, h, r, fill = true, stroke = false) {
   if (stroke) ctx.stroke();
 }
 
+function fitText(ctx, text, maxW) {
+  let t = String(text);
+  if (ctx.measureText(t).width <= maxW) return t;
+  while (t.length > 1 && ctx.measureText(t + "…").width > maxW) t = t.slice(0, -1);
+  return t + "…";
+}
+
+function drawAvatarRing(ctx, cx, cy, r, ring, p) {
+  const g = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
+  g.addColorStop(0, "#ffffff");
+  g.addColorStop(0.35, "#F996B1");
+  g.addColorStop(0.65, "#b77ad0");
+  g.addColorStop(1, "#F996B1");
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  const ir = r - ring;
+  ctx.fillStyle = "#20132a";
+  ctx.beginPath();
+  ctx.arc(cx, cy, ir, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (p.img) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, ir, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.drawImage(p.img, cx - ir, cy - ir, ir * 2, ir * 2);
+    ctx.restore();
+  } else {
+    ctx.fillStyle = "#fdf2f6";
+    ctx.font = `italic 700 ${Math.round(ir * 0.6)}px serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(p.initials, cx, cy);
+    ctx.textBaseline = "alphabetic";
+  }
+}
+
 async function generateLeaderboardImage(category = "exp") {
   const meta = LEADERBOARD_CATEGORIES[category] || LEADERBOARD_CATEGORIES.exp;
-  const width = 680;
-  const height = 840;
-  const canvas = createCanvas(width, height);
+  const W = 580;
+  const H = 814;
+  const S = 2; // resolusi 2x supaya tajam
+  const canvas = createCanvas(W * S, H * S);
   const ctx = canvas.getContext("2d");
+  ctx.scale(S, S);
 
-  const bgGrad = ctx.createLinearGradient(0, 0, width, height);
-  bgGrad.addColorStop(0, "#12121a");
-  bgGrad.addColorStop(1, "#09090d");
-  ctx.fillStyle = bgGrad;
-  drawRoundRect(ctx, 10, 10, width - 20, height - 20, 26, true, false);
+  const SANS = "sans-serif";
+  const SERIF = "serif";
+  const PINK = "#F996B1";
+  const PINK_SOFT = "#ffd3df";
+  const TEXT = "#fdf2f6";
+  const MUTED = "rgba(253, 242, 246, 0.58)";
+  const pad2 = (n) => String(n).padStart(2, "0");
+  const showLevel = category === "exp";
 
-  const orb1 = ctx.createRadialGradient(width - 90, 90, 10, width - 90, 90, 260);
-  orb1.addColorStop(0, "rgba(249, 150, 177, 0.2)");
-  orb1.addColorStop(1, "rgba(249, 150, 177, 0)");
-  ctx.fillStyle = orb1;
-  ctx.fillRect(10, 10, width - 20, height - 20);
-
-  const orb2 = ctx.createRadialGradient(90, height - 90, 10, 90, height - 90, 240);
-  orb2.addColorStop(0, "rgba(249, 150, 177, 0.14)");
-  orb2.addColorStop(1, "rgba(249, 150, 177, 0)");
-  ctx.fillStyle = orb2;
-  ctx.fillRect(10, 10, width - 20, height - 20);
-
-  ctx.strokeStyle = "rgba(249, 150, 177, 0.4)";
-  ctx.lineWidth = 2;
-  drawRoundRect(ctx, 10, 10, width - 20, height - 20, 26, false, true);
-
-  const titleGrad = ctx.createLinearGradient(width / 2 - 220, 0, width / 2 + 220, 0);
-  titleGrad.addColorStop(0, "#FFFFFF");
-  titleGrad.addColorStop(0.5, "#F996B1");
-  titleGrad.addColorStop(1, "#FFFFFF");
-  ctx.fillStyle = titleGrad;
-  ctx.font = "900 28px serif";
-  ctx.textAlign = "center";
-  ctx.fillText(meta.title, width / 2, 62);
-
-  ctx.fillStyle = "rgba(255, 255, 255, 0.58)";
-  ctx.font = "bold 11px sans-serif";
-  ctx.fillText(meta.subtitle, width / 2, 84);
-
-  const divGrad = ctx.createLinearGradient(60, 0, width - 60, 0);
-  divGrad.addColorStop(0, "rgba(249, 150, 177, 0)");
-  divGrad.addColorStop(0.5, "rgba(249, 150, 177, 0.55)");
-  divGrad.addColorStop(1, "rgba(249, 150, 177, 0)");
-  ctx.strokeStyle = divGrad;
-  ctx.lineWidth = 1.5;
+  // ---------- LATAR ----------
+  ctx.save();
   ctx.beginPath();
-  ctx.moveTo(60, 102);
-  ctx.lineTo(width - 60, 102);
+  ctx.roundRect(0, 0, W, H, 30);
+  ctx.clip();
+
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, "#170d1c");
+  bg.addColorStop(1, "#0c080f");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  const glow = (x, y, r, c0, c1) => {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, c0);
+    g.addColorStop(1, c1);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  };
+  glow(W * 0.18, 0, 340, "rgba(249,150,177,0.38)", "rgba(249,150,177,0)");
+  glow(W * 0.95, H * 0.22, 300, "rgba(150,90,190,0.28)", "rgba(150,90,190,0)");
+  glow(W * 0.5, H, 380, "rgba(249,150,177,0.22)", "rgba(249,150,177,0)");
+  ctx.restore();
+
+  ctx.strokeStyle = "rgba(249,150,177,0.25)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(0.5, 0.5, W - 1, H - 1, 30);
   ctx.stroke();
 
-  const allWallets = [...wallets.entries()].map(([id, data]) => ({ id, ...data }));
-  const sorted = [...allWallets]
+  // ---------- DATA ----------
+  const sorted = [...wallets.entries()]
+    .map(([id, data]) => ({ id, ...data }))
     .sort((a, b) => (b[meta.field] || 0) - (a[meta.field] || 0))
     .slice(0, 10);
 
   while (sorted.length < 10) {
-    sorted.push({ id: null, coins: 0, pips: 0, exp: 0, sponsorTotal: 0 });
+    sorted.push({ id: null, coins: 0, pips: 0, exp: 0, expTotal: 0, sponsorTotal: 0, sponsorMonthly: 0 });
   }
 
   const topVal = Math.max(1, sorted[0]?.[meta.field] || 1);
+  const players = [];
 
-  const fetchPlayerInfo = async (entry) => {
-    if (!entry.id) return { username: "Empty Slot", initials: "--", avatarUrl: null };
-    try {
-      const user = await client.users.fetch(entry.id);
-      const name = user.username || "User";
-      return {
-        username: name,
-        initials: name.substring(0, 2).toUpperCase(),
-        avatarUrl: user.displayAvatarURL({ extension: "png", size: 64 }),
-      };
-    } catch {
-      return { username: "Unknown", initials: "UN", avatarUrl: null };
-    }
-  };
-
-  const startX = 36;
-  const rowW = width - 72;
-  const rowH = 58;
-  let y = 122;
-
-  for (let i = 0; i < 10; i++) {
-    const rank = i + 1;
-    const entry = sorted[i];
+  for (const entry of sorted) {
     const val = entry[meta.field] || 0;
-    const infoData = await fetchPlayerInfo(entry);
+    let name = "Empty Slot";
+    let initials = "--";
+    let img = null;
 
-    if (rank === 1) {
-      const r1Grad = ctx.createLinearGradient(startX, y, startX + rowW, y);
-      r1Grad.addColorStop(0, "rgba(249, 150, 177, 0.22)");
-      r1Grad.addColorStop(0.65, "rgba(20, 20, 28, 0.78)");
-      ctx.fillStyle = r1Grad;
-      ctx.strokeStyle = "#F996B1";
-      ctx.lineWidth = 1.5;
-    } else if (rank <= 3) {
-      ctx.fillStyle = "rgba(24, 24, 34, 0.7)";
-      ctx.strokeStyle = "rgba(249, 150, 177, 0.35)";
-      ctx.lineWidth = 1;
-    } else {
-      ctx.fillStyle = "rgba(20, 20, 28, 0.55)";
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
-      ctx.lineWidth = 1;
-    }
-    drawRoundRect(ctx, startX, y, rowW, rowH, 13, true, true);
-
-    ctx.font = rank === 1 ? "900 18px sans-serif" : "bold 15px sans-serif";
-    ctx.fillStyle = rank === 1 ? "#F996B1" : rank <= 3 ? "#FFFFFF" : "rgba(255, 255, 255, 0.45)";
-    ctx.textAlign = "center";
-    ctx.fillText(`#${rank}`, startX + 30, y + 35);
-
-    const avX = startX + 76;
-    const avY = y + rowH / 2;
-    const avR = 19;
-
-    ctx.beginPath();
-    ctx.arc(avX, avY, avR + 1.5, 0, Math.PI * 2);
-    ctx.fillStyle = "#F996B1";
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.arc(avX, avY, avR, 0, Math.PI * 2);
-    ctx.fillStyle = "#181822";
-    ctx.fill();
-
-    let drewAvatar = false;
-    if (infoData.avatarUrl) {
+    if (entry.id) {
       try {
-        const img = await loadImage(infoData.avatarUrl);
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(avX, avY, avR, 0, Math.PI * 2);
-        ctx.clip();
-        ctx.drawImage(img, avX - avR, avY - avR, avR * 2, avR * 2);
-        ctx.restore();
-        drewAvatar = true;
-      } catch {}
+        const user = await client.users.fetch(entry.id);
+        name = user.username || "User";
+        initials = name.substring(0, 2).toUpperCase();
+        try {
+          img = await loadImage(user.displayAvatarURL({ extension: "png", size: 128 }));
+        } catch {}
+      } catch {
+        name = "Unknown";
+        initials = "UN";
+      }
     }
 
-    if (!drewAvatar) {
-      ctx.fillStyle = "#FFFFFF";
-      ctx.font = "bold 12px sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(infoData.initials, avX, avY + 4);
-    }
-
-    ctx.textAlign = "left";
-    ctx.fillStyle = "#FFFFFF";
-    ctx.font = "bold 15px sans-serif";
-    const displayName = infoData.username.length > 15 ? infoData.username.slice(0, 15) + "..." : infoData.username;
-    ctx.fillText(displayName, startX + 108, y + 25);
-
-    ctx.fillStyle = "#F996B1";
-    ctx.font = "bold 12px sans-serif";
-    ctx.fillText(meta.subText(val), startX + 108, y + 43);
-
-    const pct = meta.progressPct(val, topVal);
-    const barX = startX + 275;
-    const barW = 195;
-    const barY = y + 32;
-
-    ctx.fillStyle = "rgba(255, 255, 255, 0.62)";
-    ctx.font = "11px sans-serif";
-    ctx.fillText(meta.barLabel, barX, y + 23);
-    ctx.textAlign = "right";
-    ctx.fillText(`${pct}%`, barX + barW, y + 23);
-
-    ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
-    drawRoundRect(ctx, barX, barY, barW, 8, 4, true, false);
-
-    if (pct > 0) {
-      const fillGrad = ctx.createLinearGradient(barX, 0, barX + barW, 0);
-      fillGrad.addColorStop(0, "#F996B1");
-      fillGrad.addColorStop(1, "#ffd1df");
-      ctx.fillStyle = fillGrad;
-      drawRoundRect(ctx, barX, barY, Math.max(8, (barW * pct) / 100), 8, 4, true, false);
-    }
-
-    const badgeW = 108;
-    const badgeX = startX + rowW - badgeW - 14;
-    ctx.fillStyle = "rgba(249, 150, 177, 0.14)";
-    ctx.strokeStyle = "rgba(249, 150, 177, 0.45)";
-    ctx.lineWidth = 1;
-    drawRoundRect(ctx, badgeX, y + 15, badgeW, 28, 8, true, true);
-
-    ctx.fillStyle = "#FFFFFF";
-    ctx.font = "bold 12px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(meta.badgeText(val, Boolean(entry.id)), badgeX + badgeW / 2, y + 33);
-
-    y += rowH + 8;
+    const sub = meta.subText(val);
+    const sp = sub.indexOf(" ");
+    players.push({
+      hasUser: Boolean(entry.id),
+      name,
+      initials,
+      img,
+      num: sp > 0 ? sub.slice(0, sp) : sub,
+      unit: sp > 0 ? sub.slice(sp + 1) : "",
+      pct: Math.max(0, Math.min(100, meta.progressPct(val, topVal))),
+      level: entry.id ? getLevelInfo(val).level : 0,
+    });
   }
 
-  ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
-  ctx.font = "bold 11px sans-serif";
+  // ---------- HEADER ----------
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+
+  ctx.fillStyle = PINK;
+  ctx.font = `700 12px ${SANS}`;
+  ctx.fillText(`PlatoMy  •  ${meta.label.replace(" Leaderboard", "")}`, W / 2, 44);
+
+  const tg = ctx.createLinearGradient(0, 60, 0, 98);
+  tg.addColorStop(0.15, "#ffffff");
+  tg.addColorStop(1, PINK);
+  ctx.fillStyle = tg;
+  ctx.font = `italic 700 42px ${SERIF}`;
+  ctx.fillText("Leaderboard", W / 2, 92);
+
+  ctx.fillStyle = MUTED;
+  ctx.font = `500 12px ${SANS}`;
+  const subtitle = meta.subtitle.charAt(0) + meta.subtitle.slice(1).toLowerCase();
+  ctx.fillText(subtitle, W / 2, 114);
+
+  // ---------- PODIUM (susunan 2 - 1 - 3) ----------
+  const cxs = [W / 2 - 191.5, W / 2, W / 2 + 191.5];
+  [1, 0, 2].forEach((pi, col) => {
+    const p = players[pi];
+    const n = pi + 1;
+    const first = n === 1;
+    const cx = cxs[col];
+    const r = first ? 48 : 33;
+    const cy = first ? 205 : 234;
+
+    ctx.globalAlpha = p.hasUser ? 1 : 0.45;
+
+    if (first) {
+      // halo juara
+      ctx.strokeStyle = PINK;
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = p.hasUser ? 0.45 : 0.2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r + 9, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = p.hasUser ? 0.18 : 0.08;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r + 19, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = p.hasUser ? 1 : 0.45;
+    }
+
+    drawAvatarRing(ctx, cx, cy, r, first ? 4 : 3, p);
+
+    if (first) {
+      // mahkota (dilukis, tanpa emoji)
+      ctx.save();
+      ctx.translate(cx, cy - r - 16);
+      ctx.rotate((-6 * Math.PI) / 180);
+      ctx.shadowColor = PINK;
+      ctx.shadowBlur = 10;
+      ctx.fillStyle = "#f7c948";
+      ctx.beginPath();
+      ctx.moveTo(-14, 10);
+      ctx.lineTo(-14, -6);
+      ctx.lineTo(-7, 1);
+      ctx.lineTo(0, -10);
+      ctx.lineTo(7, 1);
+      ctx.lineTo(14, -6);
+      ctx.lineTo(14, 10);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // lencana nombor
+    const br = first ? 15 : 12;
+    const by = cy + r - 1;
+    ctx.fillStyle = "#0c080f";
+    ctx.beginPath();
+    ctx.arc(cx, by, br + 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = PINK;
+    ctx.beginPath();
+    ctx.arc(cx, by, br, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#1b0f1c";
+    ctx.font = `italic 700 ${first ? 17 : 14}px ${SERIF}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(String(n), cx, by + 1);
+    ctx.textBaseline = "alphabetic";
+
+    // nama
+    ctx.fillStyle = TEXT;
+    ctx.font = `800 ${first ? 16 : 13.5}px ${SANS}`;
+    ctx.textAlign = "center";
+    ctx.fillText(fitText(ctx, p.name, first ? 190 : 140), cx, first ? 288 : 297);
+
+    // EXP / jumlah
+    const numSize = first ? 19 : 15;
+    ctx.font = `italic 500 ${numSize}px ${SERIF}`;
+    const wNum = ctx.measureText(p.num).width;
+    ctx.font = `500 10px ${SANS}`;
+    const wUnit = p.unit ? ctx.measureText(p.unit).width : 0;
+    const startX = cx - (wNum + (p.unit ? 3 + wUnit : 0)) / 2;
+    const expY = first ? 311 : 316;
+
+    ctx.textAlign = "left";
+    ctx.fillStyle = first ? PINK_SOFT : PINK;
+    ctx.font = `italic 500 ${numSize}px ${SERIF}`;
+    ctx.fillText(p.num, startX, expY);
+    if (p.unit) {
+      ctx.fillStyle = MUTED;
+      ctx.font = `500 10px ${SANS}`;
+      ctx.fillText(p.unit, startX + wNum + 3, expY);
+    }
+
+    if (showLevel) {
+      ctx.textAlign = "center";
+      ctx.fillStyle = MUTED;
+      ctx.font = `700 11px ${SANS}`;
+      ctx.fillText(`Level ${pad2(p.level)}`, cx, 332);
+    }
+
+    ctx.globalAlpha = 1;
+  });
+
+  // ---------- SENARAI #4 - #10 ----------
+  const listX = 16;
+  const listW = W - 32;
+  const listTop = 358;
+  const rowH = 57;
+
+  ctx.fillStyle = "rgba(255,255,255,0.045)";
+  ctx.beginPath();
+  ctx.roundRect(listX, listTop, listW, 8 + 7 * rowH, 22);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(249,150,177,0.2)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  const barX = 114;
+  const barW = 286;
+
+  for (let i = 3; i < 10; i++) {
+    const p = players[i];
+    const row = i - 3;
+    const y0 = listTop + 4 + row * rowH;
+    const mid = y0 + 28;
+
+    ctx.globalAlpha = p.hasUser ? 1 : 0.45;
+
+    // nombor ranking
+    ctx.textAlign = "center";
+    ctx.fillStyle = PINK;
+    ctx.font = `italic 700 20px ${SERIF}`;
+    ctx.fillText(String(i + 1), 43, mid + 7);
+
+    // avatar
+    drawAvatarRing(ctx, 85, mid, 18, 2, p);
+
+    // nama
+    ctx.textAlign = "left";
+    ctx.fillStyle = TEXT;
+    ctx.font = `700 13.5px ${SANS}`;
+    ctx.fillText(fitText(ctx, p.name, 300), barX, mid - 4);
+
+    // bar progress
+    ctx.fillStyle = "rgba(255,255,255,0.1)";
+    ctx.beginPath();
+    ctx.roundRect(barX, mid + 7, barW, 3, 2);
+    ctx.fill();
+
+    if (p.pct > 0) {
+      const fg = ctx.createLinearGradient(barX, 0, barX + barW, 0);
+      fg.addColorStop(0, "#b77ad0");
+      fg.addColorStop(0.6, PINK);
+      fg.addColorStop(1, PINK_SOFT);
+      ctx.save();
+      ctx.shadowColor = "rgba(249,150,177,0.6)";
+      ctx.shadowBlur = 6;
+      ctx.fillStyle = fg;
+      ctx.beginPath();
+      ctx.roundRect(barX, mid + 7, Math.max(3, (barW * p.pct) / 100), 3, 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    ctx.textAlign = "right";
+    ctx.fillStyle = MUTED;
+    ctx.font = `600 10px ${SANS}`;
+    ctx.fillText(`${p.pct}%`, 439, mid + 11);
+
+    // EXP / jumlah di kanan
+    const expY = showLevel ? mid - 3 : mid + 6;
+    ctx.font = `500 9.5px ${SANS}`;
+    const wUnit = p.unit ? ctx.measureText(p.unit).width : 0;
+    if (p.unit) {
+      ctx.fillStyle = MUTED;
+      ctx.fillText(p.unit, 550, expY);
+    }
+    ctx.fillStyle = PINK_SOFT;
+    ctx.font = `italic 600 15px ${SERIF}`;
+    ctx.fillText(p.num, 550 - (p.unit ? wUnit + 3 : 0), expY);
+
+    // pill LVL (EXP bulanan sahaja)
+    if (showLevel) {
+      const label = `LVL ${pad2(p.level)}`;
+      ctx.font = `700 10.5px ${SANS}`;
+      const pw = ctx.measureText(label).width + 16;
+      const px = 550 - pw;
+      const py = mid + 3;
+      ctx.strokeStyle = "rgba(249,150,177,0.5)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(px, py, pw, 17, 8.5);
+      ctx.stroke();
+      ctx.fillStyle = PINK;
+      ctx.textAlign = "center";
+      ctx.fillText(label, px + pw / 2, py + 12.5);
+    }
+
+    ctx.globalAlpha = 1;
+
+    // garis pemisah
+    if (row < 6) {
+      ctx.strokeStyle = "rgba(249,150,177,0.14)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(30, y0 + rowH - 0.5);
+      ctx.lineTo(550, y0 + rowH - 0.5);
+      ctx.stroke();
+    }
+  }
+
+  // ---------- FOOTER ----------
+  const part1 = "Auto-update setiap 10 minit  ·  ";
+  ctx.font = `500 10.5px ${SANS}`;
+  const w1 = ctx.measureText(part1).width;
+  ctx.font = `700 10.5px ${SANS}`;
+  const w2 = ctx.measureText("PlatoMy").width;
+  const fx = W / 2 - (w1 + w2) / 2;
+
   ctx.textAlign = "left";
-  ctx.fillText("AUTO-UPDATE SETIAP 10 MINIT", 36, height - 24);
+  ctx.fillStyle = MUTED;
+  ctx.font = `500 10.5px ${SANS}`;
+  ctx.fillText(part1, fx, 794);
+  ctx.fillStyle = PINK;
+  ctx.font = `700 10.5px ${SANS}`;
+  ctx.fillText("PlatoMy", fx + w1, 794);
 
-  ctx.textAlign = "right";
-  ctx.fillStyle = "#F996B1";
-  ctx.fillText("POWERED BY PLATOMY", width - 36, height - 24);
-
-  const imageBuffer = canvas.toBuffer("image/png");
-  return new AttachmentBuilder(imageBuffer, { name: `leaderboard-${category}.png` });
+  return new AttachmentBuilder(canvas.toBuffer("image/png"), { name: `leaderboard-${category}.png` });
 }
 
 // Container Components V2 tanpa warna untuk setiap Leaderboard
@@ -1502,7 +1707,7 @@ const commands = [
         .setDescription("Tindakan")
         .setRequired(true)
         .addChoices(
-          { name: "Add Sponsor (Coins)", value: "add_sponsor" },
+          { name: "Add Sponsor (Coins / Pips)", value: "add_sponsor" },
           { name: "Add Coins", value: "add_coins" },
           { name: "Deduct Coins", value: "deduct_coins" },
           { name: "Add Pips", value: "add_pips" },
@@ -1512,7 +1717,17 @@ const commands = [
     )
     .addUserOption((opt) => opt.setName("target").setDescription("Ahli / Penaja").setRequired(true))
     .addIntegerOption((opt) => opt.setName("amount").setDescription("Jumlah").setRequired(true))
-    .addStringOption((opt) => opt.setName("reason").setDescription("Sebab / Nota").setRequired(false)),
+    .addStringOption((opt) => opt.setName("reason").setDescription("Sebab / Nota").setRequired(false))
+    .addStringOption((opt) =>
+      opt
+        .setName("sponsor_currency")
+        .setDescription("Untuk Add Sponsor: guna Coins atau Pips (default Coins)")
+        .setRequired(false)
+        .addChoices(
+          { name: "🪙 Coins", value: "coins" },
+          { name: "💠 Pips (750 Coins = 1 Pip)", value: "pips" }
+        )
+    ),
 
   new SlashCommandBuilder().setName("setup-trading").setDescription("Hantar panel PlatoMy Trading (Admin sahaja)"),
 
@@ -1532,8 +1747,10 @@ const commands = [
         .setDescription("Pilih kategori leaderboard")
         .setRequired(true)
         .addChoices(
-          { name: "✨ EXP & Levels", value: "exp" },
-          { name: "🌸 Total Sponsor", value: "sponsor" },
+          { name: "✨ Monthly EXP", value: "exp" },
+          { name: "✨ Lifetime EXP", value: "exp_all" },
+          { name: "🌸 Monthly Sponsor", value: "sponsor" },
+          { name: "🌸 Lifetime Sponsor", value: "sponsor_all" },
           { name: "🪙 Plato Coins", value: "coins" },
           { name: "💠 Pips", value: "pips" }
         )
@@ -1688,37 +1905,43 @@ client.once(Events.ClientReady, async (c) => {
     { timezone: "Asia/Kuala_Lumpur" }
   );
 
-  // --- AUTO-RESET EXP BULANAN (Setiap 1 hari bulan jam 12:00 malam waktu Malaysia) ---
+  // --- AUTO-RESET BULANAN: EXP + SPONSOR (Setiap 1 hari bulan jam 12:00 malam waktu Malaysia) ---
   cron.schedule(
     "0 0 1 * *",
     async () => {
       try {
-        console.log("Memulakan proses auto-reset EXP bulanan...");
+        console.log("Memulakan proses auto-reset bulanan...");
         for (const [, data] of wallets.entries()) {
           data.exp = 0;
+          data.sponsorMonthly = 0;
         }
-        console.log("✅ Semua EXP ahli dalam memori berjaya di-reset ke 0!");
 
         const configs = await getLeaderboardConfigs();
-        const expCfg = configs.exp;
-        if (expCfg?.channelId && expCfg?.messageId) {
-          const channel = await client.channels.fetch(expCfg.channelId).catch(() => null);
-          if (channel) {
-            await channel.send(
-              "🎉 **Monthly EXP Leaderboard telah tamat! Semua EXP ahli telah diset semula ke 0 untuk bulan baharu. Semoga berjaya!** 🌸"
-            );
-            const attachment = await generateLeaderboardImage("exp");
-            const message = await channel.messages.fetch(expCfg.messageId).catch(() => null);
-            if (message) {
-              await message.edit({
-                components: [buildLeaderboardBox("exp", "Bulan Baharu • Semua EXP telah diset semula ke 0")],
+        for (const category of ["exp", "sponsor"]) {
+          const cfg = configs[category];
+          if (!cfg?.channelId || !cfg?.messageId) continue;
+
+          const channel = await client.channels.fetch(cfg.channelId).catch(() => null);
+          if (!channel) continue;
+
+          await channel
+            .send(`🎉 **${LEADERBOARD_CATEGORIES[category].label} telah tamat! Papan telah diset semula untuk bulan baharu. Semoga berjaya!** 🌸`)
+            .catch(() => {});
+
+          const message = await channel.messages.fetch(cfg.messageId).catch(() => null);
+          if (message) {
+            const attachment = await generateLeaderboardImage(category);
+            await message
+              .edit({
+                components: [buildLeaderboardBox(category, "Bulan Baharu • Papan telah diset semula")],
                 files: [attachment],
                 attachments: [],
                 flags: V2,
-              });
-            }
+              })
+              .catch(() => {});
           }
         }
+        console.log("✅ Reset bulanan selesai!");
       } catch (err) {
         console.error("Ralat semasa auto-reset bulanan:", err);
       }
@@ -1757,6 +1980,7 @@ client.on(Events.MessageCreate, async (message) => {
       : Math.floor(Math.random() * 11) + 15;
 
     w.exp += gain;
+    w.expTotal = (w.expTotal || 0) + gain;
     const newLvl = getLevelInfo(w.exp).level;
 
     if (newLvl > oldLvl && message.member) {
@@ -1843,9 +2067,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
           actionTitle = "💠 Pips Deducted";
           actionDesc = `Berjaya menolak **${amount.toLocaleString()} Pips** daripada ${targetUser}.`;
         } else if (action === "add_sponsor") {
-          targetWallet.sponsorTotal += amount;
+          const sponsorCurrency = interaction.options.getString("sponsor_currency") || "coins";
+          const coinValue = sponsorCurrency === "pips" ? amount * COINS_PER_PIP : amount;
+          targetWallet.sponsorTotal += coinValue;
+          targetWallet.sponsorMonthly = (targetWallet.sponsorMonthly || 0) + coinValue;
           actionTitle = "🌸 Total Sponsor Added";
-          actionDesc = `Berjaya menambah **${amount.toLocaleString()} Coins** (≈ ${coinsToPips(amount).toLocaleString()} Pips) sebagai Total Sponsor kepada ${targetUser}.`;
+          actionDesc =
+            sponsorCurrency === "pips"
+              ? `Berjaya menambah sponsor **${amount.toLocaleString()} Pips** (dikira **${coinValue.toLocaleString()} Coins**) kepada ${targetUser}.`
+              : `Berjaya menambah sponsor **${coinValue.toLocaleString()} Coins** kepada ${targetUser}.`;
         } else if (action === "check") {
           actionTitle = "📊 Wallet Checked";
           actionDesc = `Menyemak baki wallet ${targetUser}.`;
