@@ -39,8 +39,8 @@ import {
 } from "./db.js";
 
 const NL = String.fromCharCode(10);
-
 const token = process.env.DISCORD_TOKEN;
+
 if (!token) {
   console.error("RALAT: DISCORD_TOKEN tidak ditemui di dalam Environment Variables!");
 }
@@ -75,7 +75,6 @@ const TRADING_LOG_CHANNEL_NAME = "trading-log";
 const TRADE_ROLE_NAME = "trade";
 const TRADER_ROLE_NAME = "trader";
 const TRADE_CATEGORY_ID = "1567527038368223332";
-
 const LEVEL_UP_CHANNEL_ID = "1552249117621747782";
 const LOW_EXP_CHANNEL_IDS = new Set(["1548984832263065640"]);
 
@@ -94,12 +93,10 @@ const URL_1 =
   "https://cdn.discordapp.com/attachments/1556946394239991848/" +
   "1562348900705374259/IMG_6986.gif?ex=6aeec24c&is=6aed70cc&" +
   "hm=b4094237e998531634199814f373fd7d8827c9aa8dbb8d0ec626aeb70ca092e5&";
-
 const URL_2 =
   "https://cdn.discordapp.com/attachments/1556946394239991848/" +
   "1567858191537279016/20261105_190812_0000.png?ex=6aee5dfa&" +
   "is=6aed0c7a&hm=703dd68300d271f1087bbbc0b932f49a379a78b33f00cdbef8a9f4ac80fd74c0&";
-
 const TRADE_MEDIA_URLS = [URL_1, URL_2, URL_1];
 
 // --- TETAPAN LEVEL (MAX 100) & EXP BERPERINGKAT ---
@@ -208,6 +205,7 @@ async function handleYapperActivity(member) {
   data.timestamps.push(now);
   data.lastActive = now;
   data.guildId = member.guild.id;
+
   yapperActivity.set(member.id, data);
   scheduleSaveYapperActivity();
 
@@ -226,6 +224,7 @@ const isAdmin = (i) => i.member?.permissions?.has(PermissionFlagsBits.Administra
 const isUrl = (u) => /^https?:\/\/\S+$/i.test(String(u || "").trim());
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
 const findChannel = (guild, part) => {
   const byId = guild.channels.cache.get(LOG_CHANNEL_IDS[part]);
   if (byId?.isTextBased()) return byId;
@@ -253,7 +252,6 @@ function getMalaysiaDateParts() {
     month: "numeric",
     day: "numeric",
   }).formatToParts(new Date());
-
   const get = (type) => Number(parts.find((p) => p.type === type)?.value || 1);
   return { year: get("year"), month: get("month"), day: get("day") };
 }
@@ -262,6 +260,7 @@ function getMalaysiaDateParts() {
 const V2 = MessageFlags.IsComponentsV2;
 const V2_EPHEMERAL = MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral;
 const NO_PING = { parse: [] };
+
 const sep = () => new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small);
 const txt = (content) => new TextDisplayBuilder().setContent(content);
 
@@ -454,7 +453,6 @@ function buildBirthdayCornerBox(data) {
 async function refreshBirthdayBoard(data = null) {
   const bData = data || (await getBirthdayData());
   if (!bData.config?.channelId || !bData.config?.messageId) return;
-
   const channel = await client.channels.fetch(bData.config.channelId).catch(() => null);
   const message = await channel?.messages.fetch(bData.config.messageId).catch(() => null);
   if (!message) return;
@@ -646,6 +644,7 @@ function buildTradeList({ requesterId, details, accepterId = null }) {
       txt("╰┈➤ Click **Accept Trade** if you are interested in trading with the requester.")
     );
   }
+
   return box.addActionRowComponents(new ActionRowBuilder().addComponents(btn));
 }
 
@@ -716,7 +715,6 @@ async function createTradeChannel(guild, requesterId, accepter, details) {
       flags: V2,
       allowedMentions: { users: [requesterId, accepter.id] },
     });
-
     return channel;
   } catch (err) {
     console.error("Gagal cipta channel trade:", err);
@@ -740,6 +738,7 @@ const KILL_SCENES = [
   (a, b) => `☄️ ${a} called a meteor down on ${b}!`,
   (a, b) => `🔥 ${a} torched ${b} with a flamethrower!`,
 ];
+
 const SOLO_SCENES = [
   (b) => `🌋 ${b} fell into the lava!`,
   (b) => `🦈 ${b} got eaten by a shark!`,
@@ -799,7 +798,6 @@ async function runRumbleBattle(channel, msgId) {
   const edit = (box) => (msg ? msg.edit({ components: [box], flags: V2 }).catch(() => {}) : null);
 
   const players = [...game.participants];
-
   if (players.length === 0) {
     await edit(
       info(
@@ -812,14 +810,12 @@ async function runRumbleBattle(channel, msgId) {
   }
 
   let alive = [...players];
-
   if (alive.length > winnersCount) {
     const startLines = [
       "🔥 **The battle begins!**",
       `${players.length} players have entered the arena...`,
     ];
     if (winnersCount > 1) startLines.push(`${WINNER_EMOJI} Last **${winnersCount}** standing win!`);
-
     await edit(info("🌸・PlatoMy Rumble Arena", startLines.join(NL)));
     await sleep(5000);
 
@@ -923,7 +919,6 @@ function pickRandom(arr, n) {
 
 function giveawayBox(game) {
   const box = new ContainerBuilder();
-
   if (isUrl(game.imageUrl)) {
     box.addMediaGalleryComponents(
       new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(game.imageUrl.trim()))
@@ -1029,6 +1024,7 @@ async function rerollGiveaway(msgId, count) {
     if (msg) {
       await msg.edit({ components: [giveawayBox(game)], flags: V2, allowedMentions: NO_PING }).catch(() => {});
     }
+
     const mentions = newWinners.map((id) => `<@${id}>`).join(", ");
     await channel
       .send({
@@ -1037,6 +1033,7 @@ async function rerollGiveaway(msgId, count) {
       })
       .catch(() => {});
   }
+
   return { ok: true, count: newWinners.length };
 }
 
@@ -1206,6 +1203,7 @@ async function generateLeaderboardImage(category = "exp") {
   const MUTED = "rgba(253, 242, 246, 0.58)";
   const pad2 = (n) => String(n).padStart(2, "0");
   const showLevel = category === "exp";
+  const showBar = category !== "sponsor" && category !== "sponsor_all";
 
   // ---------- LATAR ----------
   ctx.save();
@@ -1249,13 +1247,11 @@ async function generateLeaderboardImage(category = "exp") {
 
   const topVal = Math.max(1, sorted[0]?.[meta.field] || 1);
   const players = [];
-
   for (const entry of sorted) {
     const val = entry[meta.field] || 0;
     let name = "Empty Slot";
     let initials = "--";
     let img = null;
-
     if (entry.id) {
       try {
         const user = await client.users.fetch(entry.id);
@@ -1269,7 +1265,6 @@ async function generateLeaderboardImage(category = "exp") {
         initials = "UN";
       }
     }
-
     const sub = meta.subText(val);
     const sp = sub.indexOf(" ");
     players.push({
@@ -1287,7 +1282,6 @@ async function generateLeaderboardImage(category = "exp") {
   // ---------- HEADER ----------
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
-
   ctx.fillStyle = PINK;
   ctx.font = `700 12px ${SANS}`;
   ctx.fillText(`PlatoMy  •  ${meta.label.replace(" Leaderboard", "")}`, W / 2, 44);
@@ -1324,10 +1318,12 @@ async function generateLeaderboardImage(category = "exp") {
       ctx.beginPath();
       ctx.arc(cx, cy, r + 9, 0, Math.PI * 2);
       ctx.stroke();
+
       ctx.globalAlpha = p.hasUser ? 0.18 : 0.08;
       ctx.beginPath();
       ctx.arc(cx, cy, r + 19, 0, Math.PI * 2);
       ctx.stroke();
+
       ctx.globalAlpha = p.hasUser ? 1 : 0.45;
     }
 
@@ -1361,10 +1357,12 @@ async function generateLeaderboardImage(category = "exp") {
     ctx.beginPath();
     ctx.arc(cx, by, br + 3, 0, Math.PI * 2);
     ctx.fill();
+
     ctx.fillStyle = PINK;
     ctx.beginPath();
     ctx.arc(cx, by, br, 0, Math.PI * 2);
     ctx.fill();
+
     ctx.fillStyle = "#1b0f1c";
     ctx.font = `italic 700 ${first ? 17 : 14}px ${SERIF}`;
     ctx.textAlign = "center";
@@ -1391,6 +1389,7 @@ async function generateLeaderboardImage(category = "exp") {
     ctx.fillStyle = first ? PINK_SOFT : PINK;
     ctx.font = `italic 500 ${numSize}px ${SERIF}`;
     ctx.fillText(p.num, startX, expY);
+
     if (p.unit) {
       ctx.fillStyle = MUTED;
       ctx.font = `500 10px ${SANS}`;
@@ -1445,42 +1444,46 @@ async function generateLeaderboardImage(category = "exp") {
     ctx.textAlign = "left";
     ctx.fillStyle = TEXT;
     ctx.font = `700 13.5px ${SANS}`;
-    ctx.fillText(fitText(ctx, p.name, 300), barX, mid - 4);
+    ctx.fillText(fitText(ctx, p.name, 300), barX, showBar ? mid - 4 : mid + 5);
 
-    // bar progress
-    ctx.fillStyle = "rgba(255,255,255,0.1)";
-    ctx.beginPath();
-    ctx.roundRect(barX, mid + 7, barW, 3, 2);
-    ctx.fill();
-
-    if (p.pct > 0) {
-      const fg = ctx.createLinearGradient(barX, 0, barX + barW, 0);
-      fg.addColorStop(0, "#b77ad0");
-      fg.addColorStop(0.6, PINK);
-      fg.addColorStop(1, PINK_SOFT);
-      ctx.save();
-      ctx.shadowColor = "rgba(249,150,177,0.6)";
-      ctx.shadowBlur = 6;
-      ctx.fillStyle = fg;
+    // bar progress & % (disembunyikan untuk kategori Sponsor)
+    if (showBar) {
+      ctx.fillStyle = "rgba(255,255,255,0.1)";
       ctx.beginPath();
-      ctx.roundRect(barX, mid + 7, Math.max(3, (barW * p.pct) / 100), 3, 2);
+      ctx.roundRect(barX, mid + 7, barW, 3, 2);
       ctx.fill();
-      ctx.restore();
-    }
 
-    ctx.textAlign = "right";
-    ctx.fillStyle = MUTED;
-    ctx.font = `600 10px ${SANS}`;
-    ctx.fillText(`${p.pct}%`, 439, mid + 11);
+      if (p.pct > 0) {
+        const fg = ctx.createLinearGradient(barX, 0, barX + barW, 0);
+        fg.addColorStop(0, "#b77ad0");
+        fg.addColorStop(0.6, PINK);
+        fg.addColorStop(1, PINK_SOFT);
+        ctx.save();
+        ctx.shadowColor = "rgba(249,150,177,0.6)";
+        ctx.shadowBlur = 6;
+        ctx.fillStyle = fg;
+        ctx.beginPath();
+        ctx.roundRect(barX, mid + 7, Math.max(3, (barW * p.pct) / 100), 3, 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      ctx.textAlign = "right";
+      ctx.fillStyle = MUTED;
+      ctx.font = `600 10px ${SANS}`;
+      ctx.fillText(`${p.pct}%`, 439, mid + 11);
+    }
 
     // EXP / jumlah di kanan
     const expY = showLevel ? mid - 3 : mid + 6;
+    ctx.textAlign = "right";
     ctx.font = `500 9.5px ${SANS}`;
     const wUnit = p.unit ? ctx.measureText(p.unit).width : 0;
     if (p.unit) {
       ctx.fillStyle = MUTED;
       ctx.fillText(p.unit, 550, expY);
     }
+
     ctx.fillStyle = PINK_SOFT;
     ctx.font = `italic 600 15px ${SERIF}`;
     ctx.fillText(p.num, 550 - (p.unit ? wUnit + 3 : 0), expY);
@@ -1492,11 +1495,13 @@ async function generateLeaderboardImage(category = "exp") {
       const pw = ctx.measureText(label).width + 16;
       const px = 550 - pw;
       const py = mid + 3;
+
       ctx.strokeStyle = "rgba(249,150,177,0.5)";
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.roundRect(px, py, pw, 17, 8.5);
       ctx.stroke();
+
       ctx.fillStyle = PINK;
       ctx.textAlign = "center";
       ctx.fillText(label, px + pw / 2, py + 12.5);
@@ -1540,20 +1545,22 @@ function buildLeaderboardBox(category = "exp", extraNote = null) {
   const ts = Math.floor(Date.now() / 1000);
   const fileName = `leaderboard-${category}.png`;
 
-  const lines = [
-    `### ˚₊‧꒰ა <a:PinkCrown:1549417235393683681> ${meta.fancyTitle} <a:PinkCrown:1549417235393683681> ໒꒱‧₊˚`,
-    `<a:a_sparkle7:1563423627263877200> ╰┈➤ **Last Update:** <t:${ts}:R>`,
+  const footerLines = [
+    `-# <a:a_sparkle7:1563423627263877200> ╰┈➤ **Last Update:** <t:${ts}:R>`,
   ];
-  if (extraNote) lines.push(`-# ${extraNote}`);
+  if (extraNote) footerLines.push(`-# ${extraNote}`);
 
   return new ContainerBuilder()
-    .addTextDisplayComponents(txt(lines.join(NL)))
+    .addTextDisplayComponents(
+      txt(`### ˚₊‧꒰ა <a:PinkCrown:1549417235393683681> ${meta.fancyTitle} <a:PinkCrown:1549417235393683681> ໒꒱‧₊˚`)
+    )
     .addSeparatorComponents(sep())
     .addMediaGalleryComponents(
       new MediaGalleryBuilder().addItems(
         new MediaGalleryItemBuilder().setURL(`attachment://${fileName}`)
       )
-    );
+    )
+    .addTextDisplayComponents(txt(footerLines.join(NL)));
 }
 
 // ================= RANK CARD GENERATOR (/myrank) =================
@@ -1692,12 +1699,10 @@ const commands = [
     .addUserOption((opt) =>
       opt.setName("player").setDescription("Semak baki pemain lain (Admin sahaja)").setRequired(false)
     ),
-
   new SlashCommandBuilder()
     .setName("myrank")
     .setDescription("Semak kad rank, level & baki EXP ke level seterusnya! 👑")
     .addUserOption((opt) => opt.setName("user").setDescription("Semak rank ahli lain (pilihan)").setRequired(false)),
-
   new SlashCommandBuilder()
     .setName("admin-wallet")
     .setDescription("Urus baki akaun PlatoMy • Wallet ahli (Admin sahaja)")
@@ -1728,16 +1733,13 @@ const commands = [
           { name: "💠 Pips (750 Coins = 1 Pip)", value: "pips" }
         )
     ),
-
   new SlashCommandBuilder().setName("setup-trading").setDescription("Hantar panel PlatoMy Trading (Admin sahaja)"),
-
   new SlashCommandBuilder()
     .setName("setup-birthday")
     .setDescription("Hantar panel PlatoMy Birthday Corner di channel ini (Admin sahaja)")
     .addChannelOption((opt) =>
       opt.setName("chat_channel").setDescription("Channel chat untuk ahli hantar ucapan (pilihan)").setRequired(false)
     ),
-
   new SlashCommandBuilder()
     .setName("setup-leaderboard")
     .setDescription("Hantar papan Leaderboard mengikut kategori di channel ini (Admin sahaja)")
@@ -1755,21 +1757,17 @@ const commands = [
           { name: "💠 Pips", value: "pips" }
         )
     ),
-
   new SlashCommandBuilder().setName("reset-leaderboard").setDescription("Set semula (reset) semua EXP ahli kepada 0 (Admin sahaja)"),
-
   new SlashCommandBuilder()
     .setName("embed-builder")
     .setDescription("Cipta custom container interaktif (Admin sahaja)")
     .addChannelOption((opt) => opt.setName("channel").setDescription("Pilih channel").setRequired(true)),
-
   new SlashCommandBuilder()
     .setName("embed-image")
     .setDescription("Hantar gambar sahaja dengan kod warna Hex (Admin sahaja)")
     .addChannelOption((opt) => opt.setName("channel").setDescription("Pilih channel").setRequired(true))
     .addStringOption((opt) => opt.setName("image_url").setDescription("Link URL gambar").setRequired(true))
     .addStringOption((opt) => opt.setName("color").setDescription("Kod warna Hex (cth: #ffb6c1)").setRequired(false)),
-
   new SlashCommandBuilder()
     .setName("rumble")
     .setDescription("Mula permainan PlatoMy Rumble (Admin sahaja)")
@@ -1788,7 +1786,6 @@ const commands = [
     .addIntegerOption((opt) =>
       opt.setName("winners").setDescription("Berapa ramai pemenang (hadiah dibahagi sama rata, default 1)").setRequired(false).setMinValue(1).setMaxValue(25)
     ),
-
   new SlashCommandBuilder()
     .setName("giveaway")
     .setDescription("Mula giveaway (Admin sahaja)")
@@ -1805,7 +1802,6 @@ const commands = [
     .addStringOption((opt) =>
       opt.setName("image_url").setDescription("Link gambar / GIF (pilihan)").setRequired(false)
     ),
-
   new SlashCommandBuilder()
     .setName("giveaway-reroll")
     .setDescription("Reroll pemenang giveaway (Admin sahaja)")
@@ -1953,8 +1949,8 @@ client.once(Events.ClientReady, async (c) => {
 // --- MESSAGE CREATE: !wallet, EXP + LEVEL UP + ROLES, & MURAI YAPPERS ---
 client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot || !message.guild) return;
-  const content = message.content.trim().toLowerCase();
 
+  const content = message.content.trim().toLowerCase();
   if (content === "!wallet" || content === "!bank") {
     await message.reply({ components: [walletBox(getWallet(message.author.id))], flags: V2 });
     return;
@@ -2011,14 +2007,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (name === "wallet") {
         const target = interaction.options.getUser("player");
         const checkingOther = target && target.id !== interaction.user.id;
-
         if (checkingOther && !isAdmin(interaction)) {
           return interaction.reply({
             content: "❌ Hanya Administrator boleh semak wallet pemain lain!",
             ephemeral: true,
           });
         }
-
         const who = checkingOther ? target : interaction.user;
         await interaction.reply({
           components: [walletBox(getWallet(who.id), checkingOther ? who : null)],
@@ -2045,8 +2039,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const targetUser = interaction.options.getUser("target");
         const amount = interaction.options.getInteger("amount");
         const reason = interaction.options.getString("reason") || "Tiada sebab dinyatakan";
-
         const targetWallet = getWallet(targetUser.id);
+
         let actionTitle = "";
         let actionDesc = "";
 
@@ -2111,7 +2105,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
         const listChannel = findChannel(interaction.guild, TRADING_LIST_CHANNEL_NAME);
         const listRef = listChannel ? `<#${listChannel.id}>` : "#🛍️・trading-list";
-
         await interaction.channel.send({
           components: [buildTradePanel(listRef)],
           flags: V2,
@@ -2222,7 +2215,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
           return interaction.reply({ content: "❌ Anda tidak mempunyai kebenaran Administrator!", ephemeral: true });
         }
         const targetChannel = interaction.options.getChannel("channel");
-
         const modal = new ModalBuilder()
           .setCustomId(`embed_builder:${targetChannel.id}`)
           .setTitle("🎨 PlatoMy Container Builder");
@@ -2233,12 +2225,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
           .setStyle(TextInputStyle.Short)
           .setRequired(false)
           .setMaxLength(256);
+
         const descInput = new TextInputBuilder()
           .setCustomId("eb_desc")
           .setLabel("Mesej / Penerangan")
           .setStyle(TextInputStyle.Paragraph)
           .setRequired(false)
           .setMaxLength(3500);
+
         const colorInput = new TextInputBuilder()
           .setCustomId("eb_color")
           .setLabel("Warna Hex (pilihan, cth: #ff69b4)")
@@ -2246,6 +2240,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           .setRequired(false)
           .setMaxLength(7)
           .setPlaceholder("#ff69b4");
+
         const imageInput = new TextInputBuilder()
           .setCustomId("eb_image")
           .setLabel("URL gambar (pilihan)")
@@ -2260,6 +2255,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           new ActionRowBuilder().addComponents(colorInput),
           new ActionRowBuilder().addComponents(imageInput)
         );
+
         await interaction.showModal(modal);
         return;
       }
@@ -2305,7 +2301,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
           imageUrl,
           hostId: interaction.user.id,
         });
-
         await interaction.reply({ content: "✅ Giveaway berjaya dimulakan!", ephemeral: true });
         return;
       }
@@ -2317,7 +2312,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await interaction.deferReply({ ephemeral: true });
         const msgId = interaction.options.getString("message_id").trim();
         const count = interaction.options.getInteger("count") ?? 1;
-
         const result = await rerollGiveaway(msgId, count);
         await interaction.editReply({
           content: result.ok ? `✅ Berjaya reroll ${result.count} pemenang!` : `❌ ${result.error}`,
@@ -2376,6 +2370,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           new ActionRowBuilder().addComponents(dayInput),
           new ActionRowBuilder().addComponents(monthInput)
         );
+
         await interaction.showModal(modal);
         return;
       }
@@ -2383,7 +2378,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (id === "join_giveaway") {
         await interaction.deferReply({ ephemeral: true });
         const game = giveawayGames.get(interaction.message.id);
-
         if (!game || game.ended) {
           return interaction.editReply({ content: "❌ Giveaway ini sudah tamat." });
         }
@@ -2398,7 +2392,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         game.participants.push(interaction.user.id);
         saveGiveaways();
-
         await interaction.message
           .edit({ components: [giveawayBox(game)], flags: V2, allowedMentions: NO_PING })
           .catch(() => {});
@@ -2413,8 +2406,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         if (game.participants.includes(interaction.user.id)) {
           return interaction.editReply({ content: "⚠️ You've already joined!" });
         }
-        game.participants.push(interaction.user.id);
 
+        game.participants.push(interaction.user.id);
         await interaction.message.edit({ components: [rumbleOpenBox(game)], flags: V2 }).catch(() => {});
         await interaction.editReply({ content: "✅ Successfully joined PlatoMy Rumble!" });
         return;
@@ -2438,7 +2431,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const hasTradeRole = interaction.member?.roles?.cache?.some((r) =>
           r.name.toLowerCase().includes(TRADE_ROLE_NAME)
         );
-
         if (!hasTradeRole) {
           return interaction.reply({ content: "❌ You need the Trade role to accept trades.", ephemeral: true });
         }
@@ -2448,13 +2440,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
         if (acceptedTrades.has(interaction.message.id)) {
           return interaction.reply({ content: "❌ This trade has already been accepted.", ephemeral: true });
         }
-        acceptedTrades.add(interaction.message.id);
 
+        acceptedTrades.add(interaction.message.id);
         await interaction.deferUpdate();
 
         const infoText = collectText(interaction.message.components).find((t) => t.includes("**Item Details:**")) || "";
         const item = infoText.split("**Item Details:**")[1]?.trim() || "-";
-
         const tradeChannel = await createTradeChannel(interaction.guild, requesterId, interaction.user, item);
 
         await interaction.editReply({
@@ -2507,7 +2498,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       if (id.startsWith("close_trade:")) {
         const accepterId = id.split(":")[1];
-
         if (interaction.channel?.parentId !== TRADE_CATEGORY_ID) {
           return interaction.reply({ content: "❌ This button only works inside a trade channel.", ephemeral: true });
         }
@@ -2556,8 +2546,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (interaction.customId === "birthday_modal") {
         const day = parseInt(interaction.fields.getTextInputValue("bday_day").trim(), 10);
         const month = parseInt(interaction.fields.getTextInputValue("bday_month").trim(), 10);
-
         const maxDaysInMonth = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
         if (isNaN(month) || month < 1 || month > 12 || isNaN(day) || day < 1 || day > maxDaysInMonth[month - 1]) {
           return interaction.reply({
             content: "❌ Tarikh tidak sah! Sila masukkan Day (1–31) dan Month (1–12) yang betul.",
@@ -2577,7 +2567,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
           : `🎂 Hari lahir anda telah didaftarkan pada **${formatDayMonth(day, month)}**!`;
 
         await interaction.reply({ content: replyMsg, ephemeral: true });
-
         await runDailyBirthdayRoutine().catch(() => refreshBirthdayBoard());
         return;
       }
@@ -2594,7 +2583,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
 
         const traderRole = interaction.guild.roles.cache.find((r) => r.name.toLowerCase().includes(TRADER_ROLE_NAME));
-
         const sent = await listChannel
           .send({
             components: [
@@ -2605,6 +2593,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             allowedMentions: traderRole ? { roles: [traderRole.id] } : NO_PING,
           })
           .catch(() => null);
+
         if (!sent) {
           return interaction.reply({
             content: "❌ The bot can't send to the trading-list channel. Please check the bot's permissions.",
