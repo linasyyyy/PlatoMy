@@ -480,6 +480,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await createRumble(interaction.channel, currencyType, totalPrize, durationMins, winnersCount, bountyTarget?.id || null, bountyPrize);
         return interaction.reply({ content: "✅ Plato Arena berjaya dimulakan!", ephemeral: true });
       }
+    }
+
     // ===== BUTANG =====
     if (interaction.isButton()) {
       const id = interaction.customId;
@@ -514,11 +516,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (id.startsWith("join_rumble_")) {
         await interaction.deferReply({ ephemeral: true });
         const game = rumbleMap.get(interaction.message.id);
-        if (!game || game.ended) return interaction.editReply({ content: "❌ This rumble has ended." });
-        if (game.participants.includes(interaction.user.id)) return interaction.editReply({ content: "⚠️ You've already joined!" });
+        if (!game || game.ended) return interaction.editReply({ content: "❌ Plato Arena ini sudah tamat." });
+        if (game.participants.includes(interaction.user.id)) return interaction.editReply({ content: "⚠️ Anda sudah menyertai Plato Arena!" });
         game.participants.push(interaction.user.id);
-        await interaction.message.edit({ components: [rumbleOpenBox(game)], flags: V2 }).catch(() => {});
-        return interaction.editReply({ content: "✅ Successfully joined PlatoMy Rumble!" });
+        await interaction.message.edit({ components: [rumbleOpenBox(game)], flags: V2, allowedMentions: NO_PING }).catch(() => {});
+        return interaction.editReply({ content: "✅ Berjaya menyertai Plato Arena!" });
       }
 
       if (id === "open_trading_modal") {
