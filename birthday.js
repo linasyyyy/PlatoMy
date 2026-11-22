@@ -10,6 +10,7 @@ import { loadBirthdayDataDB, saveBirthdayConfigDB, saveUserBirthdayDB } from "./
 import { NL, NO_PING, V2, getMalaysiaDateParts, sep, txt } from "./utils.js";
 
 const BIRTHDAY_DATA_PATH = "./birthdays.json";
+const BIRTHDAY_THREAD_CHANNEL_ID = "1574001176758853683";
 const BIRTHDAY_ROLE_KEYWORD = "it's my birthday";
 const PARTY_ROLE_KEYWORD = "mypartycrashers";
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -79,7 +80,7 @@ function getBirthdayDiffDays(day, month, today) {
 
 export function buildBirthdayCornerBox(data) {
   const today = getMalaysiaDateParts();
-  const chatChannelId = data.config?.chatChannelId || data.config?.channelId || "1552249117621747782";
+  const chatChannelId = data.config?.chatChannelId || BIRTHDAY_THREAD_CHANNEL_ID;
   const todayList = [];
   const upcomingList = [];
   const recentList = [];
@@ -178,6 +179,9 @@ export async function runDailyBirthdayRoutine(client) {
   const channel = await client.channels.fetch(bData.config.channelId).catch(() => null);
   if (!channel?.guild) return;
 
+  const threadChannel =
+    (await client.channels.fetch(BIRTHDAY_THREAD_CHANNEL_ID).catch(() => null)) || channel;
+
   const guild = channel.guild;
   const birthdayRole = guild.roles.cache.find((r) => r.name.toLowerCase().includes(BIRTHDAY_ROLE_KEYWORD));
   const partyRole = guild.roles.cache.find((r) => r.name.toLowerCase().includes(PARTY_ROLE_KEYWORD));
@@ -209,7 +213,7 @@ export async function runDailyBirthdayRoutine(client) {
     if (userRecord && userRecord.celebratedYear !== today.year) {
       try {
         const threadName = `🎂・Happy Birthday ${member.user.username}!`.slice(0, 100);
-        const thread = await channel.threads.create({
+        const thread = await threadChannel.threads.create({
           name: threadName,
           autoArchiveDuration: 1440,
           type: ChannelType.PublicThread,
