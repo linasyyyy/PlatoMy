@@ -853,7 +853,7 @@ async function runRumbleBattle(channel, msgId) {
   const winnerMentions = winners.map((id) => `<@${id}>`).join(", ");
   const shareText =
     winners.length > 1
-      ? ` (${share.toLocaleString()} ${label} each${remainder > 0 ? `, +\${remainder.toLocaleString()} to <@\${winners[0]}>` : ""})`
+      ? ` (${share.toLocaleString()} ${label} each${remainder > 0 ? `, +${remainder.toLocaleString()} to <@${winners[0]}>` : ""})`
       : "";
 
   const endBody = [
@@ -2285,4 +2285,357 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const result = await rerollGiveaway(msgId, count);
         await interaction.editReply({
           content: result.ok ? `✅ Berjaya reroll ${result.count} pemenang!` : `❌ ${result.error}`,
-      
+        });
+        return;
+      }
+
+      if (name === "rumble") {
+        if (!isAdmin(interaction)) {
+          return interaction.reply({ content: "❌ Anda tidak mempunyai kebenaran Administrator!", ephemeral: true });
+        }
+        const currencyType = interaction.options.getString("currency");
+        const totalPrize = interaction.options.getInteger("prize");
+        const durationMins = interaction.options.getInteger("duration");
+        const winnersCount = interaction.options.getInteger("winners") ?? 1;
+
+        if (totalPrize < winnersCount) {
+          return interaction.reply({
+            content: "❌ Hadiah mesti sekurang-kurangnya sama dengan bilangan pemenang.",
+            ephemeral: true,
+          });
+        }
+
+        await createRumble(interaction.channel, currencyType, totalPrize, durationMins, winnersCount);
+        await interaction.reply({ content: "✅ PlatoMy Rumble berjaya dimulakan!", ephemeral: true });
+        return;
+      }
+    }
+
+    // ===== BUTANG =====
+    if (interaction.isButton()) {
+      const id = interaction.customId;
+
+      if (id === "open_birthday_modal") {
+        const modal = new ModalBuilder()
+          .setCustomId("birthday_modal")
+          .setTitle("🎂 Register / Update Birthday");
+
+        const dayInput = new TextInputBuilder()
+          .setCustomId("bday_day")
+          .setLabel("Day (1 - 31)")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setMaxLength(2)
+          .setPlaceholder("cth: 20");
+
+        const monthInput = new TextInputBuilder()
+          .setCustomId("bday_month")
+          .setLabel("Month (1 - 12)")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setMaxLength(2)
+          .setPlaceholder("cth: 11");
+
+        modal.addComponents(
+          new ActionRowBuilder().addComponents(dayInput),
+          new ActionRowBuilder().addComponents(monthInput)
+        );
+
+        await interaction.showModal(modal);
+        return;
+      }
+
+      if (id === "join_giveaway") {
+        await interaction.deferReply({ ephemeral: true });
+        const game = giveawayGames.get(interaction.message.id);
+        if (!game || game.ended) {
+          return interaction.editReply({ content: "❌ Giveaway ini sudah tamat." });
+        }
+        if (game.requiredRoleId && !interaction.member?.roles?.cache?.has(game.requiredRoleId)) {
+          return interaction.editReply({
+            content: `❌ Anda perlukan role <@&${game.requiredRoleId}> untuk menyertai giveaway ini.`,
+          });
+        }
+        if (game.participants.includes(interaction.user.id)) {
+          return interaction.editReply({ content: "⚠️ Anda sudah menyertai giveaway ini!" });
+        }
+
+        game.participants.push(interaction.user.id);
+        saveGiveaways();
+        await interaction.message
+          .edit({ components: [giveawayBox(game)], flags: V2, allowedMentions: NO_PING })
+          .catch(() => {});
+        await interaction.editReply({ content: "✅ Berjaya menyertai giveaway!" });
+        return;
+      }
+
+      if (id.startsWith("join_rumble_")) {
+        await interaction.deferReply({ ephemeral: true });
+        const game = rumbleMap.get(interaction.message.id);
+        if (!game || game.ended) return interaction.editReply({ content: "❌ This rumble has ended." });
+        if (game.participants.includes(interaction.user.id)) {
+          return interaction.editReply({ content: "⚠️ You've already joined!" });
+        }
+
+        game.participants.push(interaction.user.id);
+        await interaction.message.edit({ components: [rumbleOpenBox(game)], flags: V2 }).catch(() => {});
+        await interaction.editReply({ content: "✅ Successfully joined PlatoMy Rumble!" });
+        return;
+      }
+
+      if (id === "open_trading_modal") {
+        const modal = new ModalBuilder().setCustomId("trading_modal").setTitle("🛍️ PlatoMy Trading");
+        const itemInput = new TextInputBuilder()
+          .setCustomId("trading_text")
+          .setLabel("Item details")
+          .setStyle(TextInputStyle.Paragraph)
+          .setRequired(true)
+          .setMaxLength(1000);
+        modal.addComponents(new ActionRowBuilder().addComponents(itemInput));
+        await interaction.showModal(modal);
+        return;
+      }
+
+      if (id.startsWith("accept_trade:")) {
+        const requesterId = id.split(":")[1];
+        const hasTradeRole = interaction.member?.roles?.cache?.some((r) =>
+          r.name.toLowerCase().includes(TRADE_ROLE_NAME)
+        );
+        if (!hasTradeRole) {
+          return interaction.reply({ content: "❌ You need the Trade role to accept trades.", ephemeral: true });
+        }
+        if (interaction.user.id === requesterId) {
+          return interaction.reply({ content: "⚠️ You can't accept your own trade.", ephemeral: true });
+        }
+        if (acceptedTrades.has(interaction.message.id)) {
+          return interaction.reply({ content: "❌ This trade has already been accepted.", ephemeral: true });
+        }
+
+        acceptedTrades.add(interaction.message.id);
+        await interaction.deferUpdate();
+
+        const infoText = collectText(interaction.message.components).find((t) => t.includes("**Item Details:**")) || "";
+        const item = infoText.split("**Item Details:**")[1]?.trim() || "-";
+        const tradeChannel = await createTradeChannel(interaction.guild, requesterId, interaction.user, item);
+
+        await interaction.editReply({
+          components: [buildTradeList({ requesterId, details: item, accepterId: interaction.user.id })],
+          flags: V2,
+        });
+
+        if (tradeChannel) {
+          await interaction.channel
+            .send({
+              content: `🤝 <@${requesterId}>, your trade was accepted by ${interaction.user}. Head to ${tradeChannel} to complete the trade!`,
+              allowedMentions: { users: [requesterId] },
+            })
+            .catch(() => {});
+        } else {
+          await interaction
+            .followUp({
+              content: "❌ I couldn't create the trade channel. Please check the bot's permissions on the trade category.",
+              ephemeral: true,
+            })
+            .catch(() => {});
+          await interaction.channel
+            .send(
+              `🤝 <@${requesterId}>, your trade was accepted by ${interaction.user}. Please contact each other to complete the trade!`
+            )
+            .catch(() => {});
+        }
+
+        const logChannel = findChannel(interaction.guild, TRADING_LOG_CHANNEL_NAME);
+        if (logChannel) {
+          const logLines = [
+            `📥 **Requester:** <@${requesterId}> (\`${requesterId}\`)`,
+            `🤝 **Accepted by:** ${interaction.user} (\`${interaction.user.id}\`)`,
+          ];
+          if (tradeChannel) logLines.push(`📍 **Trade Channel:** ${tradeChannel}`);
+          logLines.push("", "📝 **Item:**", item);
+
+          await logChannel
+            .send({
+              components: [
+                info("🛍️ Trading Log: Trade Accepted", logLines.join(NL), `Trading Log • Today at ${getMalaysiaTime()}`),
+              ],
+              flags: V2,
+              allowedMentions: NO_PING,
+            })
+            .catch(() => {});
+        }
+        return;
+      }
+
+      if (id.startsWith("close_trade:")) {
+        const accepterId = id.split(":")[1];
+        if (interaction.channel?.parentId !== TRADE_CATEGORY_ID) {
+          return interaction.reply({ content: "❌ This button only works inside a trade channel.", ephemeral: true });
+        }
+        if (interaction.user.id !== accepterId && !isAdmin(interaction)) {
+          return interaction.reply({
+            content: "❌ Only the person who accepted this trade can close this channel.",
+            ephemeral: true,
+          });
+        }
+
+        const channelName = interaction.channel.name;
+        await interaction.reply({
+          content: `🔒 Trade closed by ${interaction.user}. This channel will be deleted in 5 seconds...`,
+          allowedMentions: NO_PING,
+        });
+
+        const logChannel = findChannel(interaction.guild, TRADING_LOG_CHANNEL_NAME);
+        if (logChannel) {
+          const closeLines = [
+            `🔒 **Closed by:** ${interaction.user} (\`${interaction.user.id}\`)`,
+            `🤝 **Accepted by:** <@${accepterId}>`,
+            `📍 **Channel:** ${channelName}`,
+          ].join(NL);
+
+          await logChannel
+            .send({
+              components: [
+                info("🛍️ Trading Log: Trade Closed", closeLines, `Trading Log • Today at ${getMalaysiaTime()}`),
+              ],
+              flags: V2,
+              allowedMentions: NO_PING,
+            })
+            .catch(() => {});
+        }
+
+        await sleep(5000);
+        await interaction.channel.delete(`Trade closed by ${interaction.user.tag}`).catch((e) => {
+          console.error("Gagal padam channel trade:", e);
+        });
+        return;
+      }
+    }
+
+    // ===== MODAL =====
+    if (interaction.isModalSubmit()) {
+      if (interaction.customId === "birthday_modal") {
+        const day = parseInt(interaction.fields.getTextInputValue("bday_day").trim(), 10);
+        const month = parseInt(interaction.fields.getTextInputValue("bday_month").trim(), 10);
+        const maxDaysInMonth = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+        if (isNaN(month) || month < 1 || month > 12 || isNaN(day) || day < 1 || day > maxDaysInMonth[month - 1]) {
+          return interaction.reply({
+            content: "❌ Tarikh tidak sah! Sila masukkan Day (1–31) dan Month (1–12) yang betul.",
+            ephemeral: true,
+          });
+        }
+
+        const bData = await getBirthdayData();
+        const prev = bData.users[interaction.user.id];
+        const isSameDate = prev && prev.day === day && prev.month === month;
+        const celebratedYear = isSameDate ? prev.celebratedYear : null;
+
+        await saveUserBirthday(interaction.user.id, day, month, celebratedYear);
+
+        const replyMsg = prev
+          ? `🎂 Tarikh hari lahir anda telah dikemas kini dari **${formatDayMonth(prev.day, prev.month)}** kepada **${formatDayMonth(day, month)}**!`
+          : `🎂 Hari lahir anda telah didaftarkan pada **${formatDayMonth(day, month)}**!`;
+
+        await interaction.reply({ content: replyMsg, ephemeral: true });
+        await runDailyBirthdayRoutine().catch(() => refreshBirthdayBoard());
+        return;
+      }
+
+      if (interaction.customId === "trading_modal") {
+        const details = interaction.fields.getTextInputValue("trading_text").trim();
+        if (!details) {
+          return interaction.reply({ content: "❌ Please fill in the item details.", ephemeral: true });
+        }
+
+        const listChannel = findChannel(interaction.guild, TRADING_LIST_CHANNEL_NAME);
+        if (!listChannel) {
+          return interaction.reply({ content: "❌ The trading-list channel was not found.", ephemeral: true });
+        }
+
+        const traderRole = interaction.guild.roles.cache.find((r) => r.name.toLowerCase().includes(TRADER_ROLE_NAME));
+        const sent = await listChannel
+          .send({
+            components: [
+              ...(traderRole ? [txt(`<@&${traderRole.id}>`)] : []),
+              buildTradeList({ requesterId: interaction.user.id, details }),
+            ],
+            flags: V2,
+            allowedMentions: traderRole ? { roles: [traderRole.id] } : NO_PING,
+          })
+          .catch(() => null);
+
+        if (!sent) {
+          return interaction.reply({
+            content: "❌ The bot can't send to the trading-list channel. Please check the bot's permissions.",
+            ephemeral: true,
+          });
+        }
+
+        await interaction.reply({ content: "✅ Your item details have been sent!", ephemeral: true });
+
+        const logChannel = findChannel(interaction.guild, TRADING_LOG_CHANNEL_NAME);
+        if (logChannel) {
+          const reqLines = [
+            `👤 **Requester:** ${interaction.user} (\`${interaction.user.id}\`)`,
+            "",
+            "📝 **Item:**",
+            details,
+          ].join(NL);
+
+          await logChannel
+            .send({
+              components: [
+                info("🛍️ Trading Log: New Request", reqLines, `Trading Log • Today at ${getMalaysiaTime()}`),
+              ],
+              flags: V2,
+              allowedMentions: NO_PING,
+            })
+            .catch(() => {});
+        }
+        return;
+      }
+
+      if (interaction.customId.startsWith("embed_builder:")) {
+        const channelId = interaction.customId.split(":")[1];
+        const targetChannel = await interaction.guild.channels.fetch(channelId).catch(() => null);
+        if (!targetChannel || !targetChannel.isTextBased()) {
+          return interaction.reply({ content: "❌ Channel tidak dijumpai.", ephemeral: true });
+        }
+
+        const title = interaction.fields.getTextInputValue("eb_title").trim();
+        const desc = interaction.fields.getTextInputValue("eb_desc").trim();
+        const color = interaction.fields.getTextInputValue("eb_color");
+        const image = interaction.fields.getTextInputValue("eb_image").trim();
+
+        if (!title && !desc && !isUrl(image)) {
+          return interaction.reply({ content: "❌ Isi sekurang-kurangnya tajuk, mesej atau gambar.", ephemeral: true });
+        }
+
+        const box = new ContainerBuilder();
+        const ac = accent(color);
+        if (ac !== null) box.setAccentColor(ac);
+        if (title) box.addTextDisplayComponents(txt(`## ${title}`));
+        if (title && desc) box.addSeparatorComponents(sep());
+        if (desc) box.addTextDisplayComponents(txt(desc));
+        if (isUrl(image)) {
+          box.addMediaGalleryComponents(
+            new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(image))
+          );
+        }
+
+        await targetChannel.send({ components: [box], flags: V2 });
+        await interaction.reply({ content: `✅ Container berjaya dihantar ke <#${targetChannel.id}>!`, ephemeral: true });
+        return;
+      }
+    }
+  } catch (err) {
+    console.error("Ralat interaction:", err);
+    const msg = { content: "❌ Ralat berlaku. Cuba lagi.", ephemeral: true };
+    if (interaction.deferred || interaction.replied) await interaction.followUp(msg).catch(() => {});
+    else await interaction.reply(msg).catch(() => {});
+  }
+});
+
+client.login(token).catch((err) => {
+  console.error("GAGAL LOGIN:", err);
+});
