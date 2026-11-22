@@ -167,7 +167,7 @@ export function createLeaderboardSystem({ client, wallets, getWallet, getLevelIn
   async function generateLeaderboardImage(category = "exp") {
     const meta = LEADERBOARD_CATEGORIES[category] || LEADERBOARD_CATEGORIES.exp;
     const W = 740;
-    const H = 760;
+    const H = 805;
     const S = 2;
     const canvas = createCanvas(W * S, H * S);
     const ctx = canvas.getContext("2d");
@@ -181,7 +181,6 @@ export function createLeaderboardSystem({ client, wallets, getWallet, getLevelIn
     const MUTED = "rgba(253, 242, 246, 0.58)";
     const pad2 = (n) => String(n).padStart(2, "0");
     const showLevel = category === "exp";
-    const showBar = category !== "sponsor" && category !== "sponsor_all";
 
     // ---------- LATAR ----------
     ctx.save();
@@ -223,7 +222,6 @@ export function createLeaderboardSystem({ client, wallets, getWallet, getLevelIn
       sorted.push({ id: null, coins: 0, pips: 0, exp: 0, expTotal: 0, sponsorTotal: 0, sponsorMonthly: 0 });
     }
 
-    const topVal = Math.max(1, sorted[0]?.[meta.field] || 1);
     const players = [];
     for (const entry of sorted) {
       const val = entry[meta.field] || 0;
@@ -252,7 +250,6 @@ export function createLeaderboardSystem({ client, wallets, getWallet, getLevelIn
         img,
         num: sp > 0 ? sub.slice(0, sp) : sub,
         unit: sp > 0 ? sub.slice(sp + 1) : "",
-        pct: Math.max(0, Math.min(100, meta.progressPct(val, topVal))),
         level: entry.id ? getLevelInfo(val).level : 0,
       });
     }
@@ -264,70 +261,70 @@ export function createLeaderboardSystem({ client, wallets, getWallet, getLevelIn
     ctx.font = `700 15px ${SANS}`;
     ctx.fillText(`PlatoMy  •  ${meta.label.replace(" Leaderboard", "")}`, W / 2, 32);
 
-    const tg = ctx.createLinearGradient(0, 42, 0, 86);
+    const tg = ctx.createLinearGradient(0, 42, 0, 84);
     tg.addColorStop(0.15, "#ffffff");
     tg.addColorStop(1, PINK);
     ctx.fillStyle = tg;
-    ctx.font = `italic 700 48px ${SERIF}`;
-    ctx.fillText("Leaderboard", W / 2, 80);
+    ctx.font = `italic 700 46px ${SERIF}`;
+    ctx.fillText("Leaderboard", W / 2, 78);
 
     ctx.fillStyle = MUTED;
     ctx.font = `500 14.5px ${SANS}`;
     const subtitle = meta.subtitle.charAt(0) + meta.subtitle.slice(1).toLowerCase();
-    ctx.fillText(subtitle, W / 2, 102);
+    ctx.fillText(subtitle, W / 2, 100);
 
-    // ---------- PODIUM (susunan 2 - 1 - 3) ----------
-    const cxs = [W / 2 - 225, W / 2, W / 2 + 225];
+    // ---------- PODIUM (susunan 2 - 1 - 3, saiz besar) ----------
+    const cxs = [W / 2 - 230, W / 2, W / 2 + 230];
     [1, 0, 2].forEach((pi, col) => {
       const p = players[pi];
       const n = pi + 1;
       const first = n === 1;
       const cx = cxs[col];
-      const r = first ? 46 : 35;
-      const cy = first ? 172 : 192;
+      const r = first ? 58 : 44;
+      const cy = first ? 196 : 214;
 
       ctx.globalAlpha = p.hasUser ? 1 : 0.45;
 
       if (first) {
         ctx.strokeStyle = PINK;
-        ctx.lineWidth = 1.2;
+        ctx.lineWidth = 1.4;
         ctx.globalAlpha = p.hasUser ? 0.45 : 0.2;
         ctx.beginPath();
-        ctx.arc(cx, cy, r + 9, 0, Math.PI * 2);
+        ctx.arc(cx, cy, r + 10, 0, Math.PI * 2);
         ctx.stroke();
 
         ctx.globalAlpha = p.hasUser ? 0.18 : 0.08;
         ctx.beginPath();
-        ctx.arc(cx, cy, r + 18, 0, Math.PI * 2);
+        ctx.arc(cx, cy, r + 20, 0, Math.PI * 2);
         ctx.stroke();
 
         ctx.globalAlpha = p.hasUser ? 1 : 0.45;
       }
 
-      drawAvatarRing(ctx, cx, cy, r, first ? 4 : 3.5, p);
+      drawAvatarRing(ctx, cx, cy, r, first ? 4.5 : 3.5, p);
 
       if (first) {
         ctx.save();
-        ctx.translate(cx, cy - r - 15);
+        ctx.translate(cx, cy - r - 18);
         ctx.rotate((-6 * Math.PI) / 180);
         ctx.shadowColor = PINK;
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = 12;
         ctx.fillStyle = "#f7c948";
         ctx.beginPath();
-        ctx.moveTo(-14, 10);
-        ctx.lineTo(-14, -6);
-        ctx.lineTo(-7, 1);
-        ctx.lineTo(0, -10);
-        ctx.lineTo(7, 1);
-        ctx.lineTo(14, -6);
-        ctx.lineTo(14, 10);
+        ctx.moveTo(-17, 12);
+        ctx.lineTo(-17, -7);
+        ctx.lineTo(-8, 1);
+        ctx.lineTo(0, -12);
+        ctx.lineTo(8, 1);
+        ctx.lineTo(17, -7);
+        ctx.lineTo(17, 12);
         ctx.closePath();
         ctx.fill();
         ctx.restore();
       }
 
-      const br = first ? 15 : 13;
-      const by = cy + r - 1;
+      const br = first ? 18 : 15;
+      const by = cy + r - 2;
       ctx.fillStyle = "#0c080f";
       ctx.beginPath();
       ctx.arc(cx, by, br + 3, 0, Math.PI * 2);
@@ -339,25 +336,25 @@ export function createLeaderboardSystem({ client, wallets, getWallet, getLevelIn
       ctx.fill();
 
       ctx.fillStyle = "#1b0f1c";
-      ctx.font = `italic 700 ${first ? 17 : 14.5}px ${SERIF}`;
+      ctx.font = `italic 700 ${first ? 20 : 16.5}px ${SERIF}`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(String(n), cx, by + 1);
       ctx.textBaseline = "alphabetic";
 
       ctx.fillStyle = TEXT;
-      ctx.font = `800 ${first ? 19 : 17}px ${SANS}`;
+      ctx.font = `800 ${first ? 23 : 20.5}px ${SANS}`;
       ctx.textAlign = "center";
-      ctx.fillText(fitText(ctx, p.name, first ? 210 : 185), cx, first ? 256 : 262);
+      ctx.fillText(fitText(ctx, p.name, first ? 230 : 200), cx, first ? 300 : 302);
 
-      const numSize = first ? 23 : 19;
-      const unitSize = first ? 13 : 12;
+      const numSize = first ? 28 : 23;
+      const unitSize = first ? 15 : 13.5;
       ctx.font = `italic 500 ${numSize}px ${SERIF}`;
       const wNum = ctx.measureText(p.num).width;
       ctx.font = `500 ${unitSize}px ${SANS}`;
       const wUnit = p.unit ? ctx.measureText(p.unit).width : 0;
-      const startX = cx - (wNum + (p.unit ? 4 + wUnit : 0)) / 2;
-      const expY = first ? 281 : 284;
+      const startX = cx - (wNum + (p.unit ? 5 + wUnit : 0)) / 2;
+      const expY = 329;
 
       ctx.textAlign = "left";
       ctx.fillStyle = first ? PINK_SOFT : PINK;
@@ -367,24 +364,24 @@ export function createLeaderboardSystem({ client, wallets, getWallet, getLevelIn
       if (p.unit) {
         ctx.fillStyle = MUTED;
         ctx.font = `500 ${unitSize}px ${SANS}`;
-        ctx.fillText(p.unit, startX + wNum + 4, expY);
+        ctx.fillText(p.unit, startX + wNum + 5, expY);
       }
 
       if (showLevel) {
         ctx.textAlign = "center";
         ctx.fillStyle = MUTED;
-        ctx.font = `700 13px ${SANS}`;
-        ctx.fillText(`Level ${pad2(p.level)}`, cx, 299);
+        ctx.font = `700 ${first ? 14.5 : 14}px ${SANS}`;
+        ctx.fillText(`Level ${pad2(p.level)}`, cx, 349);
       }
 
       ctx.globalAlpha = 1;
     });
 
-    // ---------- SENARAI #4 - #10 ----------
+    // ---------- SENARAI #4 - #10 (TANPA BAR %) ----------
     const listX = 18;
     const listW = W - 36;
-    const listTop = 310;
-    const rowH = 60;
+    const listTop = 360;
+    const rowH = 57;
 
     ctx.fillStyle = "rgba(255,255,255,0.045)";
     ctx.beginPath();
@@ -394,8 +391,7 @@ export function createLeaderboardSystem({ client, wallets, getWallet, getLevelIn
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    const barX = 138;
-    const barW = 315;
+    const nameX = 142;
     const rightX = W - 32;
 
     for (let i = 3; i < 10; i++) {
@@ -413,41 +409,13 @@ export function createLeaderboardSystem({ client, wallets, getWallet, getLevelIn
       ctx.fillText(String(i + 1), 50, mid + 10);
 
       // avatar
-      drawAvatarRing(ctx, 102, mid, 22, 2.5, p);
+      drawAvatarRing(ctx, 104, mid, 22, 2.5, p);
 
-      // nama
+      // nama (tengah baris, lebih besar & bersih tanpa bar)
       ctx.textAlign = "left";
       ctx.fillStyle = TEXT;
-      ctx.font = `700 21px ${SANS}`;
-      ctx.fillText(fitText(ctx, p.name, showBar ? 340 : 400), barX, showBar ? mid - 5 : mid + 7);
-
-      // bar progress & %
-      if (showBar) {
-        ctx.fillStyle = "rgba(255,255,255,0.1)";
-        ctx.beginPath();
-        ctx.roundRect(barX, mid + 9, barW, 6.5, 3.25);
-        ctx.fill();
-
-        if (p.pct > 0) {
-          const fg = ctx.createLinearGradient(barX, 0, barX + barW, 0);
-          fg.addColorStop(0, "#b77ad0");
-          fg.addColorStop(0.6, PINK);
-          fg.addColorStop(1, PINK_SOFT);
-          ctx.save();
-          ctx.shadowColor = "rgba(249,150,177,0.6)";
-          ctx.shadowBlur = 6;
-          ctx.fillStyle = fg;
-          ctx.beginPath();
-          ctx.roundRect(barX, mid + 9, Math.max(5, (barW * p.pct) / 100), 6.5, 3.25);
-          ctx.fill();
-          ctx.restore();
-        }
-
-        ctx.textAlign = "right";
-        ctx.fillStyle = MUTED;
-        ctx.font = `600 15.5px ${SANS}`;
-        ctx.fillText(`${p.pct}%`, 508, mid + 16);
-      }
+      ctx.font = `700 22px ${SANS}`;
+      ctx.fillText(fitText(ctx, p.name, 360), nameX, mid + 7);
 
       // EXP / jumlah di kanan
       const expY = showLevel ? mid - 4 : mid + 8;
@@ -505,10 +473,10 @@ export function createLeaderboardSystem({ client, wallets, getWallet, getLevelIn
     ctx.textAlign = "left";
     ctx.fillStyle = MUTED;
     ctx.font = `500 13.5px ${SANS}`;
-    ctx.fillText(part1, fx, 752);
+    ctx.fillText(part1, fx, 792);
     ctx.fillStyle = PINK;
     ctx.font = `700 13.5px ${SANS}`;
-    ctx.fillText("PlatoMy", fx + w1, 752);
+    ctx.fillText("PlatoMy", fx + w1, 792);
 
     return new AttachmentBuilder(canvas.toBuffer("image/png"), { name: `leaderboard-${category}.png` });
   }
