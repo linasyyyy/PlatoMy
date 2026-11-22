@@ -28,6 +28,7 @@ export const LOG_CHANNEL_IDS = {
 export const PIPS_EMOJI = "<:Pips:1549739800884551710>";
 export const COINS_EMOJI = "<:PlatoCoins:1549740441682059385>";
 export const WINNER_EMOJI = "<a:trophee:1563423570720329749>";
+export const PLATO_EMOJI = "<:Plato:1549414525038760069>";
 export const COINS_PER_PIP = 750;
 
 const URL_1 =
