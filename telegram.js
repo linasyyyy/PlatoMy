@@ -1,5 +1,5 @@
 import { Telegraf, Markup } from "telegraf";
-import { sleep } from "./utils.js";
+import { NL, sleep } from "./utils.js";
 
 const DEFAULT_ADMINS = ["7268897584", "413778891", "8780849175"];
 const adminIds = new Set([
@@ -23,8 +23,7 @@ function formatWallet(w, name) {
     `💠 Pips: <b>${w.pips.toLocaleString()}</b>`,
     `🌸 Sponsor (Monthly): <b>${(w.sponsorMonthly || 0).toLocaleString()}</b>`,
     `🌸 Sponsor (Lifetime): <b>${w.sponsorTotal.toLocaleString()}</b>`,
-  ].join("
-");
+  ].join(NL);
 }
 
 function pickRandom(arr, n) {
@@ -63,8 +62,7 @@ export function startTelegramBot({ getWallet, generateWheelGif }) {
     `• Reply mesej ahli + /deduct <code>pips 50</code> — Tolak baki`,
     `• /giveaway <code>5 1 1000 Coins</code> — Mula giveaway`,
     `• /spin <code>1 Nama Event</code> — Mula Wheel Spin`,
-  ].join("
-");
+  ].join(NL);
 
   bot.start((ctx) => ctx.reply(helpText, { parse_mode: "HTML" }));
   bot.help((ctx) => ctx.reply(helpText, { parse_mode: "HTML" }));
@@ -78,7 +76,6 @@ export function startTelegramBot({ getWallet, generateWheelGif }) {
     return ctx.reply(formatWallet(w, name), { parse_mode: "HTML" });
   });
 
-  // Admin: reply mesej user dengan /add coins 100 atau /deduct pips 50
   for (const mode of ["add", "deduct"]) {
     bot.command(mode, (ctx) => {
       if (!isTgAdmin(ctx)) return ctx.reply("❌ Hanya Admin boleh ubah baki wallet!");
@@ -108,9 +105,11 @@ export function startTelegramBot({ getWallet, generateWheelGif }) {
 
       const name = target.first_name || target.username || String(target.id);
       return ctx.reply(
-        `✅ Berjaya <b>${mode === "add" ? "tambah" : "tolak"} ${amount.toLocaleString()} ${currency}</b> untuk ${esc(name)}!
-
-${formatWallet(w, name)}`,
+        [
+          `✅ Berjaya <b>${mode === "add" ? "tambah" : "tolak"} ${amount.toLocaleString()} ${currency}</b> untuk ${esc(name)}!`,
+          ``,
+          formatWallet(w, name),
+        ].join(NL),
         { parse_mode: "HTML" }
       );
     });
@@ -125,8 +124,9 @@ ${formatWallet(w, name)}`,
     const prize = parts.slice(3).join(" ");
 
     if (isNaN(mins) || mins <= 0 || isNaN(winnersCount) || winnersCount <= 0 || !prize) {
-      return ctx.reply("❌ Format: /giveaway <minit> <pemenang> <hadiah>
-Contoh: /giveaway 5 1 1000 Coins");
+      return ctx.reply(
+        [`❌ Format: /giveaway <minit> <pemenang> <hadiah>`, `Contoh: /giveaway 5 1 1000 Coins`].join(NL)
+      );
     }
 
     const id = String(Date.now());
@@ -141,10 +141,12 @@ Contoh: /giveaway 5 1 1000 Coins");
     giveaways.set(id, game);
 
     const msg = await ctx.reply(
-      `🎁 <b>GIVEAWAY: ${esc(prize)}</b>
-🏆 Winners: <b>${winnersCount}</b>
-⏳ Tamat dalam: <b>${mins} minit</b>
-👥 Entries: <b>0</b>`,
+      [
+        `🎁 <b>GIVEAWAY: ${esc(prize)}</b>`,
+        `🏆 Winners: <b>${winnersCount}</b>`,
+        `⏳ Tamat dalam: <b>${mins} minit</b>`,
+        `👥 Entries: <b>0</b>`,
+      ].join(NL),
       {
         parse_mode: "HTML",
         ...Markup.inlineKeyboard([[Markup.button.callback("🎉 Join Giveaway", `tg_gw:${id}`)]]),
@@ -161,9 +163,11 @@ Contoh: /giveaway 5 1 1000 Coins");
           game.chatId,
           msg.message_id,
           undefined,
-          `🎁 <b>GIVEAWAY: ${esc(prize)}</b> (Tamat)
-🏆 Winners: <b>${winnersCount}</b>
-👥 Entries: <b>${entries.length}</b>`,
+          [
+            `🎁 <b>GIVEAWAY: ${esc(prize)}</b> (Tamat)`,
+            `🏆 Winners: <b>${winnersCount}</b>`,
+            `👥 Entries: <b>${entries.length}</b>`,
+          ].join(NL),
           { parse_mode: "HTML" }
         )
         .catch(() => {});
@@ -190,10 +194,11 @@ Contoh: /giveaway 5 1 1000 Coins");
 
       const mentions = winners.map(([uid, name]) => mention(uid, name)).join(", ");
       await bot.telegram
-        .sendMessage(game.chatId, `🏆 <b>Tahniah</b> ${mentions}!
-Anda memenangi <b>${esc(prize)}</b>!`, {
-          parse_mode: "HTML",
-        })
+        .sendMessage(
+          game.chatId,
+          [`🏆 <b>Tahniah</b> ${mentions}!`, `Anda memenangi <b>${esc(prize)}</b>!`].join(NL),
+          { parse_mode: "HTML" }
+        )
         .catch(() => {});
     }, mins * 60 * 1000);
   });
@@ -208,9 +213,11 @@ Anda memenangi <b>${esc(prize)}</b>!`, {
 
     await ctx
       .editMessageText(
-        `🎁 <b>GIVEAWAY: ${esc(game.prize)}</b>
-🏆 Winners: <b>${game.winnersCount}</b>
-👥 Entries: <b>${game.participants.size}</b>`,
+        [
+          `🎁 <b>GIVEAWAY: ${esc(game.prize)}</b>`,
+          `🏆 Winners: <b>${game.winnersCount}</b>`,
+          `👥 Entries: <b>${game.participants.size}</b>`,
+        ].join(NL),
         {
           parse_mode: "HTML",
           ...Markup.inlineKeyboard([[Markup.button.callback("🎉 Join Giveaway", `tg_gw:${game.id}`)]]),
@@ -239,10 +246,12 @@ Anda memenangi <b>${esc(prize)}</b>!`, {
     spins.set(id, game);
 
     await ctx.reply(
-      `🎡 <b>PlatoMy Wheel Spin</b>
-🎁 Event: <b>${esc(title)}</b>
-🏆 Winners: <b>${winnersCount}</b>
-👥 Peserta: <b>0</b>`,
+      [
+        `🎡 <b>PlatoMy Wheel Spin</b>`,
+        `🎁 Event: <b>${esc(title)}</b>`,
+        `🏆 Winners: <b>${winnersCount}</b>`,
+        `👥 Peserta: <b>0</b>`,
+      ].join(NL),
       {
         parse_mode: "HTML",
         ...Markup.inlineKeyboard([
@@ -266,10 +275,12 @@ Anda memenangi <b>${esc(prize)}</b>!`, {
     const list = [...game.participants.values()].slice(0, 20).map(esc).join(", ");
     await ctx
       .editMessageText(
-        `🎡 <b>PlatoMy Wheel Spin</b>
-🎁 Event: <b>${esc(game.title)}</b>
-🏆 Winners: <b>${game.winnersCount}</b>
-👥 Peserta (${game.participants.size}): ${list}`,
+        [
+          `🎡 <b>PlatoMy Wheel Spin</b>`,
+          `🎁 Event: <b>${esc(game.title)}</b>`,
+          `🏆 Winners: <b>${game.winnersCount}</b>`,
+          `👥 Peserta (${game.participants.size}): ${list}`,
+        ].join(NL),
         {
           parse_mode: "HTML",
           ...Markup.inlineKeyboard([
@@ -297,9 +308,11 @@ Anda memenangi <b>${esc(prize)}</b>!`, {
     await ctx.answerCbQuery("🎡 Memusing roda...");
     await ctx
       .editMessageText(
-        `🎡 <b>PlatoMy Wheel Spin</b> (Tamat)
-🎁 Event: <b>${esc(game.title)}</b>
-👥 Peserta: <b>${game.participants.size}</b>`,
+        [
+          `🎡 <b>PlatoMy Wheel Spin</b> (Tamat)`,
+          `🎁 Event: <b>${esc(game.title)}</b>`,
+          `👥 Peserta: <b>${game.participants.size}</b>`,
+        ].join(NL),
         { parse_mode: "HTML" }
       )
       .catch(() => {});
@@ -322,11 +335,14 @@ Anda memenangi <b>${esc(prize)}</b>!`, {
     }
 
     const mentions = winners.map(([uid, name]) => mention(uid, name)).join(", ");
-    await ctx.reply(`🎉 <b>Keputusan Wheel Spin</b>
-Tahniah ${mentions}!
-Anda memenangi <b>${esc(game.title)}</b>!`, {
-      parse_mode: "HTML",
-    });
+    await ctx.reply(
+      [
+        `🎉 <b>Keputusan Wheel Spin</b>`,
+        `Tahniah ${mentions}!`,
+        `Anda memenangi <b>${esc(game.title)}</b>!`,
+      ].join(NL),
+      { parse_mode: "HTML" }
+    );
   });
 
   // Daftar menu command dalam Telegram
