@@ -139,11 +139,10 @@ function buildSpinLobbyBox(game) {
     .setCustomId("start_spin")
     .setLabel("Spin Now")
     .setEmoji("▶️")
-    .setStyle(ButtonStyle.Success)
+    .setStyle(ButtonStyle.Secondary)
     .setDisabled(game.ended);
 
   return new ContainerBuilder()
-    .setAccentColor(0xff7eb6)
     .addTextDisplayComponents(txt("### ˚ · . ꒰ა 🎡 PlatoMy Wheel Spin 🎡 ໒꒱ . · ˚"))
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(txt(lines.join(NL)))
@@ -603,8 +602,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         if (!game || game.ended) {
           return interaction.reply({ content: "❌ Wheel Spin ini sudah tamat.", ephemeral: true });
         }
-        if (interaction.user.id !== game.hostId && !isAdmin(interaction)) {
-          return interaction.reply({ content: "❌ Hanya Host atau Admin boleh mulakan pusingan!", ephemeral: true });
+        if (interaction.user.id !== game.hostId) {
+          return interaction.reply({ content: "❌ Hanya Host sahaja boleh menekan butang Spin Now!", ephemeral: true });
         }
         if (game.participants.length < 2) {
           return interaction.reply({ content: "❌ Perlukan sekurang-kurangnya **2 peserta** untuk pusing roda.", ephemeral: true });
@@ -640,7 +639,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
           const file = new AttachmentBuilder(gifBuffer, { name: "wheel-spin.gif" });
 
           const spinBox = new ContainerBuilder()
-            .setAccentColor(0xff7eb6)
             .addTextDisplayComponents(txt("### ˚ · . ꒰ა 🎡 Wheel Spin 🎡 ໒꒱ . · ˚"))
             .addSeparatorComponents(sep())
             .addMediaGalleryComponents(
@@ -661,7 +659,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         const mentions = winners.map((uid) => `<@${uid}>`).join(", ");
         const resultBox = new ContainerBuilder()
-          .setAccentColor(0xff7eb6)
           .addTextDisplayComponents(txt("### 🎉 Keputusan Wheel Spin 🎉"))
           .addSeparatorComponents(sep())
           .addTextDisplayComponents(txt(`Tahniah ${mentions}!${NL}Anda memenangi **${game.title}**!`));
