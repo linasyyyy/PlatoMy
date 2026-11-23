@@ -6,6 +6,9 @@ import {
   REST,
   Routes,
   ActionRowBuilder,
+  AttachmentBuilder,
+  ButtonBuilder,
+  ButtonStyle,
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
@@ -67,6 +70,7 @@ import {
 import { createLeaderboardSystem } from "./leaderboard.js";
 import { createRumbleSystem } from "./rumble.js";
 import { createGiveawaySystem } from "./giveaway.js";
+import { generateWheelGif } from "./wheelSpin.js";
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
@@ -105,6 +109,46 @@ const {
 const { rumbleMap, rumbleOpenBox, createRumble } = createRumbleSystem({ getWallet });
 const { giveawayGames, saveGiveaways, giveawayBox, createGiveaway, rerollGiveaway, resumeGiveaways } =
   createGiveawaySystem({ client });
+
+// ================= WHEEL SPIN LOBBY =================
+const spinGames = new Map();
+
+function buildSpinLobbyBox(game) {
+  const lines = [
+    `🎁 **Event:** ${game.title}`,
+    `🏆 **Winners:** ${game.winnersCount}`,
+    `👤 **Host:** <@${game.hostId}>`,
+    "",
+    `👥 **Peserta (${game.participants.length}):**`,
+    game.participants.length
+      ? game.participants
+          .slice(0, 20)
+          .map((id) => `<@${id}>`)
+          .join(", ") + (game.participants.length > 20 ? ` dan ${game.participants.length - 20} lagi...` : "")
+      : "*Belum ada peserta. Tekan butang di bawah untuk sertai!*",
+  ];
+
+  const joinBtn = new ButtonBuilder()
+    .setCustomId("join_spin")
+    .setLabel(game.ended ? "Spin Tamat" : "Join Spin")
+    .setEmoji("🎡")
+    .setStyle(ButtonStyle.Secondary)
+    .setDisabled(game.ended);
+
+  const startBtn = new ButtonBuilder()
+    .setCustomId("start_spin")
+    .setLabel("Spin Now")
+    .setEmoji("▶️")
+    .setStyle(ButtonStyle.Success)
+    .setDisabled(game.ended);
+
+  return new ContainerBuilder()
+    .setAccentColor(0xff7eb6)
+    .addTextDisplayComponents(txt("### ˚ · . ꒰ა 🎡 PlatoMy Wheel Spin 🎡 ໒꒱ . · ˚"))
+    .addSeparatorComponents(sep())
+    .addTextDisplayComponents(txt(lines.join(NL)))
+    .addActionRowComponents(new ActionRowBuilder().addComponents(joinBtn, startBtn));
+}
 
 // ================= CLIENT READY & CRON =================
 client.once(Events.ClientReady, async (c) => {
@@ -458,6 +502,31 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return interaction.editReply({ content: result.ok ? `✅ Berjaya reroll ${result.count} pemenang!` : `❌ ${result.error}` });
       }
 
+      if (name === "spin") {
+        if (!isAdmin(interaction)) {
+          return interaction.reply({ content: "❌ Hanya Administrator boleh mulakan Wheel Spin!", ephemeral: true });
+        }
+        const title = interaction.options.getString("title") || "Wheel Spin";
+        const winnersCount = interaction.options.getInteger("winners") ?? 1;
+
+        const game = {
+          title,
+          winnersCount,
+          hostId: interaction.user.id,
+          participants: [],
+          ended: false,
+        };
+
+        const msg = await interaction.channel.send({
+          components: [buildSpinLobbyBox(game)],
+          flags: V2,
+          allowedMentions: NO_PING,
+        });
+
+        spinGames.set(msg.id, game);
+        return interaction.reply({ content: "✅ Lobby Wheel Spin dibuka! Tekan **Spin Now** bila sedia.", ephemeral: true });
+      }
+
       if (name === "plato-arena") {
         if (!isAdmin(interaction)) return interaction.reply({ content: "❌ Anda tidak mempunyai kebenaran Administrator!", ephemeral: true });
         const currencyType = interaction.options.getString("currency");
@@ -511,6 +580,96 @@ client.on(Events.InteractionCreate, async (interaction) => {
         saveGiveaways();
         await interaction.message.edit({ components: [giveawayBox(game)], flags: V2, allowedMentions: NO_PING }).catch(() => {});
         return interaction.editReply({ content: "✅ Berjaya menyertai giveaway!" });
+      }
+
+      if (id === "join_spin") {
+        await interaction.deferReply({ ephemeral: true });
+        const game = spinGames.get(interaction.message.id);
+        if (!game || game.ended) {
+          return interaction.editReply({ content: "❌ Wheel Spin ini sudah tamat." });
+        }
+        if (game.participants.includes(interaction.user.id)) {
+          return interaction.editReply({ content: "⚠️ Anda sudah menyertai Wheel Spin ini!" });
+        }
+        game.participants.push(interaction.user.id);
+        await interaction.message
+          .edit({ components: [buildSpinLobbyBox(game)], flags: V2, allowedMentions: NO_PING })
+          .catch(() => {});
+        return interaction.editReply({ content: "✅ Anda berjaya menyertai Wheel Spin!" });
+      }
+
+      if (id === "start_spin") {
+        const game = spinGames.get(interaction.message.id);
+        if (!game || game.ended) {
+          return interaction.reply({ content: "❌ Wheel Spin ini sudah tamat.", ephemeral: true });
+        }
+        if (interaction.user.id !== game.hostId && !isAdmin(interaction)) {
+          return interaction.reply({ content: "❌ Hanya Host atau Admin boleh mulakan pusingan!", ephemeral: true });
+        }
+        if (game.participants.length < 2) {
+          return interaction.reply({ content: "❌ Perlukan sekurang-kurangnya **2 peserta** untuk pusing roda.", ephemeral: true });
+        }
+
+        await interaction.deferReply({ ephemeral: true });
+        game.ended = true;
+        await interaction.message
+          .edit({ components: [buildSpinLobbyBox(game)], flags: V2, allowedMentions: NO_PING })
+          .catch(() => {});
+
+        const nameMap = new Map();
+        for (const uid of game.participants) {
+          const u = await client.users.fetch(uid).catch(() => null);
+          nameMap.set(uid, u ? u.displayName || u.username : uid);
+        }
+
+        const shuffled = [...game.participants].sort(() => Math.random() - 0.5);
+        const winners = shuffled.slice(0, Math.min(game.winnersCount, shuffled.length));
+        let currentPool = [...game.participants];
+
+        await interaction.editReply({ content: "🎡 Memulakan pusingan roda..." });
+
+        for (let i = 0; i < winners.length; i++) {
+          const winnerId = winners[i];
+          const names = currentPool.map((uid) => nameMap.get(uid));
+          const winnerName = nameMap.get(winnerId);
+
+          const gifBuffer = await generateWheelGif(names, winnerName, {
+            title: "Wheel Spin",
+            subtitle: `PlatoMy • ${game.title}`,
+          });
+          const file = new AttachmentBuilder(gifBuffer, { name: "wheel-spin.gif" });
+
+          const spinBox = new ContainerBuilder()
+            .setAccentColor(0xff7eb6)
+            .addTextDisplayComponents(txt("### ˚ · . ꒰ა 🎡 Wheel Spin 🎡 ໒꒱ . · ˚"))
+            .addSeparatorComponents(sep())
+            .addMediaGalleryComponents(
+              new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL("attachment://wheel-spin.gif"))
+            )
+            .addTextDisplayComponents(
+              txt(
+                winners.length > 1
+                  ? `🎁 **${game.title}**${NL}✨ *Pusingan ${i + 1} / ${winners.length}...*`
+                  : `🎁 **${game.title}**${NL}✨ *Memusing roda... tunggu sebentar!*`
+              )
+            );
+
+          await interaction.channel.send({ components: [spinBox], files: [file], flags: V2 }).catch(() => {});
+          await sleep(4500);
+          currentPool = currentPool.filter((uid) => uid !== winnerId);
+        }
+
+        const mentions = winners.map((uid) => `<@${uid}>`).join(", ");
+        const resultBox = new ContainerBuilder()
+          .setAccentColor(0xff7eb6)
+          .addTextDisplayComponents(txt("### 🎉 Keputusan Wheel Spin 🎉"))
+          .addSeparatorComponents(sep())
+          .addTextDisplayComponents(txt(`Tahniah ${mentions}!${NL}Anda memenangi **${game.title}**!`));
+
+        await interaction.channel
+          .send({ components: [resultBox], flags: V2, allowedMentions: { users: winners } })
+          .catch(() => {});
+        return;
       }
 
       if (id.startsWith("join_rumble_")) {
