@@ -14,7 +14,7 @@ export function balanceLines(w) {
 }
 
 export function walletBox(w, target = null) {
-  const box = new ContainerBuilder().addTextDisplayComponents(txt("# ˚₊‧꒰ാ 👛 𝑃𝐿𝐴𝑇𝑂𝑀𝑌 𝑊𝐴𝐿𝐿𝐸𝑇 ໒꒱‧₊˚"));
+  const box = new ContainerBuilder().addTextDisplayComponents(txt("# ˚₊‧꒰ാ 𝑃𝐿𝐴𝑇𝑂𝑀𝑌 𝑊𝐴𝐿𝐿𝐸𝑇 ໒꒱‧₊˚"));
   if (target) {
     box.addTextDisplayComponents(txt(`╰┈➤ 👤 **Player:** ${target} (\`${target.id}\`)`));
   }
@@ -34,7 +34,7 @@ export function walletLogBox({ actionTitle, target, admin, details, reason, w })
   ].join(NL);
 
   return new ContainerBuilder()
-    .addTextDisplayComponents(txt("# ˚₊‧꒰ാ 👛 𝑊𝐴𝐿𝐿𝐸𝑇 𝐿𝑂𝐺 ໒꒱‧₊˚"))
+    .addTextDisplayComponents(txt("# ˚₊‧꒰ാ 𝑊𝐴𝐿𝐿𝐸𝑇 𝐿𝑂𝐺 ໒꒱‧₊˚"))
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(txt(logBody))
     .addSeparatorComponents(sep())
