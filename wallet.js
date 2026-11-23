@@ -1,4 +1,4 @@
-import { ContainerBuilder } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ContainerBuilder } from "discord.js";
 import { NL, COINS_EMOJI, PIPS_EMOJI, getMalaysiaTime, sep, txt } from "./utils.js";
 
 const BANK_FOOTER = "⋆˚࿔ 🎀 PlatoMy Bank 𝜗𝜚˚⋆";
@@ -13,15 +13,33 @@ export function balanceLines(w) {
   ].join(NL);
 }
 
-export function walletBox(w, target = null) {
+export function walletBox(w, target = null, adminTargetId = null) {
   const box = new ContainerBuilder().addTextDisplayComponents(txt("# ˚₊‧꒰ാ 𝑃𝐿𝐴𝑇𝑂𝑀𝑌 𝑊𝐴𝐿𝐿𝐸𝑇 ໒꒱‧₊˚"));
   if (target) {
     box.addTextDisplayComponents(txt(`╰┈➤ 👤 **Player:** ${target} (\`${target.id}\`)`));
   }
-  return box
+  box
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(txt(balanceLines(w)))
     .addTextDisplayComponents(txt(`-# ${bankFooter()}`));
+
+  if (adminTargetId) {
+    const addBtn = new ButtonBuilder()
+      .setCustomId(`wallet_admin:add:${adminTargetId}`)
+      .setLabel("Add Balance")
+      .setEmoji("➕")
+      .setStyle(ButtonStyle.Secondary);
+
+    const deductBtn = new ButtonBuilder()
+      .setCustomId(`wallet_admin:deduct:${adminTargetId}`)
+      .setLabel("Deduct Balance")
+      .setEmoji("➖")
+      .setStyle(ButtonStyle.Secondary);
+
+    box.addActionRowComponents(new ActionRowBuilder().addComponents(addBtn, deductBtn));
+  }
+
+  return box;
 }
 
 export function walletLogBox({ actionTitle, target, admin, details, reason, w }) {
