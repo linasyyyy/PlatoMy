@@ -70,7 +70,7 @@ import {
 import { createLeaderboardSystem } from "./leaderboard.js";
 import { createRumbleSystem } from "./rumble.js";
 import { createGiveawaySystem } from "./giveaway.js";
-import { generateWheelGif } from "./wheelSpin.js";
+import { generateWheelGif } from "./wheelspin.js";
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
