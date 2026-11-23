@@ -10,6 +10,8 @@ import {
 import { NL, WINNER_EMOJI, V2, NO_PING, isUrl, sep, txt } from "./utils.js";
 
 const GIVEAWAY_DATA_PATH = "./giveaways.json";
+const GIFT_EMOJI = "<a:pinkgift:1574295305996869702>";
+const PARTY_BTN_EMOJI = { id: "1574309471520297050", name: "partymy", animated: true };
 
 function loadGiveaways() {
   if (!fs.existsSync(GIVEAWAY_DATA_PATH)) return new Map();
@@ -48,28 +50,32 @@ export function createGiveawaySystem({ client }) {
       );
     }
 
-    const reqText = game.requiredRoleId ? `<@&${game.requiredRoleId}>` : "Terbuka untuk semua";
     const lines = [
-      `🎁 **Prize:** ${game.prize}`,
       `${WINNER_EMOJI} **Winners:** ${game.ended && game.winners.length ? game.winners.map((id) => `<@${id}>`).join(", ") : game.winnersCount}`,
-      `📌 **Requirement:** ${reqText}`,
+    ];
+    if (game.requiredRoleId) {
+      lines.push(`📌 **Requirement:** <@&${game.requiredRoleId}>`);
+    }
+    lines.push(
       game.ended ? "⏳ **Status:** Tamat" : `⏳ **Ends:** <t:${game.endTimeSeconds}:R>`,
       `👤 **Host:** <@${game.hostId}>`,
       "",
-      `👥 **Entries:** ${game.participants.length}`,
-    ].join(NL);
+      `👥 **Entries:** ${game.participants.length}`
+    );
 
     const btn = new ButtonBuilder()
       .setCustomId("join_giveaway")
       .setLabel(game.ended ? "Giveaway Ended" : "Join Giveaway")
-      .setEmoji("🎉")
+      .setEmoji(PARTY_BTN_EMOJI)
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(game.ended);
 
+    const title = `## ${GIFT_EMOJI} ${game.prize} ${GIFT_EMOJI}${game.ended ? " (Ended)" : ""}`;
+
     return box
-      .addTextDisplayComponents(txt(`## 🌸・PlatoMy Giveaway${game.ended ? " (Ended)" : ""}`))
+      .addTextDisplayComponents(txt(title))
       .addSeparatorComponents(sep())
-      .addTextDisplayComponents(txt(lines))
+      .addTextDisplayComponents(txt(lines.join(NL)))
       .addActionRowComponents(new ActionRowBuilder().addComponents(btn));
   }
 
