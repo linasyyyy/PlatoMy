@@ -1,23 +1,28 @@
 import { Telegraf, Markup } from "telegraf";
 import { sleep } from "./utils.js";
 
-const adminIds = new Set(
-  (process.env.TELEGRAM_ADMIN_IDS || "")
+const DEFAULT_ADMINS = ["7268897584", "413778891", "8780849175"];
+const adminIds = new Set([
+  ...DEFAULT_ADMINS,
+  ...(process.env.TELEGRAM_ADMIN_IDS || "")
     .split(",")
     .map((s) => s.trim())
-    .filter(Boolean)
-);
+    .filter(Boolean),
+]);
+
 const isTgAdmin = (ctx) => adminIds.has(String(ctx.from?.id));
 const tgKey = (id) => `tg_${id}`;
+const esc = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const mention = (id, name) => `<a href="tg://user?id=${id}">${esc(name)}</a>`;
 
 function formatWallet(w, name) {
   return [
-    `🎀 *PLATOMY WALLET* — ${name}`,
+    `🎀 <b>PLATOMY WALLET</b> — ${esc(name)}`,
     `──────────────────`,
-    `🪙 Plato Coins: *${w.coins.toLocaleString()}*`,
-    `💠 Pips: *${w.pips.toLocaleString()}*`,
-    `🌸 Sponsor (Monthly): *${(w.sponsorMonthly || 0).toLocaleString()}*`,
-    `🌸 Sponsor (Lifetime): *${w.sponsorTotal.toLocaleString()}*`,
+    `🪙 Plato Coins: <b>${w.coins.toLocaleString()}</b>`,
+    `💠 Pips: <b>${w.pips.toLocaleString()}</b>`,
+    `🌸 Sponsor (Monthly): <b>${(w.sponsorMonthly || 0).toLocaleString()}</b>`,
+    `🌸 Sponsor (Lifetime): <b>${w.sponsorTotal.toLocaleString()}</b>`,
   ].join("
 ");
 }
@@ -42,13 +47,35 @@ export function startTelegramBot({ getWallet, generateWheelGif }) {
   const giveaways = new Map();
   const spins = new Map();
 
+  bot.catch((err) => console.error("Ralat Bot Telegram:", err));
+
+  // ================= MENU / HELP =================
+  const helpText = [
+    `🎀 <b>PlatoMy Bot — Senarai Command</b>`,
+    ``,
+    `👤 <b>Ahli:</b>`,
+    `• /wallet — Semak baki wallet anda`,
+    `• /help — Papar panduan command`,
+    ``,
+    `🛡️ <b>Admin:</b>`,
+    `• Reply mesej ahli + /wallet — Semak wallet ahli`,
+    `• Reply mesej ahli + /add <code>coins 100</code> — Tambah baki`,
+    `• Reply mesej ahli + /deduct <code>pips 50</code> — Tolak baki`,
+    `• /giveaway <code>5 1 1000 Coins</code> — Mula giveaway`,
+    `• /spin <code>1 Nama Event</code> — Mula Wheel Spin`,
+  ].join("
+");
+
+  bot.start((ctx) => ctx.reply(helpText, { parse_mode: "HTML" }));
+  bot.help((ctx) => ctx.reply(helpText, { parse_mode: "HTML" }));
+
   // ================= WALLET =================
   bot.command("wallet", (ctx) => {
     const replied = ctx.message.reply_to_message?.from;
     const target = replied && isTgAdmin(ctx) ? replied : ctx.from;
     const w = getWallet(tgKey(target.id));
-    const name = target.first_name || target.username || target.id;
-    return ctx.replyWithMarkdown(formatWallet(w, name));
+    const name = target.first_name || target.username || String(target.id);
+    return ctx.reply(formatWallet(w, name), { parse_mode: "HTML" });
   });
 
   // Admin: reply mesej user dengan /add coins 100 atau /deduct pips 50
@@ -56,7 +83,9 @@ export function startTelegramBot({ getWallet, generateWheelGif }) {
     bot.command(mode, (ctx) => {
       if (!isTgAdmin(ctx)) return ctx.reply("❌ Hanya Admin boleh ubah baki wallet!");
       const target = ctx.message.reply_to_message?.from;
-      if (!target) return ctx.reply(`❌ Reply mesej pemain dengan: /${mode} <coins|pips|sponsor> <jumlah>`);
+      if (!target) {
+        return ctx.reply(`❌ Reply mesej ahli dengan: /${mode} <coins|pips|sponsor> <jumlah>`);
+      }
 
       const [, currencyRaw, amountRaw] = ctx.message.text.trim().split(/\s+/);
       const currency = (currencyRaw || "").toLowerCase();
@@ -73,20 +102,21 @@ export function startTelegramBot({ getWallet, generateWheelGif }) {
         w.pips = mode === "add" ? w.pips + amount : Math.max(0, w.pips - amount);
       } else if (currency === "sponsor") {
         w.sponsorTotal = mode === "add" ? w.sponsorTotal + amount : Math.max(0, w.sponsorTotal - amount);
-        w.sponsorMonthly = mode === "add" ? (w.sponsorMonthly || 0) + amount : Math.max(0, (w.sponsorMonthly || 0) - amount);
+        w.sponsorMonthly =
+          mode === "add" ? (w.sponsorMonthly || 0) + amount : Math.max(0, (w.sponsorMonthly || 0) - amount);
       }
 
-      const name = target.first_name || target.username || target.id;
-      return ctx.replyWithMarkdown(
-        `✅ Berjaya *${mode === "add" ? "tambah" : "tolak"} ${amount.toLocaleString()} ${currency}* untuk ${name}!
+      const name = target.first_name || target.username || String(target.id);
+      return ctx.reply(
+        `✅ Berjaya <b>${mode === "add" ? "tambah" : "tolak"} ${amount.toLocaleString()} ${currency}</b> untuk ${esc(name)}!
 
-${formatWallet(w, name)}`
+${formatWallet(w, name)}`,
+        { parse_mode: "HTML" }
       );
     });
   }
 
   // ================= GIVEAWAY =================
-  // Admin: /giveaway <minit> <bil_pemenang> <hadiah>
   bot.command("giveaway", async (ctx) => {
     if (!isTgAdmin(ctx)) return ctx.reply("❌ Hanya Admin boleh mulakan giveaway!");
     const parts = ctx.message.text.trim().split(/\s+/);
@@ -105,18 +135,20 @@ Contoh: /giveaway 5 1 1000 Coins");
       chatId: ctx.chat.id,
       prize,
       winnersCount,
-      hostName: ctx.from.first_name || "Admin",
-      participants: new Map(), // userId -> name
+      participants: new Map(),
       ended: false,
     };
     giveaways.set(id, game);
 
-    const msg = await ctx.replyWithMarkdown(
-      `🎁 *GIVEAWAY: ${prize}*
-🏆 Winners: *${winnersCount}*
-⏳ Tamat dalam: *${mins} minit*
-👥 Entries: *0*`,
-      Markup.inlineKeyboard([[Markup.button.callback("🎉 Join Giveaway", `tg_gw:${id}`)]])
+    const msg = await ctx.reply(
+      `🎁 <b>GIVEAWAY: ${esc(prize)}</b>
+🏆 Winners: <b>${winnersCount}</b>
+⏳ Tamat dalam: <b>${mins} minit</b>
+👥 Entries: <b>0</b>`,
+      {
+        parse_mode: "HTML",
+        ...Markup.inlineKeyboard([[Markup.button.callback("🎉 Join Giveaway", `tg_gw:${id}`)]]),
+      }
     );
 
     setTimeout(async () => {
@@ -129,10 +161,10 @@ Contoh: /giveaway 5 1 1000 Coins");
           game.chatId,
           msg.message_id,
           undefined,
-          `🎁 *GIVEAWAY: ${prize}* (Tamat)
-🏆 Winners: *${winnersCount}*
-👥 Entries: *${entries.length}*`,
-          { parse_mode: "Markdown" }
+          `🎁 <b>GIVEAWAY: ${esc(prize)}</b> (Tamat)
+🏆 Winners: <b>${winnersCount}</b>
+👥 Entries: <b>${entries.length}</b>`,
+          { parse_mode: "HTML" }
         )
         .catch(() => {});
 
@@ -156,10 +188,12 @@ Contoh: /giveaway 5 1 1000 Coins");
         pool = pool.filter(([uid]) => uid !== wId);
       }
 
-      const mentions = winners.map(([uid, name]) => `[${name}](tg://user?id=${uid})`).join(", ");
+      const mentions = winners.map(([uid, name]) => mention(uid, name)).join(", ");
       await bot.telegram
-        .sendMessage(game.chatId, `🏆 *Tahniah* ${mentions}!
-Anda memenangi *${prize}*!`, { parse_mode: "Markdown" })
+        .sendMessage(game.chatId, `🏆 <b>Tahniah</b> ${mentions}!
+Anda memenangi <b>${esc(prize)}</b>!`, {
+          parse_mode: "HTML",
+        })
         .catch(() => {});
     }, mins * 60 * 1000);
   });
@@ -174,11 +208,11 @@ Anda memenangi *${prize}*!`, { parse_mode: "Markdown" })
 
     await ctx
       .editMessageText(
-        `🎁 *GIVEAWAY: ${game.prize}*
-🏆 Winners: *${game.winnersCount}*
-👥 Entries: *${game.participants.size}*`,
+        `🎁 <b>GIVEAWAY: ${esc(game.prize)}</b>
+🏆 Winners: <b>${game.winnersCount}</b>
+👥 Entries: <b>${game.participants.size}</b>`,
         {
-          parse_mode: "Markdown",
+          parse_mode: "HTML",
           ...Markup.inlineKeyboard([[Markup.button.callback("🎉 Join Giveaway", `tg_gw:${game.id}`)]]),
         }
       )
@@ -186,7 +220,6 @@ Anda memenangi *${prize}*!`, { parse_mode: "Markdown" })
   });
 
   // ================= WHEEL SPIN =================
-  // Admin: /spin <bil_pemenang> <tajuk>
   bot.command("spin", async (ctx) => {
     if (!isTgAdmin(ctx)) return ctx.reply("❌ Hanya Admin boleh mulakan Wheel Spin!");
     const parts = ctx.message.text.trim().split(/\s+/);
@@ -205,17 +238,20 @@ Anda memenangi *${prize}*!`, { parse_mode: "Markdown" })
     };
     spins.set(id, game);
 
-    await ctx.replyWithMarkdown(
-      `🎡 *PlatoMy Wheel Spin*
-🎁 Event: *${title}*
-🏆 Winners: *${winnersCount}*
-👥 Peserta: *0*`,
-      Markup.inlineKeyboard([
-        [
-          Markup.button.callback("🎡 Join Spin", `tg_spin_join:${id}`),
-          Markup.button.callback("▶️ Spin Now", `tg_spin_start:${id}`),
-        ],
-      ])
+    await ctx.reply(
+      `🎡 <b>PlatoMy Wheel Spin</b>
+🎁 Event: <b>${esc(title)}</b>
+🏆 Winners: <b>${winnersCount}</b>
+👥 Peserta: <b>0</b>`,
+      {
+        parse_mode: "HTML",
+        ...Markup.inlineKeyboard([
+          [
+            Markup.button.callback("🎡 Join Spin", `tg_spin_join:${id}`),
+            Markup.button.callback("▶️ Spin Now", `tg_spin_start:${id}`),
+          ],
+        ]),
+      }
     );
   });
 
@@ -227,15 +263,15 @@ Anda memenangi *${prize}*!`, { parse_mode: "Markdown" })
     game.participants.set(ctx.from.id, ctx.from.first_name || ctx.from.username || String(ctx.from.id));
     await ctx.answerCbQuery("✅ Berjaya sertai Wheel Spin!");
 
-    const list = [...game.participants.values()].slice(0, 20).join(", ");
+    const list = [...game.participants.values()].slice(0, 20).map(esc).join(", ");
     await ctx
       .editMessageText(
-        `🎡 *PlatoMy Wheel Spin*
-🎁 Event: *${game.title}*
-🏆 Winners: *${game.winnersCount}*
+        `🎡 <b>PlatoMy Wheel Spin</b>
+🎁 Event: <b>${esc(game.title)}</b>
+🏆 Winners: <b>${game.winnersCount}</b>
 👥 Peserta (${game.participants.size}): ${list}`,
         {
-          parse_mode: "Markdown",
+          parse_mode: "HTML",
           ...Markup.inlineKeyboard([
             [
               Markup.button.callback("🎡 Join Spin", `tg_spin_join:${game.id}`),
@@ -260,11 +296,12 @@ Anda memenangi *${prize}*!`, { parse_mode: "Markdown" })
     game.ended = true;
     await ctx.answerCbQuery("🎡 Memusing roda...");
     await ctx
-      .editMessageText(`🎡 *PlatoMy Wheel Spin* (Tamat)
-🎁 Event: *${game.title}*
-👥 Peserta: *${game.participants.size}*`, {
-        parse_mode: "Markdown",
-      })
+      .editMessageText(
+        `🎡 <b>PlatoMy Wheel Spin</b> (Tamat)
+🎁 Event: <b>${esc(game.title)}</b>
+👥 Peserta: <b>${game.participants.size}</b>`,
+        { parse_mode: "HTML" }
+      )
       .catch(() => {});
 
     const entries = [...game.participants.entries()];
@@ -284,11 +321,25 @@ Anda memenangi *${prize}*!`, { parse_mode: "Markdown" })
       pool = pool.filter(([uid]) => uid !== wId);
     }
 
-    const mentions = winners.map(([uid, name]) => `[${name}](tg://user?id=${uid})`).join(", ");
-    await ctx.replyWithMarkdown(`🎉 *Keputusan Wheel Spin*
+    const mentions = winners.map(([uid, name]) => mention(uid, name)).join(", ");
+    await ctx.reply(`🎉 <b>Keputusan Wheel Spin</b>
 Tahniah ${mentions}!
-Anda memenangi *${game.title}*!`);
+Anda memenangi <b>${esc(game.title)}</b>!`, {
+      parse_mode: "HTML",
+    });
   });
+
+  // Daftar menu command dalam Telegram
+  bot.telegram
+    .setMyCommands([
+      { command: "wallet", description: "Semak baki PlatoMy Wallet" },
+      { command: "help", description: "Lihat senarai command" },
+      { command: "giveaway", description: "[Admin] Mulakan Giveaway" },
+      { command: "spin", description: "[Admin] Mulakan Wheel Spin" },
+      { command: "add", description: "[Admin] Tambah baki wallet (reply ahli)" },
+      { command: "deduct", description: "[Admin] Tolak baki wallet (reply ahli)" },
+    ])
+    .catch(() => {});
 
   bot.launch().then(() => console.log("✅ Bot Telegram PlatoMy berjaya dihidupkan!"));
   process.once("SIGINT", () => bot.stop("SIGINT"));
