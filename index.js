@@ -307,7 +307,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
         const who = checkingOther ? target : interaction.user;
         return interaction.reply({
-          components: [walletBox(getWallet(who.id), checkingOther ? who : null)],
+          components: [walletBox(getWallet(who.id), checkingOther ? who : null, isAdmin(interaction) ? who.id : null)],
           flags: V2_EPHEMERAL,
           allowedMentions: NO_PING,
         });
@@ -554,6 +554,44 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.isButton()) {
       const id = interaction.customId;
 
+      if (id.startsWith("wallet_admin:")) {
+        if (!isAdmin(interaction)) {
+          return interaction.reply({ content: "❌ Hanya Administrator boleh ubah baki wallet!", ephemeral: true });
+        }
+        const [, mode, targetId] = id.split(":");
+        const modal = new ModalBuilder()
+          .setCustomId(`wallet_admin_modal:${mode}:${targetId}`)
+          .setTitle(mode === "add" ? "➕ Add Wallet Balance" : "➖ Deduct Wallet Balance");
+
+        modal.addComponents(
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId("wa_currency")
+              .setLabel("Jenis (coins / pips / sponsor)")
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+              .setPlaceholder("coins")
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId("wa_amount")
+              .setLabel("Jumlah")
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+              .setPlaceholder("cth: 100")
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId("wa_reason")
+              .setLabel("Sebab (pilihan)")
+              .setStyle(TextInputStyle.Short)
+              .setRequired(false)
+              .setPlaceholder("cth: Hadiah event")
+          )
+        );
+        return interaction.showModal(modal);
+      }
+
       if (id === "open_birthday_modal") {
         const modal = new ModalBuilder().setCustomId("birthday_modal").setTitle("🎂 Register / Update Birthday");
         modal.addComponents(
@@ -776,6 +814,68 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     // ===== MODAL =====
     if (interaction.isModalSubmit()) {
+      if (interaction.customId.startsWith("wallet_admin_modal:")) {
+        if (!isAdmin(interaction)) {
+          return interaction.reply({ content: "❌ Hanya Administrator boleh ubah baki wallet!", ephemeral: true });
+        }
+        const [, mode, targetId] = interaction.customId.split(":");
+        const currency = interaction.fields.getTextInputValue("wa_currency").trim().toLowerCase();
+        const amount = parseInt(interaction.fields.getTextInputValue("wa_amount").trim(), 10);
+        const reason = interaction.fields.getTextInputValue("wa_reason").trim() || "Tiada sebab dinyatakan";
+
+        if (!["coins", "pips", "sponsor"].includes(currency)) {
+          return interaction.reply({ content: "❌ Jenis tidak sah! Sila taip `coins`, `pips`, atau `sponsor`.", ephemeral: true });
+        }
+        if (isNaN(amount) || amount <= 0) {
+          return interaction.reply({ content: "❌ Jumlah mesti nombor lebih daripada 0.", ephemeral: true });
+        }
+
+        const targetUser = (await client.users.fetch(targetId).catch(() => null)) || { id: targetId, toString: () => `<@${targetId}>` };
+        const w = getWallet(targetId);
+        let actionTitle = "";
+        let actionDesc = "";
+
+        if (currency === "coins") {
+          w.coins = mode === "add" ? w.coins + amount : Math.max(0, w.coins - amount);
+          actionTitle = mode === "add" ? "🪙 Plato Coins Added" : "🪙 Plato Coins Deducted";
+          actionDesc = `Berjaya ${mode === "add" ? "menambah" : "menolak"} **${amount.toLocaleString()} Coins** ${mode === "add" ? "kepada" : "daripada"} ${targetUser}.`;
+        } else if (currency === "pips") {
+          w.pips = mode === "add" ? w.pips + amount : Math.max(0, w.pips - amount);
+          actionTitle = mode === "add" ? "💠 Pips Added" : "💠 Pips Deducted";
+          actionDesc = `Berjaya ${mode === "add" ? "menambah" : "menolak"} **${amount.toLocaleString()} Pips** ${mode === "add" ? "kepada" : "daripada"} ${targetUser}.`;
+        } else if (currency === "sponsor") {
+          if (mode === "add") {
+            w.sponsorTotal += amount;
+            w.sponsorMonthly = (w.sponsorMonthly || 0) + amount;
+          } else {
+            w.sponsorTotal = Math.max(0, w.sponsorTotal - amount);
+            w.sponsorMonthly = Math.max(0, (w.sponsorMonthly || 0) - amount);
+          }
+          actionTitle = mode === "add" ? "🌸 Sponsor Added" : "🌸 Sponsor Deducted";
+          actionDesc = `Berjaya ${mode === "add" ? "menambah" : "menolak"} sponsor **${amount.toLocaleString()} Coins** ${mode === "add" ? "kepada" : "daripada"} ${targetUser}.`;
+        }
+
+        await interaction.reply({
+          components: [walletBox(w, targetId !== interaction.user.id ? targetUser : null, targetId)],
+          flags: V2_EPHEMERAL,
+          allowedMentions: NO_PING,
+        });
+
+        const logChannel = findChannel(interaction.guild, WALLET_LOG_CHANNEL_NAME);
+        if (logChannel) {
+          await logChannel
+            .send({
+              components: [
+                walletLogBox({ actionTitle, target: targetUser, admin: interaction.user, details: actionDesc, reason, w }),
+              ],
+              flags: V2,
+              allowedMentions: NO_PING,
+            })
+            .catch(() => {});
+        }
+        return;
+      }
+
       if (interaction.customId === "birthday_modal") {
         const day = parseInt(interaction.fields.getTextInputValue("bday_day").trim(), 10);
         const month = parseInt(interaction.fields.getTextInputValue("bday_month").trim(), 10);
