@@ -9,7 +9,7 @@ import {
   MediaGalleryItemBuilder,
 } from "discord.js";
 import { NL, WINNER_EMOJI, V2, NO_PING, isUrl, sleep, sep, txt } from "./utils.js";
-import { generateWheelGif } from "./wheelSpin.js";
+import { generateWheelGif } from "./wheelspin.js";
 
 const GIVEAWAY_DATA_PATH = "./giveaways.json";
 const GIFT_EMOJI = "<a:pinkgift:1574295305996869702>";
