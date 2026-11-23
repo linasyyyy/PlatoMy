@@ -1,17 +1,22 @@
 import fs from "fs";
 import {
   ActionRowBuilder,
+  AttachmentBuilder,
   ButtonBuilder,
   ButtonStyle,
   ContainerBuilder,
   MediaGalleryBuilder,
   MediaGalleryItemBuilder,
 } from "discord.js";
-import { NL, WINNER_EMOJI, V2, NO_PING, isUrl, sep, txt } from "./utils.js";
+import { NL, WINNER_EMOJI, V2, NO_PING, isUrl, sleep, sep, txt } from "./utils.js";
+import { generateWheelGif } from "./wheelSpin.js";
 
 const GIVEAWAY_DATA_PATH = "./giveaways.json";
 const GIFT_EMOJI = "<a:pinkgift:1574295305996869702>";
 const PARTY_BTN_EMOJI = { id: "1574309471520297050", name: "partymy", animated: true };
+const WHEEL_ACCENT = 0xff7eb6;
+// Tukar ke "./platomy-logo.PNG" jika anda sudah rename fail di GitHub (Cara 2)
+const WHEEL_LOGO_PATH = "./:assets:platomy-logo.png.PNG";
 
 function loadGiveaways() {
   if (!fs.existsSync(GIVEAWAY_DATA_PATH)) return new Map();
@@ -31,6 +36,39 @@ function pickRandom(arr, n) {
   return copy.slice(0, n);
 }
 
+function wheelBox(prize, roundText = null) {
+  const desc = [
+    `🎁 **Prize:** ${prize}`,
+    roundText || "✨ *Memusing roda... tunggu sebentar!*",
+  ].join(NL);
+
+  return new ContainerBuilder()
+    .setAccentColor(WHEEL_ACCENT)
+    .addTextDisplayComponents(txt("### ˚ · . ꒰ა 🎡 Wheel Spin 🎡 ໒꒱ . · ˚"))
+    .addSeparatorComponents(sep())
+    .addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(
+        new MediaGalleryItemBuilder().setURL("attachment://wheel-spin.gif")
+      )
+    )
+    .addTextDisplayComponents(txt(desc));
+}
+
+function winnerBox(prize, mentions, isReroll = false) {
+  const title = isReroll
+    ? `### 🔄 ${WINNER_EMOJI} Giveaway Reroll ${WINNER_EMOJI}`
+    : `### ${WINNER_EMOJI} Giveaway Winner ${WINNER_EMOJI}`;
+  const body = isReroll
+    ? `Pemenang baharu: ${mentions}${NL}Tahniah, anda memenangi **${prize}**!`
+    : `Tahniah ${mentions}!${NL}Anda memenangi **${prize}**!`;
+
+  return new ContainerBuilder()
+    .setAccentColor(WHEEL_ACCENT)
+    .addTextDisplayComponents(txt(title))
+    .addSeparatorComponents(sep())
+    .addTextDisplayComponents(txt(body));
+}
+
 export function createGiveawaySystem({ client }) {
   const giveawayGames = loadGiveaways();
 
@@ -39,6 +77,50 @@ export function createGiveawaySystem({ client }) {
       fs.writeFileSync(GIVEAWAY_DATA_PATH, JSON.stringify(Object.fromEntries(giveawayGames.entries())));
     } catch (err) {
       console.error("Gagal simpan giveaways.json:", err);
+    }
+  }
+
+  async function resolveNames(userIds) {
+    const map = new Map();
+    for (const id of userIds) {
+      const user = await client.users.fetch(id).catch(() => null);
+      map.set(id, user ? user.displayName || user.username : id);
+    }
+    return map;
+  }
+
+  async function spinAndSendWheel(channel, poolIds, winnerIds, prize) {
+    const nameMap = await resolveNames(poolIds);
+    let currentPool = [...poolIds];
+
+    for (let i = 0; i < winnerIds.length; i++) {
+      const winnerId = winnerIds[i];
+      const names = currentPool.map((id) => nameMap.get(id));
+      const winnerName = nameMap.get(winnerId);
+
+      const gifBuffer = await generateWheelGif(names, winnerName, {
+        title: "Wheel Spin",
+        subtitle: `PlatoMy • ${prize}`,
+        logoPath: WHEEL_LOGO_PATH,
+      });
+
+      const file = new AttachmentBuilder(gifBuffer, { name: "wheel-spin.gif" });
+      const roundText =
+        winnerIds.length > 1
+          ? `✨ *Pusingan ${i + 1} / ${winnerIds.length}...*`
+          : null;
+
+      await channel
+        .send({
+          components: [wheelBox(prize, roundText)],
+          files: [file],
+          flags: V2,
+          allowedMentions: NO_PING,
+        })
+        .catch(() => {});
+
+      await sleep(4500);
+      currentPool = currentPool.filter((id) => id !== winnerId);
     }
   }
 
@@ -90,20 +172,30 @@ export function createGiveawaySystem({ client }) {
     const channel = await client.channels.fetch(game.channelId).catch(() => null);
     if (!channel) return;
 
+    if (game.winners.length === 0) {
+      const msg = await channel.messages.fetch(msgId).catch(() => null);
+      if (msg) {
+        await msg.edit({ components: [giveawayBox(game)], flags: V2, allowedMentions: NO_PING }).catch(() => {});
+      }
+      await channel.send("😢 Giveaway tamat tanpa peserta.").catch(() => {});
+      return;
+    }
+
+    // 1. Pusing roda dahulu dalam Container V2
+    await spinAndSendWheel(channel, game.participants, game.winners, game.prize);
+
+    // 2. Kemas kini kotak giveaway asal
     const msg = await channel.messages.fetch(msgId).catch(() => null);
     if (msg) {
       await msg.edit({ components: [giveawayBox(game)], flags: V2, allowedMentions: NO_PING }).catch(() => {});
     }
 
-    if (game.winners.length === 0) {
-      await channel.send("😢 Giveaway tamat tanpa peserta.").catch(() => {});
-      return;
-    }
-
+    // 3. Umum pemenang dalam Container V2
     const mentions = game.winners.map((id) => `<@${id}>`).join(", ");
     await channel
       .send({
-        content: `${WINNER_EMOJI} Tahniah ${mentions}! Anda memenangi **${game.prize}**!`,
+        components: [winnerBox(game.prize, mentions, false)],
+        flags: V2,
         allowedMentions: { users: game.winners },
       })
       .catch(() => {});
@@ -149,6 +241,8 @@ export function createGiveawaySystem({ client }) {
 
     const channel = await client.channels.fetch(game.channelId).catch(() => null);
     if (channel) {
+      await spinAndSendWheel(channel, pool, newWinners, game.prize);
+
       const msg = await channel.messages.fetch(msgId).catch(() => null);
       if (msg) {
         await msg.edit({ components: [giveawayBox(game)], flags: V2, allowedMentions: NO_PING }).catch(() => {});
@@ -157,7 +251,8 @@ export function createGiveawaySystem({ client }) {
       const mentions = newWinners.map((id) => `<@${id}>`).join(", ");
       await channel
         .send({
-          content: `🔄 ${WINNER_EMOJI} Reroll! Pemenang baharu: ${mentions} — tahniah, anda memenangi **${game.prize}**!`,
+          components: [winnerBox(game.prize, mentions, true)],
+          flags: V2,
           allowedMentions: { users: newWinners },
         })
         .catch(() => {});
