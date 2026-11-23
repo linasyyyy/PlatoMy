@@ -14,7 +14,6 @@ import { generateWheelGif } from "./wheelspin.js";
 const GIVEAWAY_DATA_PATH = "./giveaways.json";
 const GIFT_EMOJI = "<a:pinkgift:1574295305996869702>";
 const PARTY_BTN_EMOJI = { id: "1574309471520297050", name: "partymy", animated: true };
-const WHEEL_ACCENT = 0xff7eb6;
 // Tukar ke "./platomy-logo.PNG" jika anda sudah rename fail di GitHub (Cara 2)
 const WHEEL_LOGO_PATH = "./:assets:platomy-logo.png.PNG";
 
@@ -43,7 +42,6 @@ function wheelBox(prize, roundText = null) {
   ].join(NL);
 
   return new ContainerBuilder()
-    .setAccentColor(WHEEL_ACCENT)
     .addTextDisplayComponents(txt("### ˚ · . ꒰ა 🎡 Wheel Spin 🎡 ໒꒱ . · ˚"))
     .addSeparatorComponents(sep())
     .addMediaGalleryComponents(
@@ -63,7 +61,6 @@ function winnerBox(prize, mentions, isReroll = false) {
     : `Tahniah ${mentions}!${NL}Anda memenangi **${prize}**!`;
 
   return new ContainerBuilder()
-    .setAccentColor(WHEEL_ACCENT)
     .addTextDisplayComponents(txt(title))
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(txt(body));
