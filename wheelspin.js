@@ -11,6 +11,17 @@ const COLORS = [
   "#5E2346", // Rich Plum
 ];
 
+function cleanLabel(name) {
+  const normalized = String(name || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\x20-\x7E]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const safe = normalized || "Player";
+  return safe.length > 14 ? safe.slice(0, 13) + "..." : safe;
+}
+
 export async function generateWheelGif(entries, winnerName, options = {}) {
   const {
     title = "Wheel Spin",
@@ -27,28 +38,32 @@ export async function generateWheelGif(entries, winnerName, options = {}) {
   }
 
   const winnerIndex = slices.indexOf(winnerName);
-  const width = 440;
-  const height = 500;
+  const width = 720;
+  const height = 820;
   const centerX = width / 2;
-  const centerY = 275;
-  const radius = 165;
+  const centerY = 450;
+  const radius = 270;
   const sliceAngle = (Math.PI * 2) / slices.length;
 
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
 
   const encoder = new GIFEncoder(width, height);
   encoder.setRepeat(-1);
-  encoder.setDelay(60);
-  encoder.setQuality(15);
+  encoder.setDelay(65);
+  encoder.setQuality(5);
   encoder.start();
 
-  const totalFrames = 65;
+  const totalFrames = 55;
   const fullSpins = 4 * Math.PI * 2;
   const randomOffset = (Math.random() - 0.5) * sliceAngle * 0.7;
   const targetAngle = -(winnerIndex + 0.5) * sliceAngle + randomOffset;
   const finalRotation =
     fullSpins + (((targetAngle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2));
+
+  const fontSize = slices.length > 12 ? 18 : 22;
 
   for (let f = 0; f <= totalFrames; f++) {
     const progress = f / totalFrames;
@@ -64,32 +79,32 @@ export async function generateWheelGif(entries, winnerName, options = {}) {
     ctx.fillRect(0, 0, width, height);
 
     // Glow merah jambu di bahagian atas
-    const glow = ctx.createRadialGradient(centerX, 60, 10, centerX, 60, 240);
+    const glow = ctx.createRadialGradient(centerX, 95, 16, centerX, 95, 380);
     glow.addColorStop(0, "rgba(255, 126, 182, 0.25)");
     glow.addColorStop(1, "rgba(255, 126, 182, 0)");
     ctx.fillStyle = glow;
     ctx.fillRect(0, 0, width, height);
 
     // Bingkai kad nipis
-    ctx.strokeStyle = "rgba(255, 153, 204, 0.3)";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(8, 8, width - 16, height - 16);
+    ctx.strokeStyle = "rgba(255, 153, 204, 0.35)";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(14, 14, width - 28, height - 28);
 
     // 2. Tajuk (Gaya Leaderboard)
     ctx.textAlign = "center";
     ctx.fillStyle = "#FF99C8";
-    ctx.font = "bold 12px sans-serif";
-    ctx.fillText(subtitle, centerX, 38);
+    ctx.font = "bold 20px sans-serif";
+    ctx.fillText(subtitle, centerX, 62);
 
     ctx.fillStyle = "#FFD6EB";
-    ctx.font = "italic bold 30px Georgia, serif";
-    ctx.fillText(title, centerX, 72);
+    ctx.font = "italic bold 48px Georgia, serif";
+    ctx.fillText(title, centerX, 118);
 
     // 3. Bingkai luar roda
     ctx.beginPath();
-    ctx.arc(centerX, centerY, radius + 8, 0, Math.PI * 2);
-    ctx.strokeStyle = "rgba(255, 126, 182, 0.45)";
-    ctx.lineWidth = 3;
+    ctx.arc(centerX, centerY, radius + 12, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(255, 126, 182, 0.5)";
+    ctx.lineWidth = 5;
     ctx.stroke();
 
     // 4. Lukis setiap bahagian roda
@@ -104,7 +119,7 @@ export async function generateWheelGif(entries, winnerName, options = {}) {
       ctx.fillStyle = COLORS[i % COLORS.length];
       ctx.fill();
       ctx.strokeStyle = "#140915";
-      ctx.lineWidth = 1.8;
+      ctx.lineWidth = 3;
       ctx.stroke();
 
       // Nama peserta (teks gelap untuk warna pastel cerah, putih untuk warna gelap)
@@ -114,14 +129,13 @@ export async function generateWheelGif(entries, winnerName, options = {}) {
       ctx.rotate(start + sliceAngle / 2);
       ctx.textAlign = "right";
       ctx.fillStyle = isLightSlice ? "#1E091A" : "#FFF0F6";
-      ctx.font = "bold 13px sans-serif";
-      const label = slices[i].length > 14 ? slices[i].slice(0, 13) + "…" : slices[i];
-      ctx.fillText(label, radius - 14, 4);
+      ctx.font = `bold ${fontSize}px sans-serif`;
+      ctx.fillText(cleanLabel(slices[i]), radius - 22, Math.round(fontSize / 3));
       ctx.restore();
     }
 
     // 5. Bulatan tengah hitam pekat supaya sebati dengan latar logo PlatoMy
-    const hubRadius = 38;
+    const hubRadius = 62;
     ctx.save();
     ctx.beginPath();
     ctx.arc(centerX, centerY, hubRadius, 0, Math.PI * 2);
@@ -130,7 +144,7 @@ export async function generateWheelGif(entries, winnerName, options = {}) {
     ctx.fill();
     if (logo) {
       ctx.clip();
-      const pad = 4;
+      const pad = 6;
       ctx.drawImage(
         logo,
         centerX - hubRadius + pad,
@@ -144,26 +158,26 @@ export async function generateWheelGif(entries, winnerName, options = {}) {
     ctx.beginPath();
     ctx.arc(centerX, centerY, hubRadius, 0, Math.PI * 2);
     ctx.strokeStyle = "#FF85C0";
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 5;
     ctx.stroke();
 
     // 6. Penunjuk (Pointer) warna emas lembut
     ctx.beginPath();
-    ctx.moveTo(centerX + radius + 16, centerY - 12);
-    ctx.lineTo(centerX + radius + 16, centerY + 12);
-    ctx.lineTo(centerX + radius - 10, centerY);
+    ctx.moveTo(centerX + radius + 26, centerY - 18);
+    ctx.lineTo(centerX + radius + 26, centerY + 18);
+    ctx.lineTo(centerX + radius - 16, centerY);
     ctx.closePath();
     ctx.fillStyle = "#F4C27F";
     ctx.fill();
     ctx.strokeStyle = "#140915";
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 3;
     ctx.stroke();
 
     // 7. Footer kecil
     ctx.textAlign = "center";
-    ctx.fillStyle = "rgba(255, 153, 200, 0.7)";
-    ctx.font = "11px sans-serif";
-    ctx.fillText("PlatoMy • Wheel Spin", centerX, height - 20);
+    ctx.fillStyle = "rgba(255, 153, 200, 0.75)";
+    ctx.font = "18px sans-serif";
+    ctx.fillText("PlatoMy • Wheel Spin", centerX, height - 32);
 
     if (f === totalFrames) encoder.setDelay(2000);
     encoder.addFrame(ctx);
