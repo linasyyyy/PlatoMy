@@ -26,6 +26,31 @@ function formatWallet(w, name) {
   ].join(NL);
 }
 
+function formatTimeLeft(ms) {
+  const totalSec = Math.max(0, Math.ceil(ms / 1000));
+  const hrs = Math.floor(totalSec / 3600);
+  const mins = Math.floor((totalSec % 3600) / 60);
+  const secs = totalSec % 60;
+  if (hrs > 0) return `${hrs}j ${mins}m ${secs}s`;
+  if (mins > 0) return `${mins}m ${secs}s`;
+  return `${secs}s`;
+}
+
+function buildGiveawayText(game) {
+  const lines = [
+    `🎁 <b>GIVEAWAY: ${esc(game.prize)}</b>${game.ended ? " (Tamat)" : ""}`,
+    `🏆 Winners: <b>${game.winnersCount}</b>`,
+    game.ended
+      ? `⏳ Status: <b>Tamat</b>`
+      : `⏳ Baki Masa: <b>${formatTimeLeft(game.endTime - Date.now())}</b>`,
+    `👥 Entries: <b>${game.participants.size}</b>`,
+  ];
+  if (!game.ended) {
+    lines.push(``, `📌 <i>Reply mesej ini dengan <b>ID Plato</b> anda untuk sertai!</i>`);
+  }
+  return lines.join(NL);
+}
+
 function pickRandom(arr, n) {
   const copy = [...arr];
   for (let i = copy.length - 1; i > 0; i--) {
@@ -43,7 +68,7 @@ export function startTelegramBot({ getWallet, generateWheelGif }) {
   }
 
   const bot = new Telegraf(token);
-  const giveaways = new Map();
+  const giveaways = new Map(); // msgId -> game
   const spins = new Map();
   const claims = new Map();
 
@@ -209,7 +234,7 @@ export function startTelegramBot({ getWallet, generateWheelGif }) {
       .catch(() => {});
   });
 
-  // ================= GIVEAWAY =================
+  // ================= GIVEAWAY (REPLY ID PLATO + TIMER) =================
   bot.command("giveaway", async (ctx) => {
     if (!isTgAdmin(ctx)) return ctx.reply("❌ Hanya Admin boleh mulakan giveaway!");
     const parts = ctx.message.text.trim().split(/\s+/);
@@ -223,47 +248,44 @@ export function startTelegramBot({ getWallet, generateWheelGif }) {
       );
     }
 
-    const id = String(Date.now());
     const game = {
-      id,
       chatId: ctx.chat.id,
+      msgId: null,
       prize,
       winnersCount,
-      participants: new Map(),
+      endTime: Date.now() + mins * 60 * 1000,
+      participants: new Map(), // userId -> { name, platoId }
       ended: false,
+      timer: null,
     };
-    giveaways.set(id, game);
 
-    const msg = await ctx.reply(
-      [
-        `🎁 <b>GIVEAWAY: ${esc(prize)}</b>`,
-        `🏆 Winners: <b>${winnersCount}</b>`,
-        `⏳ Tamat dalam: <b>${mins} minit</b>`,
-        `👥 Entries: <b>0</b>`,
-      ].join(NL),
-      {
-        parse_mode: "HTML",
-        ...Markup.inlineKeyboard([[Markup.button.callback("🎉 Join Giveaway", `tg_gw:${id}`)]]),
+    const msg = await ctx.reply(buildGiveawayText(game), { parse_mode: "HTML" });
+    game.msgId = msg.message_id;
+    giveaways.set(msg.message_id, game);
+
+    // Kemas kini countdown timer setiap 10 saat
+    game.timer = setInterval(async () => {
+      if (game.ended || Date.now() >= game.endTime) {
+        clearInterval(game.timer);
+        return;
       }
-    );
+      await bot.telegram
+        .editMessageText(game.chatId, game.msgId, undefined, buildGiveawayText(game), {
+          parse_mode: "HTML",
+        })
+        .catch(() => {});
+    }, 10_000);
 
     setTimeout(async () => {
+      clearInterval(game.timer);
       if (game.ended) return;
       game.ended = true;
       const entries = [...game.participants.entries()];
 
       await bot.telegram
-        .editMessageText(
-          game.chatId,
-          msg.message_id,
-          undefined,
-          [
-            `🎁 <b>GIVEAWAY: ${esc(prize)}</b> (Tamat)`,
-            `🏆 Winners: <b>${winnersCount}</b>`,
-            `👥 Entries: <b>${entries.length}</b>`,
-          ].join(NL),
-          { parse_mode: "HTML" }
-        )
+        .editMessageText(game.chatId, game.msgId, undefined, buildGiveawayText(game), {
+          parse_mode: "HTML",
+        })
         .catch(() => {});
 
       if (entries.length === 0) {
@@ -273,10 +295,10 @@ export function startTelegramBot({ getWallet, generateWheelGif }) {
       const winners = pickRandom(entries, Math.min(game.winnersCount, entries.length));
       let pool = [...entries];
 
-      for (const [wId, wName] of winners) {
+      for (const [wId, wData] of winners) {
         const gif = await generateWheelGif(
-          pool.map(([, n]) => n),
-          wName,
+          pool.map(([, p]) => p.platoId),
+          wData.platoId,
           { title: "Wheel Spin", subtitle: `PlatoMy • ${prize}` }
         );
         await bot.telegram
@@ -286,38 +308,18 @@ export function startTelegramBot({ getWallet, generateWheelGif }) {
         pool = pool.filter(([uid]) => uid !== wId);
       }
 
-      const mentions = winners.map(([uid, name]) => mention(uid, name)).join(", ");
+      const winnerLines = winners
+        .map(([uid, p]) => `${mention(uid, p.name)} (ID Plato: <code>${esc(p.platoId)}</code>)`)
+        .join(NL);
+
       await bot.telegram
         .sendMessage(
           game.chatId,
-          [`🏆 <b>Tahniah</b> ${mentions}!`, `Anda memenangi <b>${esc(prize)}</b>!`].join(NL),
+          [`🏆 <b>Tahniah Pemenang Giveaway!</b>`, winnerLines, ``, `Anda memenangi <b>${esc(prize)}</b>!`].join(NL),
           { parse_mode: "HTML" }
         )
         .catch(() => {});
     }, mins * 60 * 1000);
-  });
-
-  bot.action(/^tg_gw:(.+)$/, async (ctx) => {
-    const game = giveaways.get(ctx.match[1]);
-    if (!game || game.ended) return ctx.answerCbQuery("❌ Giveaway sudah tamat.", { show_alert: true });
-    if (game.participants.has(ctx.from.id)) return ctx.answerCbQuery("⚠️ Anda sudah menyertai!", { show_alert: true });
-
-    game.participants.set(ctx.from.id, ctx.from.first_name || ctx.from.username || String(ctx.from.id));
-    await ctx.answerCbQuery("✅ Berjaya sertai giveaway!");
-
-    await ctx
-      .editMessageText(
-        [
-          `🎁 <b>GIVEAWAY: ${esc(game.prize)}</b>`,
-          `🏆 Winners: <b>${game.winnersCount}</b>`,
-          `👥 Entries: <b>${game.participants.size}</b>`,
-        ].join(NL),
-        {
-          parse_mode: "HTML",
-          ...Markup.inlineKeyboard([[Markup.button.callback("🎉 Join Giveaway", `tg_gw:${game.id}`)]]),
-        }
-      )
-      .catch(() => {});
   });
 
   // ================= WHEEL SPIN =================
@@ -350,7 +352,7 @@ export function startTelegramBot({ getWallet, generateWheelGif }) {
         parse_mode: "HTML",
         ...Markup.inlineKeyboard([
           [
-            Markup.button.callback("🎡 Join Spin", `tg_spin_join:${id}`),
+            Markup.button.callback("🎡 Join", `tg_spin_join:${id}`),
             Markup.button.callback("▶️ Spin Now", `tg_spin_start:${id}`),
           ],
         ]),
@@ -379,7 +381,7 @@ export function startTelegramBot({ getWallet, generateWheelGif }) {
           parse_mode: "HTML",
           ...Markup.inlineKeyboard([
             [
-              Markup.button.callback("🎡 Join Spin", `tg_spin_join:${game.id}`),
+              Markup.button.callback("🎡 Join", `tg_spin_join:${game.id}`),
               Markup.button.callback("▶️ Spin Now", `tg_spin_start:${game.id}`),
             ],
           ]),
@@ -437,6 +439,47 @@ export function startTelegramBot({ getWallet, generateWheelGif }) {
       ].join(NL),
       { parse_mode: "HTML" }
     );
+  });
+
+  // ================= TERIMA REPLY ID PLATO UNTUK GIVEAWAY =================
+  bot.on("text", async (ctx, next) => {
+    const replyMsgId = ctx.message?.reply_to_message?.message_id;
+    if (!replyMsgId) return next();
+
+    const game = giveaways.get(replyMsgId);
+    if (!game) return next();
+
+    const text = ctx.message.text.trim();
+    if (!text || text.startsWith("/")) return next();
+
+    if (game.ended) {
+      return ctx.reply("❌ Giveaway ini sudah tamat.", {
+        reply_to_message_id: ctx.message.message_id,
+      });
+    }
+
+    if (game.participants.has(ctx.from.id)) {
+      const existing = game.participants.get(ctx.from.id);
+      return ctx.reply(
+        `⚠️ Anda sudah menyertai giveaway ini! (ID Plato: <code>${esc(existing.platoId)}</code>)`,
+        { parse_mode: "HTML", reply_to_message_id: ctx.message.message_id }
+      );
+    }
+
+    const platoId = text.slice(0, 50);
+    const name = ctx.from.first_name || ctx.from.username || String(ctx.from.id);
+    game.participants.set(ctx.from.id, { name, platoId });
+
+    await ctx.reply(
+      `✅ Berjaya sertai giveaway! (ID Plato: <code>${esc(platoId)}</code>)`,
+      { parse_mode: "HTML", reply_to_message_id: ctx.message.message_id }
+    );
+
+    await bot.telegram
+      .editMessageText(game.chatId, game.msgId, undefined, buildGiveawayText(game), {
+        parse_mode: "HTML",
+      })
+      .catch(() => {});
   });
 
   // Daftar menu command dalam Telegram
