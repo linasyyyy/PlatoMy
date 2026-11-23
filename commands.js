@@ -136,4 +136,13 @@ export const commands = [
     .addIntegerOption((opt) =>
       opt.setName("count").setDescription("Berapa pemenang baharu (default 1)").setRequired(false).setMinValue(1).setMaxValue(25)
     ),
+  new SlashCommandBuilder()
+    .setName("spin")
+    .setDescription("Buka lobby Wheel Spin (pemain tekan butang untuk sertai) 🎡")
+    .addStringOption((opt) =>
+      opt.setName("title").setDescription("Tajuk / Hadiah pusingan (cth: Cabutan Bertuah)").setRequired(false)
+    )
+    .addIntegerOption((opt) =>
+      opt.setName("winners").setDescription("Bilangan pemenang (default 1)").setRequired(false).setMinValue(1).setMaxValue(10)
+    ),
 ].map((c) => c.toJSON());
