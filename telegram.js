@@ -45,6 +45,7 @@ export function startTelegramBot({ getWallet, generateWheelGif }) {
   const bot = new Telegraf(token);
   const giveaways = new Map();
   const spins = new Map();
+  const claims = new Map();
 
   bot.catch((err) => console.error("Ralat Bot Telegram:", err));
 
@@ -54,6 +55,7 @@ export function startTelegramBot({ getWallet, generateWheelGif }) {
     ``,
     `👤 <b>Ahli:</b>`,
     `• /wallet — Semak baki wallet anda`,
+    `• /claim <code>Link_Plato Item</code> — Claim hadiah anda`,
     `• /help — Papar panduan command`,
     ``,
     `🛡️ <b>Admin:</b>`,
@@ -114,6 +116,98 @@ export function startTelegramBot({ getWallet, generateWheelGif }) {
       );
     });
   }
+
+  // ================= CLAIM =================
+  bot.command("claim", async (ctx) => {
+    const parts = ctx.message.text.trim().split(/\s+/);
+    const platoLink = parts[1];
+    const item = parts.slice(2).join(" ");
+
+    if (!platoLink || !item || !/^https?:\/\//i.test(platoLink)) {
+      return ctx.reply(
+        [
+          `❌ Format salah! Sila sertakan <b>Link Plato</b> (bermula dengan <code>https://</code>) dan <b>Item</b>.`,
+          `Contoh: <code>/claim https://platoapp.com/link/xxx Pink Dice</code>`,
+        ].join(NL),
+        { parse_mode: "HTML" }
+      );
+    }
+
+    const id = String(Date.now());
+    const claim = {
+      id,
+      userId: ctx.from.id,
+      userName: ctx.from.first_name || ctx.from.username || String(ctx.from.id),
+      platoLink,
+      item,
+      done: false,
+    };
+    claims.set(id, claim);
+
+    const text = [
+      `🎁 <b>PLATOMY CLAIM REQUEST</b>`,
+      `──────────────────`,
+      `👤 <b>Pemain:</b> ${mention(claim.userId, claim.userName)}`,
+      `🔗 <b>Link Plato:</b> ${esc(claim.platoLink)}`,
+      `📦 <b>Item:</b> <b>${esc(claim.item)}</b>`,
+      `📌 <b>Status:</b> ⏳ Menunggu Admin`,
+    ].join(NL);
+
+    await ctx.reply(text, {
+      parse_mode: "HTML",
+      disable_web_page_preview: true,
+      ...Markup.inlineKeyboard([
+        [
+          Markup.button.callback("✅ Selesai", `tg_claim:approve:${id}`),
+          Markup.button.callback("❌ Tolak", `tg_claim:reject:${id}`),
+        ],
+      ]),
+    });
+  });
+
+  bot.action(/^tg_claim:(approve|reject):(.+)$/, async (ctx) => {
+    if (!isTgAdmin(ctx)) {
+      return ctx.answerCbQuery("❌ Hanya Admin boleh uruskan claim!", { show_alert: true });
+    }
+
+    const [, status, id] = ctx.match;
+    const claim = claims.get(id);
+    if (!claim || claim.done) {
+      return ctx.answerCbQuery("⚠️ Claim ini sudah diproses.", { show_alert: true });
+    }
+
+    claim.done = true;
+    const adminName = ctx.from.first_name || ctx.from.username || "Admin";
+    const statusText =
+      status === "approve"
+        ? `✅ Selesai oleh ${esc(adminName)}`
+        : `❌ Ditolak oleh ${esc(adminName)}`;
+
+    await ctx.answerCbQuery(status === "approve" ? "✅ Claim disahkan!" : "❌ Claim ditolak.");
+
+    await ctx
+      .editMessageText(
+        [
+          `🎁 <b>PLATOMY CLAIM REQUEST</b>`,
+          `──────────────────`,
+          `👤 <b>Pemain:</b> ${mention(claim.userId, claim.userName)}`,
+          `🔗 <b>Link Plato:</b> ${esc(claim.platoLink)}`,
+          `📦 <b>Item:</b> <b>${esc(claim.item)}</b>`,
+          `📌 <b>Status:</b> ${statusText}`,
+        ].join(NL),
+        { parse_mode: "HTML", disable_web_page_preview: true }
+      )
+      .catch(() => {});
+
+    await ctx
+      .reply(
+        status === "approve"
+          ? `✅ ${mention(claim.userId, claim.userName)}, claim anda untuk <b>${esc(claim.item)}</b> telah <b>dihantar / selesai</b>!`
+          : `❌ ${mention(claim.userId, claim.userName)}, maaf claim anda untuk <b>${esc(claim.item)}</b> telah <b>ditolak</b>. Sila hubungi Admin.`,
+        { parse_mode: "HTML" }
+      )
+      .catch(() => {});
+  });
 
   // ================= GIVEAWAY =================
   bot.command("giveaway", async (ctx) => {
@@ -349,6 +443,7 @@ export function startTelegramBot({ getWallet, generateWheelGif }) {
   bot.telegram
     .setMyCommands([
       { command: "wallet", description: "Semak baki PlatoMy Wallet" },
+      { command: "claim", description: "Claim hadiah (/claim Link_Plato Item)" },
       { command: "help", description: "Lihat senarai command" },
       { command: "giveaway", description: "[Admin] Mulakan Giveaway" },
       { command: "spin", description: "[Admin] Mulakan Wheel Spin" },
