@@ -15,7 +15,7 @@ export async function generateWheelGif(entries, winnerName, options = {}) {
   const {
     title = "Wheel Spin",
     subtitle = "PlatoMy • Event",
-    logoPath = "./assets/platomy-logo.png",
+    logoPath = "./:assets:platomy-logo.png.PNG",
   } = options;
 
   const logo = logoPath ? await loadImage(logoPath).catch(() => null) : null;
