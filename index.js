@@ -71,6 +71,7 @@ import { createLeaderboardSystem } from "./leaderboard.js";
 import { createRumbleSystem } from "./rumble.js";
 import { createGiveawaySystem } from "./giveaway.js";
 import { generateWheelGif } from "./wheelspin.js";
+import { startTelegramBot } from "./telegram.js";
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
@@ -964,3 +965,5 @@ client.on(Events.InteractionCreate, async (interaction) => {
 client.login(token).catch((err) => {
   console.error("GAGAL LOGIN:", err);
 });
+
+startTelegramBot({ getWallet, generateWheelGif });
