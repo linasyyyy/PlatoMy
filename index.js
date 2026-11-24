@@ -3,6 +3,7 @@ import {
   Client,
   Events,
   GatewayIntentBits,
+  PermissionFlagsBits,
   REST,
   Routes,
   ActionRowBuilder,
@@ -47,6 +48,15 @@ import {
 } from "./utils.js";
 import { walletBox, walletLogBox } from "./wallet.js";
 import {
+  PETALS_PER_COIN,
+  PETALS_PER_PIP,
+  SHOP_COINS_EMOJI,
+  SHOP_PIPS_EMOJI,
+  buildShopPanel,
+  buildShopModal,
+  buildShopReceiptBox,
+} from "./shop.js";
+import {
   MAX_LEVEL,
   NORMAL_EXP_COOLDOWN_MS,
   LOW_EXP_COOLDOWN_MS,
@@ -89,9 +99,11 @@ const client = new Client({
 const wallets = new Map();
 function getWallet(id) {
   if (!wallets.has(id)) {
-    wallets.set(id, { coins: 0, pips: 0, exp: 0, expTotal: 0, sponsorTotal: 0, sponsorMonthly: 0 });
+    wallets.set(id, { coins: 0, pips: 0, petals: 0, exp: 0, expTotal: 0, sponsorTotal: 0, sponsorMonthly: 0 });
   }
-  return wallets.get(id);
+  const w = wallets.get(id);
+  if (typeof w.petals !== "number") w.petals = 0;
+  return w;
 }
 
 await loadWallets(wallets);
@@ -162,7 +174,6 @@ client.once(Events.ClientReady, async (c) => {
 
   resumeGiveaways();
 
-  // Auto-update leaderboard setiap 10 minit
   cron.schedule(
     "*/10 * * * *",
     async () => {
@@ -189,10 +200,8 @@ client.once(Events.ClientReady, async (c) => {
     { timezone: "Asia/Kuala_Lumpur" }
   );
 
-  // Semak Murai Yappers tidak aktif setiap 1 jam
   cron.schedule("0 * * * *", () => cleanupInactiveYappers(client));
 
-  // Semakan harian Birthday Corner (12:00 malam MYT)
   cron.schedule(
     "0 0 * * *",
     async () => {
@@ -206,7 +215,6 @@ client.once(Events.ClientReady, async (c) => {
     { timezone: "Asia/Kuala_Lumpur" }
   );
 
-  // Auto-reset bulanan EXP & Sponsor (1 hari bulan, 12:00 malam MYT)
   cron.schedule(
     "0 0 1 * *",
     async () => {
@@ -251,9 +259,67 @@ client.once(Events.ClientReady, async (c) => {
 client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot || !message.guild) return;
 
-  const content = message.content.trim().toLowerCase();
+  const raw = message.content.trim();
+  const content = raw.toLowerCase();
+
   if (content === "!wallet" || content === "!bank") {
     await message.reply({ components: [walletBox(getWallet(message.author.id))], flags: V2 });
+    return;
+  }
+
+  // !petals add <jumlah> @p1 @p2  ATAU  !petals deduct <jumlah> @p1 @p2
+  if (content === "!petals" || content.startsWith("!petals ")) {
+    if (!message.member?.permissions?.has(PermissionFlagsBits.Administrator)) {
+      await message.reply("❌ Hanya Administrator boleh guna command `!petals`!");
+      return;
+    }
+
+    const args = raw.split(/\s+/).slice(1);
+    const mode = args[0]?.toLowerCase();
+    if (!["add", "deduct"].includes(mode)) {
+      await message.reply("❌ Format salah! Guna:
+`!petals add <jumlah> @player1 @player2`
+`!petals deduct <jumlah> @player1 @player2`");
+      return;
+    }
+
+    const amountArg = args.slice(1).find((a) => /^\d+$/.test(a));
+    const amount = amountArg ? parseInt(amountArg, 10) : NaN;
+    const targets = [...message.mentions.users.values()];
+
+    if (isNaN(amount) || amount <= 0 || targets.length === 0) {
+      await message.reply("❌ Sila masukkan jumlah nombor (> 0) dan tag sekurang-kurangnya seorang pemain!
+Contoh: `!petals add 50 @player1 @player2`");
+      return;
+    }
+
+    const isAdd = mode === "add";
+    const actionTitle = isAdd ? "❀ Petals Added (Bulk)" : "❀ Petals Deducted (Bulk)";
+    const logChannel = findChannel(message.guild, WALLET_LOG_CHANNEL_NAME);
+
+    for (const user of targets) {
+      const w = getWallet(user.id);
+      w.petals = isAdd ? (w.petals || 0) + amount : Math.max(0, (w.petals || 0) - amount);
+
+      if (logChannel) {
+        const desc = `Berjaya ${isAdd ? "menambah" : "menolak"} **${amount.toLocaleString()} ❀ Petals** ${isAdd ? "kepada" : "daripada"} ${user}.`;
+        await logChannel
+          .send({
+            components: [
+              walletLogBox({ actionTitle, target: user, admin: message.author, details: desc, reason: "Command !petals", w }),
+            ],
+            flags: V2,
+            allowedMentions: NO_PING,
+          })
+          .catch(() => {});
+      }
+    }
+
+    const mentionList = targets.map((u) => `<@${u.id}>`).join(", ");
+    await message.reply({
+      content: `✅ Berjaya ${isAdd ? "menambah" : "menolak"} **${amount.toLocaleString()} ❀ Petals** ${isAdd ? "kepada" : "daripada"} **${targets.length} pemain**: ${mentionList}`,
+      allowedMentions: NO_PING,
+    });
     return;
   }
 
@@ -320,6 +386,63 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return interaction.editReply({ files: [card] });
       }
 
+      if (name === "petals") {
+        if (!isAdmin(interaction)) {
+          return interaction.reply({ content: "❌ Anda tidak mempunyai kebenaran Administrator!", ephemeral: true });
+        }
+        const action = interaction.options.getString("action");
+        const amount = interaction.options.getInteger("amount");
+        const playersRaw = interaction.options.getString("players");
+        const reason = interaction.options.getString("reason") || "Tiada sebab dinyatakan";
+
+        const userIds = [...new Set([...playersRaw.matchAll(/<@!?(\d+)>/g)].map((m) => m[1]))];
+        if (userIds.length === 0) {
+          return interaction.reply({ content: "❌ Tiada pemain yang di-tag! Sila tag sekurang-kurangnya seorang pemain (cth: `@ali @abu`).", ephemeral: true });
+        }
+
+        const isAdd = action === "add";
+        const actionTitle = isAdd ? "❀ Petals Added (Bulk)" : "❀ Petals Deducted (Bulk)";
+        const logChannel = findChannel(interaction.guild, WALLET_LOG_CHANNEL_NAME);
+
+        for (const uid of userIds) {
+          const w = getWallet(uid);
+          w.petals = isAdd ? (w.petals || 0) + amount : Math.max(0, (w.petals || 0) - amount);
+
+          if (logChannel) {
+            const targetUser = (await client.users.fetch(uid).catch(() => null)) || { id: uid, toString: () => `<@${uid}>` };
+            const desc = `Berjaya ${isAdd ? "menambah" : "menolak"} **${amount.toLocaleString()} ❀ Petals** ${isAdd ? "kepada" : "daripada"} ${targetUser}.`;
+            await logChannel
+              .send({
+                components: [
+                  walletLogBox({ actionTitle, target: targetUser, admin: interaction.user, details: desc, reason, w }),
+                ],
+                flags: V2,
+                allowedMentions: NO_PING,
+              })
+              .catch(() => {});
+          }
+        }
+
+        const mentionList = userIds.map((id) => `<@${id}>`).join(", ");
+        return interaction.reply({
+          content: `✅ Berjaya ${isAdd ? "menambah" : "menolak"} **${amount.toLocaleString()} ❀ Petals** ${isAdd ? "kepada" : "daripada"} **${userIds.length} pemain**: ${mentionList}`,
+          ephemeral: true,
+          allowedMentions: NO_PING,
+        });
+      }
+
+      if (name === "setup-shop") {
+        if (!isAdmin(interaction)) {
+          return interaction.reply({ content: "❌ Anda tidak mempunyai kebenaran Administrator!", ephemeral: true });
+        }
+        const bannerUrl = interaction.options.getString("banner_url");
+        if (bannerUrl && !isUrl(bannerUrl)) {
+          return interaction.reply({ content: "❌ Link gambar tidak sah. Mesti bermula dengan https://", ephemeral: true });
+        }
+        await interaction.channel.send({ components: [buildShopPanel(bannerUrl)], flags: V2 });
+        return interaction.reply({ content: "✅ Panel Petals Shop berjaya dihantar!", ephemeral: true });
+      }
+
       if (name === "admin-wallet") {
         if (!isAdmin(interaction)) {
           return interaction.reply({ content: "❌ Anda tidak mempunyai kebenaran Administrator!", ephemeral: true });
@@ -336,11 +459,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
         if (action === "add_coins") {
           targetWallet.coins += amount;
           actionTitle = "🪙 Plato Coins Added";
-          actionDesc = `Berjaya menambah **${amount.toLocaleString()} Coins** kepada ${targetUser}.`;
+          actionDesc = `Berjaya menambah **${amount.toLocaleString()} Plato Coins** kepada ${targetUser}.`;
         } else if (action === "deduct_coins") {
           targetWallet.coins = Math.max(0, targetWallet.coins - amount);
           actionTitle = "🪙 Plato Coins Deducted";
-          actionDesc = `Berjaya menolak **${amount.toLocaleString()} Coins** daripada ${targetUser}.`;
+          actionDesc = `Berjaya menolak **${amount.toLocaleString()} Plato Coins** daripada ${targetUser}.`;
         } else if (action === "add_pips") {
           targetWallet.pips += amount;
           actionTitle = "💠 Pips Added";
@@ -349,6 +472,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
           targetWallet.pips = Math.max(0, targetWallet.pips - amount);
           actionTitle = "💠 Pips Deducted";
           actionDesc = `Berjaya menolak **${amount.toLocaleString()} Pips** daripada ${targetUser}.`;
+        } else if (action === "add_petals") {
+          targetWallet.petals = (targetWallet.petals || 0) + amount;
+          actionTitle = "❀ Petals Added";
+          actionDesc = `Berjaya menambah **${amount.toLocaleString()} ❀ Petals** kepada ${targetUser}.`;
+        } else if (action === "deduct_petals") {
+          targetWallet.petals = Math.max(0, (targetWallet.petals || 0) - amount);
+          actionTitle = "❀ Petals Deducted";
+          actionDesc = `Berjaya menolak **${amount.toLocaleString()} ❀ Petals** daripada ${targetUser}.`;
         } else if (action === "add_sponsor") {
           const sponsorCurrency = interaction.options.getString("sponsor_currency") || "coins";
           const coinValue = sponsorCurrency === "pips" ? amount * COINS_PER_PIP : amount;
@@ -357,8 +488,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
           actionTitle = "🌸 Total Sponsor Added";
           actionDesc =
             sponsorCurrency === "pips"
-              ? `Berjaya menambah sponsor **${amount.toLocaleString()} Pips** (dikira **${coinValue.toLocaleString()} Coins**) kepada ${targetUser}.`
-              : `Berjaya menambah sponsor **${coinValue.toLocaleString()} Coins** kepada ${targetUser}.`;
+              ? `Berjaya menambah sponsor **${amount.toLocaleString()} Pips** (dikira **${coinValue.toLocaleString()} Plato Coins**) kepada ${targetUser}.`
+              : `Berjaya menambah sponsor **${coinValue.toLocaleString()} Plato Coins** kepada ${targetUser}.`;
         } else if (action === "check") {
           actionTitle = "📊 Wallet Checked";
           actionDesc = `Menyemak baki wallet ${targetUser}.`;
@@ -554,6 +685,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.isButton()) {
       const id = interaction.customId;
 
+      if (id === "shop_buy_coins" || id === "shop_buy_pips") {
+        const type = id === "shop_buy_coins" ? "coins" : "pips";
+        const w = getWallet(interaction.user.id);
+        return interaction.showModal(buildShopModal(type, w.petals || 0));
+      }
+
       if (id.startsWith("wallet_admin:")) {
         if (!isAdmin(interaction)) {
           return interaction.reply({ content: "❌ Hanya Administrator boleh ubah baki wallet!", ephemeral: true });
@@ -567,7 +704,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           new ActionRowBuilder().addComponents(
             new TextInputBuilder()
               .setCustomId("wa_currency")
-              .setLabel("Jenis (coins / pips / sponsor)")
+              .setLabel("Jenis (coins / pips / petals / sponsor)")
               .setStyle(TextInputStyle.Short)
               .setRequired(true)
               .setPlaceholder("coins")
@@ -814,6 +951,61 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     // ===== MODAL =====
     if (interaction.isModalSubmit()) {
+      if (interaction.customId.startsWith("shop_modal:")) {
+        const type = interaction.customId.split(":")[1];
+        const amount = parseInt(interaction.fields.getTextInputValue("shop_amount").trim(), 10);
+        if (isNaN(amount) || amount <= 0) {
+          return interaction.reply({ content: "❌ Jumlah tidak sah! Sila masukkan nombor lebih daripada 0.", ephemeral: true });
+        }
+
+        const rate = type === "coins" ? PETALS_PER_COIN : PETALS_PER_PIP;
+        const cost = amount * rate;
+        const w = getWallet(interaction.user.id);
+
+        if ((w.petals || 0) < cost) {
+          return interaction.reply({
+            content: `❌ **❀ Petals tidak mencukupi!**
+Anda perlukan **${cost.toLocaleString()} ❀ Petals**, tetapi baki anda cuma **${(w.petals || 0).toLocaleString()} ❀ Petals**.`,
+            ephemeral: true,
+          });
+        }
+
+        w.petals -= cost;
+        if (type === "coins") w.coins += amount;
+        else w.pips += amount;
+
+        await interaction.reply({
+          components: [buildShopReceiptBox({ type, amount, cost, w })],
+          flags: V2_EPHEMERAL,
+          allowedMentions: NO_PING,
+        });
+
+        const logChannel = findChannel(interaction.guild, WALLET_LOG_CHANNEL_NAME);
+        if (logChannel) {
+          const itemStr =
+            type === "coins"
+              ? `**${amount.toLocaleString()}** ${SHOP_COINS_EMOJI} **Plato Coins**`
+              : `**${amount.toLocaleString()}** ${SHOP_PIPS_EMOJI} **Pips**`;
+          await logChannel
+            .send({
+              components: [
+                walletLogBox({
+                  actionTitle: "❀ Petals Shop Redeem",
+                  target: interaction.user,
+                  admin: interaction.user,
+                  details: `Tebus ${itemStr} dengan **${cost.toLocaleString()} ❀ Petals**.`,
+                  reason: "Petals Shop Exchange",
+                  w,
+                }),
+              ],
+              flags: V2,
+              allowedMentions: NO_PING,
+            })
+            .catch(() => {});
+        }
+        return;
+      }
+
       if (interaction.customId.startsWith("wallet_admin_modal:")) {
         if (!isAdmin(interaction)) {
           return interaction.reply({ content: "❌ Hanya Administrator boleh ubah baki wallet!", ephemeral: true });
@@ -823,8 +1015,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const amount = parseInt(interaction.fields.getTextInputValue("wa_amount").trim(), 10);
         const reason = interaction.fields.getTextInputValue("wa_reason").trim() || "Tiada sebab dinyatakan";
 
-        if (!["coins", "pips", "sponsor"].includes(currency)) {
-          return interaction.reply({ content: "❌ Jenis tidak sah! Sila taip `coins`, `pips`, atau `sponsor`.", ephemeral: true });
+        if (!["coins", "pips", "petals", "sponsor"].includes(currency)) {
+          return interaction.reply({ content: "❌ Jenis tidak sah! Sila taip `coins`, `pips`, `petals`, atau `sponsor`.", ephemeral: true });
         }
         if (isNaN(amount) || amount <= 0) {
           return interaction.reply({ content: "❌ Jumlah mesti nombor lebih daripada 0.", ephemeral: true });
@@ -838,11 +1030,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
         if (currency === "coins") {
           w.coins = mode === "add" ? w.coins + amount : Math.max(0, w.coins - amount);
           actionTitle = mode === "add" ? "🪙 Plato Coins Added" : "🪙 Plato Coins Deducted";
-          actionDesc = `Berjaya ${mode === "add" ? "menambah" : "menolak"} **${amount.toLocaleString()} Coins** ${mode === "add" ? "kepada" : "daripada"} ${targetUser}.`;
+          actionDesc = `Berjaya ${mode === "add" ? "menambah" : "menolak"} **${amount.toLocaleString()} Plato Coins** ${mode === "add" ? "kepada" : "daripada"} ${targetUser}.`;
         } else if (currency === "pips") {
           w.pips = mode === "add" ? w.pips + amount : Math.max(0, w.pips - amount);
           actionTitle = mode === "add" ? "💠 Pips Added" : "💠 Pips Deducted";
           actionDesc = `Berjaya ${mode === "add" ? "menambah" : "menolak"} **${amount.toLocaleString()} Pips** ${mode === "add" ? "kepada" : "daripada"} ${targetUser}.`;
+        } else if (currency === "petals") {
+          w.petals = mode === "add" ? (w.petals || 0) + amount : Math.max(0, (w.petals || 0) - amount);
+          actionTitle = mode === "add" ? "❀ Petals Added" : "❀ Petals Deducted";
+          actionDesc = `Berjaya ${mode === "add" ? "menambah" : "menolak"} **${amount.toLocaleString()} ❀ Petals** ${mode === "add" ? "kepada" : "daripada"} ${targetUser}.`;
         } else if (currency === "sponsor") {
           if (mode === "add") {
             w.sponsorTotal += amount;
@@ -852,7 +1048,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             w.sponsorMonthly = Math.max(0, (w.sponsorMonthly || 0) - amount);
           }
           actionTitle = mode === "add" ? "🌸 Sponsor Added" : "🌸 Sponsor Deducted";
-          actionDesc = `Berjaya ${mode === "add" ? "menambah" : "menolak"} sponsor **${amount.toLocaleString()} Coins** ${mode === "add" ? "kepada" : "daripada"} ${targetUser}.`;
+          actionDesc = `Berjaya ${mode === "add" ? "menambah" : "menolak"} sponsor **${amount.toLocaleString()} Plato Coins** ${mode === "add" ? "kepada" : "daripada"} ${targetUser}.`;
         }
 
         await interaction.reply({
