@@ -13,12 +13,15 @@ import { NL, isUrl, getMalaysiaTime, sep, txt } from "./utils.js";
 
 export const PETALS_PER_COIN = 10;
 export const PETALS_PER_PIP = 7500;
+export const COINS_PER_PIP_SHOP = 750;
 
 export const SHOP_COINS_EMOJI = "<:PlatoCoins:1549740441682059385>";
 export const SHOP_PIPS_EMOJI = "<:Pips:1549739800884551710>";
 
 const PLATO_COINS_BTN_EMOJI = { id: "1549740441682059385", name: "PlatoCoins" };
 const PIPS_BTN_EMOJI = { id: "1549739800884551710", name: "Pips" };
+
+const fmt = (n) => Number(n.toFixed(2)).toLocaleString();
 
 export function buildShopPanel(bannerUrl = null) {
   const box = new ContainerBuilder();
@@ -61,9 +64,15 @@ export function buildShopPanel(bannerUrl = null) {
     .setEmoji(PIPS_BTN_EMOJI)
     .setStyle(ButtonStyle.Secondary);
 
+  const calcBtn = new ButtonBuilder()
+    .setCustomId("shop_calculator")
+    .setLabel("Calculator")
+    .setEmoji("🧮")
+    .setStyle(ButtonStyle.Secondary);
+
   return box
     .addTextDisplayComponents(txt(content))
-    .addActionRowComponents(new ActionRowBuilder().addComponents(buyCoinsBtn, buyPipsBtn));
+    .addActionRowComponents(new ActionRowBuilder().addComponents(buyCoinsBtn, buyPipsBtn, calcBtn));
 }
 
 export function buildShopModal(type, currentPetals = 0) {
@@ -73,8 +82,8 @@ export function buildShopModal(type, currentPetals = 0) {
     .setTitle(isCoins ? "Redeem Plato Coins" : "Redeem Pips");
 
   const label = isCoins
-    ? `Jumlah Plato Coins (10 Petals = 1 Coin)`
-    : `Jumlah Pips (7,500 Petals = 1 Pip)`;
+    ? "Jumlah Plato Coins (10 Petals = 1 Coin)"
+    : "Jumlah Pips (7,500 Petals = 1 Pip)";
 
   const maxBuy = Math.floor(currentPetals / (isCoins ? PETALS_PER_COIN : PETALS_PER_PIP));
 
@@ -111,4 +120,69 @@ export function buildShopReceiptBox({ type, amount, cost, w }) {
     .addSeparatorComponents(sep())
     .addTextDisplayComponents(txt(lines))
     .addTextDisplayComponents(txt(`-# ⋆˚࿔ <:pinkbow:1563423584624582779> Petals Shop • Today at ${getMalaysiaTime()} 𝜗𝜚˚⋆`));
+}
+
+export function buildCalcModal() {
+  const modal = new ModalBuilder()
+    .setCustomId("shop_calc_modal")
+    .setTitle("🧮 Petals Calculator");
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId("calc_type")
+        .setLabel("Jenis (petals / coins / pips)")
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setPlaceholder("cth: petals")
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId("calc_amount")
+        .setLabel("Jumlah")
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setPlaceholder("cth: 7500")
+    )
+  );
+
+  return modal;
+}
+
+export function buildCalcResultBox(type, amount, currentPetals = 0) {
+  let petals = 0;
+  let coins = 0;
+  let pips = 0;
+
+  if (type === "petals") {
+    petals = amount;
+    coins = amount / PETALS_PER_COIN;
+    pips = amount / PETALS_PER_PIP;
+  } else if (type === "coins") {
+    coins = amount;
+    petals = amount * PETALS_PER_COIN;
+    pips = amount / COINS_PER_PIP_SHOP;
+  } else {
+    pips = amount;
+    coins = amount * COINS_PER_PIP_SHOP;
+    petals = amount * PETALS_PER_PIP;
+  }
+
+  const cukup =
+    currentPetals >= petals
+      ? "✅ Baki Petals anda **mencukupi**!"
+      : `⚠️ Kurang **${Math.ceil(petals - currentPetals).toLocaleString()} ❀ Petals** lagi.`;
+
+  const lines = [
+    `╰┈➤ ❀ **Petals:** ${fmt(petals)}`,
+    `╰┈➤ ${SHOP_COINS_EMOJI} **Plato Coins:** ${fmt(coins)}`,
+    `╰┈➤ ${SHOP_PIPS_EMOJI} **Pips:** ${fmt(pips)}`,
+    "",
+    `-# Baki anda: **${currentPetals.toLocaleString()} ❀ Petals** • ${cukup}`,
+  ].join(NL);
+
+  return new ContainerBuilder()
+    .addTextDisplayComponents(txt("### ˚₊‧꒰ა 🧮 𝑃𝐸𝑇𝐴𝐿𝑆 𝐶𝐴𝐿𝐶𝑈𝐿𝐴𝑇𝑂𝑅 🧮 ໒꒱‧₊˚"))
+    .addSeparatorComponents(sep())
+    .addTextDisplayComponents(txt(lines));
 }
