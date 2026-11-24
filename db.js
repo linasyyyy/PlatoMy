@@ -21,12 +21,14 @@ export async function loadWallets(wallets) {
         discord_id TEXT PRIMARY KEY,
         coins BIGINT NOT NULL DEFAULT 0,
         pips BIGINT NOT NULL DEFAULT 0,
+        petals BIGINT NOT NULL DEFAULT 0,
         exp BIGINT NOT NULL DEFAULT 0,
         sponsor_total BIGINT NOT NULL DEFAULT 0,
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
 
+    await pool.query(`ALTER TABLE platomy_wallets ADD COLUMN IF NOT EXISTS petals BIGINT NOT NULL DEFAULT 0`);
     await pool.query(`ALTER TABLE platomy_wallets ADD COLUMN IF NOT EXISTS exp BIGINT NOT NULL DEFAULT 0`);
     await pool.query(`ALTER TABLE platomy_wallets ADD COLUMN IF NOT EXISTS sponsor_total BIGINT NOT NULL DEFAULT 0`);
     await pool.query(`ALTER TABLE platomy_wallets ADD COLUMN IF NOT EXISTS exp_total BIGINT NOT NULL DEFAULT 0`);
@@ -43,7 +45,6 @@ export async function loadWallets(wallets) {
       )
     `);
 
-    // Jadual Birthday Corner (Config & Tarikh Lahir Ahli)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS platomy_birthday_config (
         id INT PRIMARY KEY DEFAULT 1,
@@ -69,6 +70,7 @@ export async function loadWallets(wallets) {
       const w = {
         coins: Number(r.coins || 0),
         pips: Number(r.pips || 0),
+        petals: Number(r.petals || 0),
         exp: Number(r.exp || 0),
         expTotal: Number(r.exp_total || 0),
         sponsorTotal: Number(r.sponsor_total || 0),
@@ -90,17 +92,18 @@ async function saveChanged(wallets) {
     if (lastSaved.get(id) === snap) continue;
     try {
       await pool.query(
-        `INSERT INTO platomy_wallets (discord_id, coins, pips, exp, exp_total, sponsor_total, sponsor_monthly, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+        `INSERT INTO platomy_wallets (discord_id, coins, pips, petals, exp, exp_total, sponsor_total, sponsor_monthly, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
          ON CONFLICT (discord_id) DO UPDATE SET
            coins = EXCLUDED.coins,
            pips = EXCLUDED.pips,
+           petals = EXCLUDED.petals,
            exp = EXCLUDED.exp,
            exp_total = EXCLUDED.exp_total,
            sponsor_total = EXCLUDED.sponsor_total,
            sponsor_monthly = EXCLUDED.sponsor_monthly,
            updated_at = NOW()`,
-        [id, w.coins, w.pips, w.exp, w.expTotal || 0, w.sponsorTotal, w.sponsorMonthly || 0]
+        [id, w.coins, w.pips, w.petals || 0, w.exp, w.expTotal || 0, w.sponsorTotal, w.sponsorMonthly || 0]
       );
       lastSaved.set(id, snap);
     } catch (e) {
