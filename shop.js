@@ -54,13 +54,13 @@ export function buildShopPanel(bannerUrl = null) {
 
   const buyCoinsBtn = new ButtonBuilder()
     .setCustomId("shop_buy_coins")
-    .setLabel("Buy Plato Coins")
+    .setLabel("Plato Coins")
     .setEmoji(PLATO_COINS_BTN_EMOJI)
     .setStyle(ButtonStyle.Secondary);
 
   const buyPipsBtn = new ButtonBuilder()
     .setCustomId("shop_buy_pips")
-    .setLabel("Buy Pips")
+    .setLabel("Pips")
     .setEmoji(PIPS_BTN_EMOJI)
     .setStyle(ButtonStyle.Secondary);
 
