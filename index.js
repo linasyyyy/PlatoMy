@@ -277,9 +277,13 @@ client.on(Events.MessageCreate, async (message) => {
     const args = raw.split(/\s+/).slice(1);
     const mode = args[0]?.toLowerCase();
     if (!["add", "deduct"].includes(mode)) {
-      await message.reply("❌ Format salah! Guna:
-`!petals add <jumlah> @player1 @player2`
-`!petals deduct <jumlah> @player1 @player2`");
+      await message.reply(
+        [
+          "❌ Format salah! Guna:",
+          "`!petals add <jumlah> @player1 @player2`",
+          "`!petals deduct <jumlah> @player1 @player2`",
+        ].join(NL)
+      );
       return;
     }
 
@@ -288,8 +292,12 @@ client.on(Events.MessageCreate, async (message) => {
     const targets = [...message.mentions.users.values()];
 
     if (isNaN(amount) || amount <= 0 || targets.length === 0) {
-      await message.reply("❌ Sila masukkan jumlah nombor (> 0) dan tag sekurang-kurangnya seorang pemain!
-Contoh: `!petals add 50 @player1 @player2`");
+      await message.reply(
+        [
+          "❌ Sila masukkan jumlah nombor (> 0) dan tag sekurang-kurangnya seorang pemain!",
+          "Contoh: `!petals add 50 @player1 @player2`",
+        ].join(NL)
+      );
       return;
     }
 
@@ -964,8 +972,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         if ((w.petals || 0) < cost) {
           return interaction.reply({
-            content: `❌ **❀ Petals tidak mencukupi!**
-Anda perlukan **${cost.toLocaleString()} ❀ Petals**, tetapi baki anda cuma **${(w.petals || 0).toLocaleString()} ❀ Petals**.`,
+            content: [
+              "❌ **❀ Petals tidak mencukupi!**",
+              `Anda perlukan **${cost.toLocaleString()} ❀ Petals**, tetapi baki anda cuma **${(w.petals || 0).toLocaleString()} ❀ Petals**.`,
+            ].join(NL),
             ephemeral: true,
           });
         }
