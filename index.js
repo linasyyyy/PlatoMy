@@ -55,6 +55,8 @@ import {
   buildShopPanel,
   buildShopModal,
   buildShopReceiptBox,
+  buildCalcModal,
+  buildCalcResultBox,
 } from "./shop.js";
 import {
   MAX_LEVEL,
@@ -699,6 +701,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return interaction.showModal(buildShopModal(type, w.petals || 0));
       }
 
+      if (id === "shop_calculator") {
+        return interaction.showModal(buildCalcModal());
+      }
+
       if (id.startsWith("wallet_admin:")) {
         if (!isAdmin(interaction)) {
           return interaction.reply({ content: "❌ Hanya Administrator boleh ubah baki wallet!", ephemeral: true });
@@ -959,6 +965,30 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     // ===== MODAL =====
     if (interaction.isModalSubmit()) {
+      if (interaction.customId === "shop_calc_modal") {
+        const rawType = interaction.fields.getTextInputValue("calc_type").trim().toLowerCase();
+        const amount = parseFloat(interaction.fields.getTextInputValue("calc_amount").trim());
+
+        let type = null;
+        if (["petal", "petals"].includes(rawType)) type = "petals";
+        else if (["coin", "coins", "plato coin", "plato coins"].includes(rawType)) type = "coins";
+        else if (["pip", "pips"].includes(rawType)) type = "pips";
+
+        if (!type) {
+          return interaction.reply({ content: "❌ Jenis tidak sah! Sila taip `petals`, `coins`, atau `pips`.", ephemeral: true });
+        }
+        if (isNaN(amount) || amount <= 0) {
+          return interaction.reply({ content: "❌ Jumlah mesti nombor lebih daripada 0.", ephemeral: true });
+        }
+
+        const w = getWallet(interaction.user.id);
+        return interaction.reply({
+          components: [buildCalcResultBox(type, amount, w.petals || 0)],
+          flags: V2_EPHEMERAL,
+          allowedMentions: NO_PING,
+        });
+      }
+
       if (interaction.customId.startsWith("shop_modal:")) {
         const type = interaction.customId.split(":")[1];
         const amount = parseInt(interaction.fields.getTextInputValue("shop_amount").trim(), 10);
