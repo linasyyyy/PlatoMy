@@ -21,10 +21,12 @@ export const commands = [
         .setRequired(true)
         .addChoices(
           { name: "Add Sponsor (Coins / Pips)", value: "add_sponsor" },
-          { name: "Add Coins", value: "add_coins" },
-          { name: "Deduct Coins", value: "deduct_coins" },
+          { name: "Add Plato Coins", value: "add_coins" },
+          { name: "Deduct Plato Coins", value: "deduct_coins" },
           { name: "Add Pips", value: "add_pips" },
           { name: "Deduct Pips", value: "deduct_pips" },
+          { name: "Add Petals", value: "add_petals" },
+          { name: "Deduct Petals", value: "deduct_petals" },
           { name: "Check", value: "check" }
         )
     )
@@ -37,9 +39,37 @@ export const commands = [
         .setDescription("Untuk Add Sponsor: guna Coins atau Pips (default Coins)")
         .setRequired(false)
         .addChoices(
-          { name: "🪙 Coins", value: "coins" },
+          { name: "🪙 Plato Coins", value: "coins" },
           { name: "💠 Pips (750 Coins = 1 Pip)", value: "pips" }
         )
+    ),
+  new SlashCommandBuilder()
+    .setName("petals")
+    .setDescription("Tambah atau tolak ❀ Petals untuk ramai pemain sekaligus (Admin sahaja)")
+    .addStringOption((opt) =>
+      opt
+        .setName("action")
+        .setDescription("Tambah atau tolak")
+        .setRequired(true)
+        .addChoices(
+          { name: "➕ Add Petals", value: "add" },
+          { name: "➖ Deduct Petals", value: "deduct" }
+        )
+    )
+    .addIntegerOption((opt) =>
+      opt.setName("amount").setDescription("Jumlah ❀ Petals").setRequired(true).setMinValue(1)
+    )
+    .addStringOption((opt) =>
+      opt.setName("players").setDescription("Tag pemain (boleh tag ramai, cth: @ali @abu @siti)").setRequired(true)
+    )
+    .addStringOption((opt) =>
+      opt.setName("reason").setDescription("Sebab / Nota (pilihan)").setRequired(false)
+    ),
+  new SlashCommandBuilder()
+    .setName("setup-shop")
+    .setDescription("Hantar panel Petals Shop di channel ini (Admin sahaja)")
+    .addStringOption((opt) =>
+      opt.setName("banner_url").setDescription("URL gambar banner (pilihan)").setRequired(false)
     ),
   new SlashCommandBuilder().setName("setup-trading").setDescription("Hantar panel PlatoMy Trading (Admin sahaja)"),
   new SlashCommandBuilder()
@@ -59,6 +89,7 @@ export const commands = [
         .addChoices(
           { name: "✨ Monthly EXP", value: "exp" },
           { name: "✨ Lifetime EXP", value: "exp_all" },
+          { name: "❀ Petals", value: "petals" },
           { name: "🌸 Monthly Sponsor", value: "sponsor" },
           { name: "🌸 Lifetime Sponsor", value: "sponsor_all" },
           { name: "🪙 Plato Coins", value: "coins" },
