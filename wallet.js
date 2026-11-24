@@ -8,7 +8,7 @@ export function balanceLines(w) {
   return [
     `╰┈➤ ${COINS_EMOJI} Plato Coins: ${w.coins.toLocaleString()}`,
     `╰┈➤ ${PIPS_EMOJI} Pips: ${w.pips.toLocaleString()}`,
-    `╰┈➤ 🌸 Sponsor (Monthly): ${COINS_EMOJI} ${(w.sponsorMonthly || 0).toLocaleString()}`,
+    `╰┈➤ ❀ Petals: ${(w.petals || 0).toLocaleString()}`,
     `╰┈➤ 🌸 Sponsor (Lifetime): ${COINS_EMOJI} ${w.sponsorTotal.toLocaleString()}`,
   ].join(NL);
 }
