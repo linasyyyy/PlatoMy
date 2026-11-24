@@ -93,6 +93,17 @@ export function createLeaderboardSystem({ client, wallets, getWallet, getLevelIn
       badgeText: (val) => `${val.toLocaleString()} XP`,
       progressPct: pctOfTop,
     },
+    petals: {
+      label: "Petals Leaderboard",
+      fancyTitle: "𝑃𝐸𝑇𝐴𝐿𝑆 𝐿𝐸𝐴𝐷𝐸𝑅𝐵𝑂𝐴𝑅𝐷",
+      title: "PETALS LEADERBOARD",
+      subtitle: "TOP 10 RICHEST PETALS COLLECTORS",
+      field: "petals",
+      barLabel: "Petals Share",
+      subText: (val) => `${val.toLocaleString()} Petals`,
+      badgeText: (val) => `${val.toLocaleString()}`,
+      progressPct: pctOfTop,
+    },
     sponsor: {
       label: "Monthly Sponsor Leaderboard",
       fancyTitle: "𝑀𝑂𝑁𝑇𝐻𝐿𝑌 𝑆𝑃𝑂𝑁𝑆𝑂𝑅 𝐿𝐸𝐴𝐷𝐸𝑅𝐵𝑂𝐴𝑅𝐷",
@@ -219,7 +230,7 @@ export function createLeaderboardSystem({ client, wallets, getWallet, getLevelIn
       .slice(0, 10);
 
     while (sorted.length < 10) {
-      sorted.push({ id: null, coins: 0, pips: 0, exp: 0, expTotal: 0, sponsorTotal: 0, sponsorMonthly: 0 });
+      sorted.push({ id: null, coins: 0, pips: 0, petals: 0, exp: 0, expTotal: 0, sponsorTotal: 0, sponsorMonthly: 0 });
     }
 
     const targetGuild = client.guilds.cache.first() || null;
