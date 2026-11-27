@@ -223,50 +223,62 @@ export function createLeaderboardSystem({ client, wallets, getWallet, getLevelIn
     ctx.roundRect(0.5, 0.5, W - 1, H - 1, 28);
     ctx.stroke();
 
-    // ---------- DATA (Server Display Name) ----------
-    const sorted = [...wallets.entries()]
+    // ---------- DATA (Tapis ID sah & nilai > 0 sahaja) ----------
+    const candidates = [...wallets.entries()]
+      .filter(([id, data]) => /^\d{17,20}$/.test(id) && (data[meta.field] || 0) > 0)
       .map(([id, data]) => ({ id, ...data }))
-      .sort((a, b) => (b[meta.field] || 0) - (a[meta.field] || 0))
-      .slice(0, 10);
-
-    while (sorted.length < 10) {
-      sorted.push({ id: null, coins: 0, pips: 0, petals: 0, exp: 0, expTotal: 0, sponsorTotal: 0, sponsorMonthly: 0 });
-    }
+      .sort((a, b) => (b[meta.field] || 0) - (a[meta.field] || 0));
 
     const targetGuild = client.guilds.cache.first() || null;
     const players = [];
-    for (const entry of sorted) {
+
+    for (const entry of candidates) {
+      if (players.length >= 10) break;
       const val = entry[meta.field] || 0;
-      let name = "Empty Slot";
-      let initials = "--";
-      let img = null;
-      if (entry.id) {
+      try {
+        const member = targetGuild
+          ? await targetGuild.members.fetch(entry.id).catch(() => null)
+          : null;
+        const user = member?.user || (await client.users.fetch(entry.id));
+        if (!user) continue;
+
+        const name = member?.displayName || user.displayName || user.globalName || user.username || "User";
+        const initials = Array.from(name.trim()).slice(0, 2).join("").toUpperCase() || "--";
+        let img = null;
+        const avatarUrl = (member || user).displayAvatarURL({ extension: "png", size: 128 });
         try {
-          const member = targetGuild
-            ? await targetGuild.members.fetch(entry.id).catch(() => null)
-            : null;
-          const user = member?.user || (await client.users.fetch(entry.id));
-          name = member?.displayName || user.displayName || user.globalName || user.username || "User";
-          initials = Array.from(name.trim()).slice(0, 2).join("").toUpperCase() || "--";
-          const avatarUrl = (member || user).displayAvatarURL({ extension: "png", size: 128 });
-          try {
-            img = await loadImage(avatarUrl);
-          } catch {}
-        } catch {
-          name = "Unknown";
-          initials = "UN";
-        }
+          img = await loadImage(avatarUrl);
+        } catch {}
+
+        const sub = meta.subText(val);
+        const sp = sub.indexOf(" ");
+        players.push({
+          hasUser: true,
+          name,
+          initials,
+          img,
+          num: sp > 0 ? sub.slice(0, sp) : sub,
+          unit: sp > 0 ? sub.slice(sp + 1) : "",
+          level: getLevelInfo(val).level,
+        });
+      } catch {
+        // Langkau ID yang gagal di-fetch supaya tidak keluar "Unknown"
+        continue;
       }
-      const sub = meta.subText(val);
+    }
+
+    // Penuhkan baki slot kosong dengan Empty Slot
+    while (players.length < 10) {
+      const sub = meta.subText(0);
       const sp = sub.indexOf(" ");
       players.push({
-        hasUser: Boolean(entry.id),
-        name,
-        initials,
-        img,
+        hasUser: false,
+        name: "Empty Slot",
+        initials: "--",
+        img: null,
         num: sp > 0 ? sub.slice(0, sp) : sub,
         unit: sp > 0 ? sub.slice(sp + 1) : "",
-        level: entry.id ? getLevelInfo(val).level : 0,
+        level: 0,
       });
     }
 
@@ -520,6 +532,7 @@ export function createLeaderboardSystem({ client, wallets, getWallet, getLevelIn
     const lvl = getLevelInfo(w.exp);
 
     const allSorted = [...wallets.entries()]
+      .filter(([id]) => /^\d{17,20}$/.test(id))
       .map(([id, data]) => ({ id, exp: data.exp || 0 }))
       .sort((a, b) => b.exp - a.exp);
     const rankIdx = allSorted.findIndex((x) => x.id === user.id);
