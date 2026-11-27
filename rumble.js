@@ -1,69 +1,70 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import { NL, COINS_EMOJI, PIPS_EMOJI, WINNER_EMOJI, PLATO_EMOJI, V2, NO_PING, sleep, pick, info } from "./utils.js";
 
-// --- SCENE MALAM (WEREWOLF PLATO ROLES) ---
+// --- NIGHT SCENES (WEREWOLF PLATO ROLES) ---
 const NIGHT_KILL_SCENES = [
-  (a, b) => `🐺 **Alpha Wolf** ${a} menyelinap dalam gelap dan membaham ${b}!`,
-  (a, b) => `🧛 **Vampire** ${a} menghalang Doctor lalu menyedut tenaga ${b}!`,
-  (a, b) => `🧙‍♀️ **Witch** ${a} mencampakkan ramuan beracun tepat ke arah ${b}!`,
-  (a, b) => `🧜‍♀️ **Siren** ${a} memukau ${b} dengan nyanyian maut hingga lemas!`,
-  (a, b) => `🎭 **Shapeshifter** ${a} menyamar jadi kawan rapat lalu menikam belakang ${b}!`,
-  (a, b) => `🌑 **Nightmare** ${a} memerangkap ${b} dalam mimpi ngeri tanpa jalan keluar!`,
-  (a, b) => `🔮 **Wolf Shaman** ${a} menyumpah ${b} hingga hilang ditelan kabus malam!`,
-  (a, b) => `🗡️ **Assassin** ${a} melancarkan serangan senyap dan menyingkirkan ${b}!`,
-  (a, b) => `🏹 **Hunter** ${a} melepaskan tembakan terakhir tepat ke dada ${b}!`,
-  (a, b) => `💔 Sumpahan **Lovers**! Kerana ${a} tercedera, ${b} turut rebah patah hati!`,
+  (a, b) => `🐺 **Alpha Wolf** ${a} crept through the shadows and ambushed ${b}!`,
+  (a, b) => `🧛 **Vampire** ${a} blocked the Doctor and drained all of ${b}'s energy!`,
+  (a, b) => `🧙‍♀️ **Witch** ${a} hurled a deadly poison potion straight at ${b}!`,
+  (a, b) => `🧜‍♀️ **Siren** ${a} lured ${b} with a hypnotic song until they vanished into the deep!`,
+  (a, b) => `🎭 **Shapeshifter** ${a} disguised as a close ally and backstabbed ${b}!`,
+  (a, b) => `🌑 **Nightmare** ${a} trapped ${b} in an endless nightmare with no escape!`,
+  (a, b) => `🔮 **Wolf Shaman** ${a} placed a dark curse on ${b} until they faded into the mist!`,
+  (a, b) => `🗡️ **Assassin** ${a} struck silently from behind and eliminated ${b}!`,
+  (a, b) => `🏹 **Hunter** ${a} fired a final lethal shot straight through ${b}!`,
+  (a, b) => `💔 **Lovers' Curse!** When ${a} took a hit, ${b} collapsed from heartbreak!`,
 ];
 
-// --- SCENE SIANG (VOTE KAMPUNG & GAME PLATO) ---
+// --- DAY SCENES (VILLAGE VOTE & PLATO GAMES) ---
 const DAY_KILL_SCENES = [
-  (a, b) => `⚖️ **Mayor** ${a} guna undi berganda — seluruh kampung sepakat gantung ${b}!`,
-  (a, b) => `👁️ **Seer** ${a} dedahkan identiti sebenar ${b}! Kampung terus menghalaunya!`,
-  (a, b) => `📢 **Town Crier** ${a} buat kecoh menuduh ${b} — akhirnya ${b} tersingkir!`,
-  (a, b) => `🤡 **Jester** ${a} berjaya psiko satu lobby sampai ${b} kena vote keluar!`,
-  (a, b) => `👑 **King** ${a} menjatuhkan hukuman buang daerah ke atas ${b}!`,
-  (a, b) => `🃏 **Ocho:** ${a} timbun kad **+4** berturut-turut — ${b} terus *rage quit*!`,
-  (a, b) => `🎲 **Ludo:** ${a} sepak buah ${b} betul-betul depan garisan tamat!`,
-  (a, b) => `🎱 **8-Ball Pool:** ${a} buat *bank shot* padu — ${b} terkedu lalu tersingkir!`,
-  (a, b) => `🥤 **Cup Pong:** ${a} lempar bola masuk cawan terakhir, ${b} kalah teruk!`,
-  (a, b) => `🎳 **Bowling:** ${a} baling *strike* 3 kali berturut-turut, ${b} tercampak keluar!`,
-  (a, b) => `💰 **Bankroll:** ${b} terbeliak kena bayar sewa hotel ${a} sampai muflis!`,
-  (a, b) => `👾 **Match Monsters:** ${a} lepaskan *combo* 5x — monster ${b} terus K.O.!`,
-  (a, b) => `⛳ **Mini Golf:** ${a} pukul bola langgar ${b} sampai masuk kolam air!`,
-  (a, b) => `⚽ **Table Soccer:** ${a} rembat gol roket yang menyingkirkan ${b}!`,
+  (a, b) => `⚖️ **Mayor** ${a} used their double vote — the entire village voted out ${b}!`,
+  (a, b) => `👁️ **Seer** ${a} exposed ${b}'s true identity! The village immediately exiled them!`,
+  (a, b) => `📢 **Town Crier** ${a} stirred up chaos accusing ${b} — and got ${b} eliminated!`,
+  (a, b) => `🤡 **Jester** ${a} mind-gamed the whole lobby into voting out ${b}!`,
+  (a, b) => `👑 **King** ${a} sentenced ${b} to permanent exile from the arena!`,
+  (a, b) => `🃏 **Ocho:** ${a} stacked **+4** cards back-to-back — ${b} immediately *rage quit*!`,
+  (a, b) => `🎲 **Ludo:** ${a} kicked ${b}'s token right before the finish line!`,
+  (a, b) => `🎱 **8-Ball Pool:** ${a} pulled off a filthy *bank shot* — ${b} was stunned and knocked out!`,
+  (a, b) => `🥤 **Cup Pong:** ${a} sank the final cup and completely destroyed ${b}!`,
+  (a, b) => `🎳 **Bowling:** ${a} rolled 3 strikes in a row and sent ${b} flying out of the lane!`,
+  (a, b) => `💰 **Bankroll:** ${b} went totally bankrupt paying rent on ${a}'s hotel!`,
+  (a, b) => `👾 **Match Monsters:** ${a} unleashed a 5x combo — ${b}'s monster got K.O.'d!`,
+  (a, b) => `⛳ **Mini Golf:** ${a} smashed the ball into ${b} and knocked them into the water hazard!`,
+  (a, b) => `⚽ **Table Soccer:** ${a} fired a rocket goal that blasted ${b} out of the arena!`,
 ];
 
-// --- SCENE SOLO ---
+// --- SOLO SCENES ---
 const SOLO_SCENES = [
-  (b) => `🌕 **Lycan** ${b} disalah anggap sebagai Werewolf oleh Seer lalu diusir!`,
-  (b) => `🚪 **Harlot** ${b} tersalah ketuk pintu rumah Werewolf pada waktu malam!`,
-  (b) => `🕵️ **Thief** ${b} tersalah curi kad beracun lalu rebah serta-merta!`,
-  (b) => `💣 **Minesweepers:** ${b} tertekan petak bom tepat pada langkah pertama!`,
-  (b) => `🎱 **8-Ball Pool:** ${b} termasuk bola hitam (8-ball) awal sangat — terus kalah!`,
-  (b) => `📶 **Plato Lag:** ${b} terputus sambungan (*AFK*) terlalu lama dan ditendang keluar!`,
-  (b) => `🌋 ${b} tergelincir masuk ke dalam kawah lava Plato Arena!`,
+  (b) => `🌕 **Lycan** ${b} was mistaken for a Werewolf by the Seer and got exiled!`,
+  (b) => `🚪 **Harlot** ${b} knocked on the Werewolf's door in the middle of the night!`,
+  (b) => `🕵️ **Thief** ${b} accidentally stole a poisoned card and collapsed instantly!`,
+  (b) => `💣 **Minesweepers:** ${b} clicked a bomb on their very first move!`,
+  (b) => `🎱 **8-Ball Pool:** ${b} potted the black 8-ball way too early — instant loss!`,
+  (b) => `📶 **Plato Lag:** ${b} disconnected (*AFK*) for too long and got kicked out!`,
+  (b) => `🌋 ${b} slipped and fell straight into the Plato Arena lava pit!`,
 ];
 
-// --- SCENE REVIVE ---
+// --- REVIVE SCENES ---
 const REVIVE_SCENES = [
-  (helper, target) => `✨ **Necromancer** ${helper} menyeru roh ${target} kembali ke arena!`,
-  (helper, target) => `💉 **Doctor** ${helper} sempat merawat ${target} pada saat akhir — kembali hidup!`,
-  (helper, target) => `🌿 **Druid** ${helper} guna magis hutan untuk membangkitkan semula ${target}!`,
-  (helper, target) => `🔮 **Mystic** ${helper} memutar balik masa dan membawa ${target} masuk semula!`,
-  (helper, target) => `🎵 **Bard** ${helper} memainkan lagu semangat — ${target} bangkit semula!`,
-  (helper, target) => `🎲 **Ludo Luck:** ${target} dapat nombor **6** dan masuk balik ke arena dengan bantuan ${helper}!`,
-  (helper, target) => `📶 **Reconnect!** ${target} berjaya masuk balik ke lobby Plato tepat pada masanya!`,
+  (helper, target) => `✨ **Necromancer** ${helper} summoned ${target}'s spirit back into the arena!`,
+  (helper, target) => `💉 **Doctor** ${helper} healed ${target} just in time — they're back alive!`,
+  (helper, target) => `🌿 **Druid** ${helper} used forest magic to resurrect ${target}!`,
+  (helper, target) => `🔮 **Mystic** ${helper} rewound time and brought ${target} back into the fight!`,
+  (helper, target) => `🎵 **Bard** ${helper} played a revival melody — ${target} rose from the ashes!`,
+  (helper, target) => `🎲 **Ludo Luck:** ${target} rolled a **6** and jumped right back in with ${helper}'s help!`,
+  (helper, target) => `📶 **Reconnected!** ${target} rejoined the Plato lobby right in the nick of time!`,
 ];
 
-// --- SCENE DRAMA / SELAMAT ---
+// --- DRAMA / SAFE SCENES ---
 const DRAMA_SCENES = [
-  (a, b) => `🛡️ **Knight** ${a} berjaya menepis serangan Werewolf terhadap ${b}!`,
-  (a, b) => `💉 **Doctor** ${a} lindungi ${b} malam ini — serangan gagal!`,
-  (a, b) => `🔄 **Ocho Reverse!** ${b} pantulkan balik serangan ${a} — dua-dua masih selamat!`,
-  (a, b) => `👁️ **Seer** ${a} mengintip ${b} secara senyap... suspek makin mencurigakan!`,
-  (a, b) => `🧜‍♀️ **Siren** ${a} cuba memukau ${b}, tapi ${b} sempat tutup telinga!`,
-  (a, b) => `🤝 ${a} dan ${b} buat pakatan rahsia di tepi meja **Table Soccer**!`,
-  (a, b) => `👑 **Princess** ${a} beri amaran keras kepada ${b} di hadapan orang kampung!`,
+  (a, b) => `🛡️ **Knight** ${a} parried a Werewolf ambush aimed at ${b}!`,
+  (a, b) => `💉 **Doctor** ${a} protected ${b} tonight — the attack completely failed!`,
+  (a, b) => `🔄 **Ocho Reverse!** ${b} reflected ${a}'s attack — both survived!`,
+  (a, b) => `👁️ **Seer** ${a} quietly investigated ${b}... looking pretty suspicious!`,
+  (a, b) => `🧜‍♀️ **Siren** ${a} tried to charm ${b}, but ${b} covered their ears just in time!`,
+  (a, b) => `🤝 ${a} and ${b} formed a secret alliance beside the **Table Soccer** table!`,
+  (a, b) => `👑 **Princess** ${a} gave ${b} a stern warning in front of the whole village!`,
+  (a, b) => `💨 ${a} lunged at ${b}, but ${b} dodged at the last second!`,
 ];
 
 function rumbleLabel(currencyType) {
@@ -76,9 +77,10 @@ export function createRumbleSystem({ getWallet }) {
   function rumbleOpenBox(game) {
     const joinBtn = new ButtonBuilder()
       .setCustomId(`join_rumble_${game.currencyType}_${game.totalPrize}`)
-      .setLabel("Join Plato Arena")
+      .setLabel(game.ended ? "Battle Started" : "Join Plato Arena")
       .setEmoji({ id: "1549414525038760069" })
-      .setStyle(ButtonStyle.Secondary);
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(game.ended);
 
     const lines = [
       `🎁 **Total Prize:** ${game.totalPrize.toLocaleString()} ${rumbleLabel(game.currencyType)}`,
@@ -87,7 +89,7 @@ export function createRumbleSystem({ getWallet }) {
 
     if (game.bountyTargetId && game.bountyPrize > 0) {
       lines.push(
-        `🎯 **Bounty Target:** <@${game.bountyTargetId}> *(+${game.bountyPrize.toLocaleString()} ${rumbleLabel(game.currencyType)} untuk yang menumpaskannya!)*`
+        `🎯 **Bounty Target:** <@${game.bountyTargetId}> *(+${game.bountyPrize.toLocaleString()} ${rumbleLabel(game.currencyType)} for whoever eliminates them!)*`
       );
     }
 
@@ -108,18 +110,21 @@ export function createRumbleSystem({ getWallet }) {
     const winnersCount = game.winnersCount || 1;
     const hasBounty = Boolean(game.bountyTargetId && game.bountyPrize > 0);
     const msg = await channel.messages.fetch(msgId).catch(() => null);
-    const edit = (box) =>
-      msg ? msg.edit({ components: [box], flags: V2, allowedMentions: NO_PING }).catch(() => {}) : null;
+
+    // Disable Join button on the original lobby message
+    if (msg) {
+      await msg.edit({ components: [rumbleOpenBox(game)], flags: V2, allowedMentions: NO_PING }).catch(() => {});
+    }
+
+    const sendScene = (title, body) =>
+      channel.send({ components: [info(title, body)], flags: V2, allowedMentions: NO_PING }).catch(() => {});
 
     const players = [...game.participants];
     if (players.length === 0) {
-      await edit(
-        info(
-          `${PLATO_EMOJI}・Plato Arena Ended`,
-          [`🎁 **Prize:** ${prizeText}`, `${WINNER_EMOJI} **Winners:** No participants`, "", "👥 **Players:** 0"].join(NL)
-        )
+      await sendScene(
+        `${PLATO_EMOJI}・Plato Arena Ended`,
+        [`🎁 **Prize:** ${prizeText}`, `${WINNER_EMOJI} **Winners:** No participants`, "", "👥 **Players:** 0"].join(NL)
       );
-      await channel.send("😢 Plato Arena tamat tanpa peserta.").catch(() => {});
       return;
     }
 
@@ -127,23 +132,25 @@ export function createRumbleSystem({ getWallet }) {
     let dead = [];
     let totalRevives = 0;
     let bountyClaimedBy = null;
-    const maxRevives = Math.max(4, Math.floor(players.length * 0.75));
-    const MAX_ROUNDS_BEFORE_SUDDEN_DEATH = 16;
+    const maxRevives = Math.max(4, Math.floor(players.length * 0.9));
+    const MAX_ROUNDS_BEFORE_SUDDEN_DEATH = 14;
 
     if (alive.length > winnersCount) {
       const startLines = [
-        `🐺 **Malam pertama bermula di Plato Arena...**`,
-        `👥 **${players.length}** pemain telah menerima kad role rahsia dan memasuki arena!`,
-        "🎮 Bersedia untuk aksi Werewolf, *revive*, dan kekecohan game Plato!",
+        `🐺 **The first night falls over Plato Arena...**`,
+        `👥 **${players.length}** players have received their secret roles and entered the arena!`,
+        `🎮 Get ready for Werewolf betrayals, epic revives, and Plato game chaos!`,
       ];
       if (hasBounty) {
         startLines.push(
-          `🎯 **BOUNTY AKTIF!** Sesiapa yang menumpaskan <@${game.bountyTargetId}> akan merangkul **${game.bountyPrize.toLocaleString()} ${label}**!`
+          `🎯 **BOUNTY ACTIVE!** Whoever eliminates <@${game.bountyTargetId}> claims **${game.bountyPrize.toLocaleString()} ${label}**!`
         );
       }
-      if (winnersCount > 1) startLines.push(`${WINNER_EMOJI} Hanya **${winnersCount}** terakhir yang bertahan akan menang!`);
-      await edit(info(`${PLATO_EMOJI}・Plato Arena`, startLines.join(NL)));
-      await sleep(5000);
+      if (winnersCount > 1) {
+        startLines.push(`${WINNER_EMOJI} Only the last **${winnersCount}** survivors will win!`);
+      }
+      await sendScene(`${PLATO_EMOJI}・Plato Arena Started`, startLines.join(NL));
+      await sleep(4500);
 
       let round = 0;
       while (alive.length > winnersCount) {
@@ -154,13 +161,14 @@ export function createRumbleSystem({ getWallet }) {
         const phaseTitle = suddenDeath
           ? `🔥 **Sudden Death — Round ${round}**`
           : isNight
-          ? `🌙 **Night ${cycleNum}** *(Fasa Werewolf)*`
-          : `☀️ **Day ${cycleNum}** *(Undian Kampung & Game Plato)*`;
+          ? `🌙 **Round ${round} • Night ${cycleNum}** *(Werewolf Phase)*`
+          : `☀️ **Round ${round} • Day ${cycleNum}** *(Village Vote & Plato Games)*`;
 
         const lines = [];
 
-        // 1) Aksi Revive
-        if (!suddenDeath && dead.length > 0 && totalRevives < maxRevives && Math.random() < 0.55) {
+        // 1) Revive Check (higher chance when few players remain)
+        const reviveChance = alive.length <= winnersCount + 1 ? 0.75 : 0.65;
+        if (!suddenDeath && dead.length > 0 && totalRevives < maxRevives && Math.random() < reviveChance) {
           const reviveCount = dead.length >= 3 && Math.random() < 0.35 ? 2 : 1;
           for (let r = 0; r < reviveCount && dead.length > 0 && totalRevives < maxRevives; r++) {
             const [revived] = dead.splice(Math.floor(Math.random() * dead.length), 1);
@@ -171,8 +179,9 @@ export function createRumbleSystem({ getWallet }) {
           }
         }
 
-        // 2) Aksi Drama / Selamat
-        if (!suddenDeath && alive.length >= 2 && Math.random() < 0.65) {
+        // 2) Drama / Safe Action
+        const dramaChance = alive.length <= 4 ? 0.8 : 0.65;
+        if (!suddenDeath && alive.length >= 2 && Math.random() < dramaChance) {
           const a = pick(alive);
           const others = alive.filter((id) => id !== a);
           if (others.length > 0) {
@@ -180,40 +189,44 @@ export function createRumbleSystem({ getWallet }) {
           }
         }
 
-        // 3) Penyingkiran & Semakan Bounty
-        const maxCanKill = alive.length - winnersCount;
-        const targetKills = suddenDeath
-          ? Math.max(1, Math.min(maxCanKill, Math.ceil(alive.length * 0.35)))
-          : Math.max(1, Math.min(maxCanKill, Math.ceil(alive.length * 0.2)));
+        // 3) Eliminations & Bounty Check (30% chance of a safe/suspense round if drama or revive already happened)
+        const skipKillThisRound = !suddenDeath && lines.length > 0 && Math.random() < 0.3;
 
-        for (let i = 0; i < targetKills && alive.length > winnersCount; i++) {
-          const [victim] = alive.splice(Math.floor(Math.random() * alive.length), 1);
-          dead.push(victim);
-          const v = `<@${victim}>`;
+        if (!skipKillThisRound) {
+          const maxCanKill = alive.length - winnersCount;
+          const targetKills = suddenDeath
+            ? Math.max(1, Math.min(maxCanKill, Math.ceil(alive.length * 0.35)))
+            : Math.max(1, Math.min(maxCanKill, Math.ceil(alive.length * 0.2)));
 
-          if (alive.length > 0 && Math.random() > 0.18) {
-            const killerId = pick(alive);
-            const killer = `<@${killerId}>`;
-            const pool = isNight ? NIGHT_KILL_SCENES : DAY_KILL_SCENES;
-            lines.push(pick(pool)(killer, v));
+          for (let i = 0; i < targetKills && alive.length > winnersCount; i++) {
+            const [victim] = alive.splice(Math.floor(Math.random() * alive.length), 1);
+            dead.push(victim);
+            const v = `<@${victim}>`;
 
-            if (hasBounty && !bountyClaimedBy && victim === game.bountyTargetId) {
-              bountyClaimedBy = killerId;
-              const kw = getWallet(killerId);
-              if (game.currencyType === "coins") kw.coins += game.bountyPrize;
-              else kw.pips += game.bountyPrize;
-              lines.push(
-                `🎯 **BOUNTY CLAIMED!** ${killer} menumpaskan sasaran bounty ${v} dan merangkul **${game.bountyPrize.toLocaleString()} ${label}**!`
-              );
+            if (alive.length > 0 && Math.random() > 0.18) {
+              const killerId = pick(alive);
+              const killer = `<@${killerId}>`;
+              const pool = isNight ? NIGHT_KILL_SCENES : DAY_KILL_SCENES;
+              lines.push(pick(pool)(killer, v));
+
+              if (hasBounty && !bountyClaimedBy && victim === game.bountyTargetId) {
+                bountyClaimedBy = killerId;
+                const kw = getWallet(killerId);
+                if (game.currencyType === "coins") kw.coins += game.bountyPrize;
+                else kw.pips += game.bountyPrize;
+                lines.push(
+                  `🎯 **BOUNTY CLAIMED!** ${killer} eliminated the bounty target ${v} and won **${game.bountyPrize.toLocaleString()} ${label}**!`
+                );
+              }
+            } else {
+              lines.push(pick(SOLO_SCENES)(v));
             }
-          } else {
-            lines.push(pick(SOLO_SCENES)(v));
           }
         }
 
         const shown = lines.slice(0, 8);
         if (lines.length > shown.length) {
-          shown.push(`...dan ${lines.length - shown.length} lagi kejadian berlaku dalam kekecohan.`);
+          shown.push(`...and ${lines.length - shown.length} more chaotic events unfolded.`);
         }
 
         const roundBody = [
@@ -221,11 +234,11 @@ export function createRumbleSystem({ getWallet }) {
           "",
           shown.join(NL),
           "",
-          `👥 **Masih hidup:** ${alive.length}  •  💀 **Tersingkir:** ${dead.length}`,
+          `👥 **Alive:** ${alive.length}  •  💀 **Eliminated:** ${dead.length}`,
         ].join(NL);
 
-        await edit(info(`${PLATO_EMOJI}・Plato Arena`, roundBody));
-        if (alive.length > winnersCount) await sleep(6000);
+        await sendScene(`${PLATO_EMOJI}・Plato Arena`, roundBody);
+        if (alive.length > winnersCount) await sleep(5500);
       }
       await sleep(2500);
     }
@@ -255,27 +268,27 @@ export function createRumbleSystem({ getWallet }) {
     if (hasBounty) {
       if (bountyClaimedBy) {
         endLines.push(
-          `🎯 **Bounty Hunter:** <@${bountyClaimedBy}> *(+${game.bountyPrize.toLocaleString()} ${label} kerana menumpaskan <@${game.bountyTargetId}>)*`
+          `🎯 **Bounty Hunter:** <@${bountyClaimedBy}> *(+${game.bountyPrize.toLocaleString()} ${label} for eliminating <@${game.bountyTargetId}>)*`
         );
       } else if (winners.includes(game.bountyTargetId)) {
-        endLines.push(`🎯 **Bounty:** <@${game.bountyTargetId}> berjaya bertahan hingga tamat!`);
+        endLines.push(`🎯 **Bounty:** <@${game.bountyTargetId}> survived until the very end!`);
       } else {
-        endLines.push(`🎯 **Bounty:** Tidak dituntut *(sasaran tersingkir secara solo / tidak menyertai)*`);
+        endLines.push(`🎯 **Bounty:** Unclaimed *(target was eliminated solo / did not join)*`);
       }
     }
 
     endLines.push("", `👥 **Players:** ${players.length}  •  ✨ **Total Revives:** ${totalRevives}`);
 
-    await edit(info(`${PLATO_EMOJI}・Plato Arena Ended`, endLines.join(NL)));
+    await sendScene(`${PLATO_EMOJI}・Plato Arena Ended`, endLines.join(NL));
 
     const announceLines = [
       winners.length === 1
-        ? `${WINNER_EMOJI} <@${winners[0]}> memenangi **${prizeText}** di **Plato Arena**!`
-        : `${WINNER_EMOJI} ${winnerMentions} memenangi **${prizeText}** di **Plato Arena**!${shareText}`,
+        ? `${WINNER_EMOJI} <@${winners[0]}> won **${prizeText}** in **Plato Arena**!`
+        : `${WINNER_EMOJI} ${winnerMentions} won **${prizeText}** in **Plato Arena**!${shareText}`,
     ];
     if (bountyClaimedBy) {
       announceLines.push(
-        `🎯 <@${bountyClaimedBy}> turut merangkul hadiah bounty **${game.bountyPrize.toLocaleString()} ${label}** kerana menumpaskan <@${game.bountyTargetId}>!`
+        `🎯 <@${bountyClaimedBy}> also claimed the **${game.bountyPrize.toLocaleString()} ${label}** bounty for eliminating <@${game.bountyTargetId}>!`
       );
     }
 
