@@ -64,7 +64,7 @@ export function buildLevelUpBox(member, newLevel, totalExp) {
   const avatarUrl = member.user.displayAvatarURL({ extension: "png", size: 256 });
   const headerAndBody = [
     "### ˚₊‧꒰ა <a:PinkCrown:1549417235393683681> 𝐿𝐸𝑉𝐸𝐿 𝑈𝑃! <a:PinkCrown:1549417235393683681> ໒꒱‧₊˚",
-    `<a:a_sparkle7:1563423627263877200> ╰┈➤ Congratulations ${member}! You just advanced to Level ${newLevel} with ${totalExp.toLocaleString()} XP!`,
+    `<a:a_sparkle7:1563423627263877200> ╰┈➤ Congratulations ${member}! You just advanced to **Level ${newLevel}** with **${totalExp.toLocaleString()} XP**!`,
   ].join(NL);
 
   const section = new SectionBuilder()
