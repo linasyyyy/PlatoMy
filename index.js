@@ -176,8 +176,9 @@ client.once(Events.ClientReady, async (c) => {
 
   resumeGiveaways();
 
+  // Auto-update leaderboard setiap 30 minit
   cron.schedule(
-    "*/10 * * * *",
+    "*/30 * * * *",
     async () => {
       const configs = await getLeaderboardConfigs();
       for (const [category, cfg] of Object.entries(configs)) {
@@ -194,6 +195,7 @@ client.once(Events.ClientReady, async (c) => {
             flags: V2,
           });
           console.log(`✅ Auto-update leaderboard [${category}] berjaya!`);
+          await sleep(1500);
         } catch (err) {
           console.error(`Ralat auto-update leaderboard [${category}]:`, err);
         }
@@ -555,7 +557,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           const attachment = await generateLeaderboardImage(category);
           await msg.edit({ components: [buildLeaderboardBox(category)], files: [attachment], attachments: [], flags: V2 });
           return interaction.editReply({
-            content: `✅ **${meta.label}** berjaya ditetapkan di <#${interaction.channel.id}> (disimpan ke Neon) dan akan auto-update setiap 10 minit!`,
+            content: `✅ **${meta.label}** berjaya ditetapkan di <#${interaction.channel.id}> (disimpan ke Neon) dan akan auto-update setiap 30 minit!`,
           });
         } catch (err) {
           console.error("Leaderboard generation error:", err);
@@ -1195,6 +1197,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.deferred || interaction.replied) await interaction.followUp(msg).catch(() => {});
     else await interaction.reply(msg).catch(() => {});
   }
+});
+
+// ================= CRASH SHIELD =================
+process.on("unhandledRejection", (err) => {
+  console.error("Unhandled Rejection:", err);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception:", err);
 });
 
 client.login(token).catch((err) => {
